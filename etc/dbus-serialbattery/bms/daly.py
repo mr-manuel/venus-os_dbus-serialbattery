@@ -143,20 +143,20 @@ class Daly(Battery):
                         + "s"
                     )
 
-                result = result and self.read_cells_volts(ser)
+                result = result and self.read_balance_state(ser)
                 if self.runtime > 0.200:  # TROUBLESHOOTING for no reply errors
                     logger.info(
-                        "  |- refresh_data: read_cells_volts - result: "
+                        "  |- refresh_data: read_balance_state - result: "
                         + str(result)
                         + " - runtime: "
                         + str(self.runtime)
                         + "s"
                     )
 
-                result = result and self.read_balance_state(ser)
+                result = result and self.read_cells_volts(ser)
                 if self.runtime > 0.200:  # TROUBLESHOOTING for no reply errors
                     logger.info(
-                        "  |- refresh_data: read_balance_state - result: "
+                        "  |- refresh_data: read_cells_volts - result: "
                         + str(result)
                         + " - runtime: "
                         + str(self.runtime)
@@ -245,57 +245,57 @@ class Daly(Battery):
 
         if al_volt & 48:
             # High voltage levels - Alarm
-            self.voltage_high = 2
+            self.protection.voltage_high = 2
         elif al_volt & 15:
             # High voltage Warning levels - Pre-alarm
-            self.voltage_high = 1
+            self.protection.voltage_high = 1
         else:
-            self.voltage_high = 0
+            self.protection.voltage_high = 0
 
         if al_volt & 128:
             # Low voltage level - Alarm
-            self.voltage_low = 2
+            self.protection.voltage_low = 2
         elif al_volt & 64:
             # Low voltage Warning level - Pre-alarm
-            self.voltage_low = 1
+            self.protection.voltage_low = 1
         else:
-            self.voltage_low = 0
+            self.protection.voltage_low = 0
 
         if al_temp & 2:
             # High charge temp - Alarm
-            self.temp_high_charge = 2
+            self.protection.temp_high_charge = 2
         elif al_temp & 1:
             # High charge temp - Pre-alarm
-            self.temp_high_charge = 1
+            self.protection.temp_high_charge = 1
         else:
-            self.temp_high_charge = 0
+            self.protection.temp_high_charge = 0
 
         if al_temp & 8:
             # Low charge temp - Alarm
-            self.temp_low_charge = 2
+            self.protection.temp_low_charge = 2
         elif al_temp & 4:
             # Low charge temp - Pre-alarm
-            self.temp_low_charge = 1
+            self.protection.temp_low_charge = 1
         else:
-            self.temp_low_charge = 0
+            self.protection.temp_low_charge = 0
 
         if al_temp & 32:
             # High discharge temp - Alarm
-            self.temp_high_discharge = 2
+            self.protection.temp_high_discharge = 2
         elif al_temp & 16:
             # High discharge temp - Pre-alarm
-            self.temp_high_discharge = 1
+            self.protection.temp_high_discharge = 1
         else:
-            self.temp_high_discharge = 0
+            self.protection.temp_high_discharge = 0
 
         if al_temp & 128:
             # Low discharge temp - Alarm
-            self.temp_low_discharge = 2
+            self.protection.temp_low_discharge = 2
         elif al_temp & 64:
             # Low discharge temp - Pre-alarm
-            self.temp_low_discharge = 1
+            self.protection.temp_low_discharge = 1
         else:
-            self.temp_low_discharge = 0
+            self.protection.temp_low_discharge = 0
 
         # if al_crnt_soc & 2:
         #    # High charge current - Alarm
@@ -317,21 +317,21 @@ class Daly(Battery):
 
         if al_crnt_soc & 2 or al_crnt_soc & 8:
             # High charge/discharge current - Alarm
-            self.current_over = 2
+            self.protection.current_over = 2
         elif al_crnt_soc & 1 or al_crnt_soc & 4:
             # High charge/discharge current - Pre-alarm
-            self.current_over = 1
+            self.protection.current_over = 1
         else:
-            self.current_over = 0
+            self.protection.current_over = 0
 
         if al_crnt_soc & 128:
             # Low SoC - Alarm
-            self.soc_low = 2
+            self.protection.soc_low = 2
         elif al_crnt_soc & 64:
             # Low SoC Warning level - Pre-alarm
-            self.soc_low = 1
+            self.protection.soc_low = 1
         else:
-            self.soc_low = 0
+            self.protection.soc_low = 0
 
         return True
 
@@ -356,7 +356,9 @@ class Daly(Battery):
                 ser, buffer, self.LENGTH_POS, 0, lenFixed
             )
             if cells_volts_data is False:
-                logger.warning("No data received in read_cells_volts()")
+                logger.debug(
+                    "No data received in read_cells_volts()"
+                )  # just debug level, as there are DALY BMS that send broken packages occasionally
                 return False
 
             frameCell = [0, 0, 0]
@@ -595,7 +597,7 @@ class Daly(Battery):
             )
             return False
 
-    # Read data from previously openned serial port
+    # Read data from previously opened serial port
     def read_serialport_data(
         self,
         ser,
@@ -610,6 +612,7 @@ class Daly(Battery):
             # if you see a lot of errors, try to increase in steps of 0.005
             sleep(0.020)
 
+            time_run = 0
             time_start = time()
             ser.flushOutput()
             ser.flushInput()
@@ -630,7 +633,7 @@ class Daly(Battery):
                 time_run = time() - time_start
                 if time_run > 0.500:
                     self.runtime = time_run
-                    logger.error(">>> ERROR: No reply - returning")
+                    logger.warning(">>> ERROR: No reply - returning")
                     return False
 
             # logger.info('serial data toread ' + str(toread))
@@ -660,13 +663,13 @@ class Daly(Battery):
                 time_run = time() - time_start
                 if time_run > 0.500:
                     self.runtime = time_run
-                    logger.error(
-                        ">>> ERROR: No reply - returning [len:"
+                    logger.warning(
+                        "No reply - returning [len:"
                         + str(len(data))
                         + "/"
                         + str(length + length_check)
                         + "]"
-                    )
+                    )  # just a warning, as there are DALY BMS that send broken packages occasionally
                     return False
 
             self.runtime = time_run
@@ -733,3 +736,4 @@ class Daly(Battery):
         if reply[4] != 1:
             logger.error("write soc failed")
         return True
+
