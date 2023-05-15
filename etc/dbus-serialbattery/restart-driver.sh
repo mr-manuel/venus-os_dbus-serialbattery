@@ -2,6 +2,7 @@
 
 # remove comment for easier troubleshooting
 #set -x
+DRIVERNAME=dbus-serialbattery
 
 # copy config.ini in case it was changed
 cp -f /data/etc/dbus-serialbattery/config.ini /opt/victronenergy/dbus-serialbattery/config.ini
