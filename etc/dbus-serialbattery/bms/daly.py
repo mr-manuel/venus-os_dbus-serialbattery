@@ -506,33 +506,6 @@ class Daly(Battery):
             )
         return True
 
-    def generate_command(self, command):
-        buffer = bytearray(self.command_base)
-        buffer[1] = self.command_address[0]  # Always serial 40 or 80
-        buffer[2] = command[0]
-        buffer[12] = sum(buffer[:12]) & 0xFF  # checksum calc
-        return buffer
-
-    def request_data(self, ser, command, sentences_to_receive=1):
-        # wait shortly, else the Daly is not ready and throws a lot of no reply errors
-        # if you see a lot of errors, try to increase in steps of 0.005
-        sleep(0.020)
-
-        self.runtime = 0
-        time_start = time()
-        ser.flushOutput()
-        ser.flushInput()
-        ser.write(self.generate_command(command))
-
-        reply = bytearray()
-        for _ in range(sentences_to_receive):
-            next = self.read_sentence(ser, command)
-            if not next:
-                return False
-            reply += next
-        self.runtime = time() - time_start
-        return reply
-
     def reset_soc_callback(self, path, value):
         if value is None:
             return False
@@ -582,6 +555,34 @@ class Daly(Battery):
             logger.error("write soc failed")
         return True
 
+    def generate_command(self, command):
+        buffer = bytearray(self.command_base)
+        buffer[1] = self.command_address[0]  # Always serial 40 or 80
+        buffer[2] = command[0]
+        buffer[12] = sum(buffer[:12]) & 0xFF  # checksum calc
+        return buffer
+
+    def request_data(self, ser, command, sentences_to_receive=1):
+        # wait shortly, else the Daly is not ready and throws a lot of no reply errors
+        # if you see a lot of errors, try to increase in steps of 0.005
+        sleep(0.020)
+
+        self.runtime = 0
+        time_start = time()
+        ser.flushOutput()
+        ser.flushInput()
+        ser.write(self.generate_command(command))
+
+        reply = bytearray()
+        for i in range(sentences_to_receive):
+            next = self.read_sentence(ser, command)
+            if not next:
+                logger.warning(f"request_data: bad reply no. {i}")
+                return False
+            reply += next
+        self.runtime = time() - time_start
+        return reply
+
     def read_sentence(self, ser, expected_reply, timeout=0.5):
         """read one 13 byte sentence from daly smart bms.
         return false if less than 13 bytes received in timeout secs, or frame errors occured
@@ -591,7 +592,9 @@ class Daly(Battery):
 
         reply = ser.read_until(b"\xA5")
         if not reply or b"\xA5" not in reply:
-            logger.error("read_sentence: no sentence start received")
+            logger.error(
+                f"read_sentence {bytes(expected_reply).hex()}: no sentence start received"
+            )
             return False
 
         idx = reply.index(b"\xA5")
@@ -602,7 +605,7 @@ class Daly(Battery):
             toread = ser.inWaiting()
             time_run = time() - time_start
             if time_run > timeout:
-                logger.warning("read_sentence timeout")
+                logger.warning(f"read_sentence {bytes(expected_reply).hex()}: timeout")
                 return False
 
         reply += ser.read(12)
@@ -610,13 +613,15 @@ class Daly(Battery):
 
         # logger.info(f"reply: {bytes(reply).hex()}")  # debug
 
-        if id != 1 or length != 8 or cmd != int.from_bytes(expected_reply, "big"):
-            logger.error("read_sentence wrong header")
+        if id != 1 or length != 8 or cmd != expected_reply[0]:
+            logger.error(f"read_sentence {bytes(expected_reply).hex()}: wrong header")
             return False
 
         chk = unpack_from(">B", reply, 12)[0]
         if sum(reply[:12]) & 0xFF != chk:
-            logger.warning("read_sentence wrong checksum")
+            logger.warning(
+                f"read_sentence {bytes(expected_reply).hex()}: wrong checksum"
+            )
             return False
 
         return reply[4:12]
