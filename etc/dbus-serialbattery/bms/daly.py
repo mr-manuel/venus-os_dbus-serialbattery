@@ -89,7 +89,7 @@ class Daly(Battery):
                         "  |- refresh_data: read_soc_data - result: "
                         + str(result)
                         + " - runtime: "
-                        + str(self.runtime)
+                        + str(f"{self.runtime:.1f}")
                         + "s"
                     )
 
@@ -99,7 +99,7 @@ class Daly(Battery):
                         "  |- refresh_data: read_fed_data - result: "
                         + str(result)
                         + " - runtime: "
-                        + str(self.runtime)
+                        + str(f"{self.runtime:.1f}")
                         + "s"
                     )
 
@@ -109,7 +109,7 @@ class Daly(Battery):
                         "  |- refresh_data: read_cell_voltage_range_data - result: "
                         + str(result)
                         + " - runtime: "
-                        + str(self.runtime)
+                        + str(f"{self.runtime:.1f}")
                         + "s"
                     )
 
@@ -119,7 +119,7 @@ class Daly(Battery):
                         "  |- refresh_data: write_soc_and_datetime - result: "
                         + str(result)
                         + " - runtime: "
-                        + str(self.runtime)
+                        + str(f"{self.runtime:.1f}")
                         + "s"
                     )
 
@@ -129,7 +129,7 @@ class Daly(Battery):
                         "  |- refresh_data: read_alarm_data - result: "
                         + str(result)
                         + " - runtime: "
-                        + str(self.runtime)
+                        + str(f"{self.runtime:.1f}")
                         + "s"
                     )
 
@@ -139,7 +139,7 @@ class Daly(Battery):
                         "  |- refresh_data: read_temperature_range_data - result: "
                         + str(result)
                         + " - runtime: "
-                        + str(self.runtime)
+                        + str(f"{self.runtime:.1f}")
                         + "s"
                     )
 
@@ -149,7 +149,7 @@ class Daly(Battery):
                         "  |- refresh_data: read_balance_state - result: "
                         + str(result)
                         + " - runtime: "
-                        + str(self.runtime)
+                        + str(f"{self.runtime:.1f}")
                         + "s"
                     )
 
@@ -159,7 +159,7 @@ class Daly(Battery):
                         "  |- refresh_data: read_cells_volts - result: "
                         + str(result)
                         + " - runtime: "
-                        + str(self.runtime)
+                        + str(f"{self.runtime:.1f}")
                         + "s"
                     )
 
@@ -501,39 +501,19 @@ class Daly(Battery):
 
     # new
     def read_battery_code(self, ser):
-        lenFixed = (
-            5 * 13
-        )  # batt code field is 35 bytes and we transfer 7 bytes in each telegram
-        data = self.read_serialport_data(
-            ser,
-            self.generate_command(self.command_batt_code),
-            self.LENGTH_POS,
-            0,
-            lenFixed,
-        )
+        data = self.read_serial_data_daly(ser, self.command_batt_code, sentences_to_receive=5)
 
         if data is False:
             logger.warning("No data received in read_battery_code()")
             return False
 
-        bufIdx = 0
         battery_code = ""
         # logger.warning("data " + bytes(cells_volts_data).hex())
-        while (
-            bufIdx <= len(data) - 13
-        ):  # we at least need 13 bytes to extract the identifiers + 8 bytes payload + checksum
-            b1, b2, b3, b4 = unpack_from(">BBBB", data, bufIdx)
-            if b1 == 0xA5 and b2 == 0x01 and b3 == 0x57 and b4 == 0x08:
-                _, part, chk = unpack_from(">B7sB", data, bufIdx + 4)
-                if sum(data[bufIdx : bufIdx + 12]) & 0xFF != chk:
-                    logger.warning(
-                        "bad battery code checksum"
-                    )  # use string anyhow, just warn
-                battery_code += part.decode("utf-8")
-                bufIdx += 13  # BBBBB7sB -> 13 byte
-            else:
-                bufIdx += 1  # step through buffer to find valid start
-                logger.warning("bad battery code header")
+        for i in range(5):
+            nr, part = unpack_from(">B7s", data, i * 8)
+            if nr != i + 1:
+                logger.warning("bad battery code index")  # use string anyhow, just warn
+            battery_code += part.decode("utf-8")
 
         if battery_code != "":
             self.custom_field = sub(
@@ -555,47 +535,25 @@ class Daly(Battery):
         buffer[12] = sum(buffer[:12]) & 0xFF  # checksum calc
         return buffer
 
-    def read_serial_data_daly(self, ser, command):
-        data = self.read_serialport_data(
-            ser, self.generate_command(command), self.LENGTH_POS, self.LENGTH_CHECK
-        )
-        if data is False:
-            logger.info("No reply to cmd " + bytes(command).hex())
-            return False
+    def read_serial_data_daly(self, ser, command, sentences_to_receive=1):
+        # wait shortly, else the Daly is not ready and throws a lot of no reply errors
+        # if you see a lot of errors, try to increase in steps of 0.005
+        sleep(0.020)
 
-        if len(data) <= 12:
-            logger.debug("Too short reply to cmd " + bytes(command).hex())
-            return False
+        self.runtime = 0
+        time_start = time()
+        ser.flushOutput()
+        ser.flushInput()
+        ser.write(self.generate_command(command))
 
-        # search sentence start
-        try:
-            idx = data.index(0xA5)
-        except ValueError:
-            logger.debug(
-                "No Sentence Start found for reply to cmd " + bytes(command).hex()
-            )
-            return False
-
-        if len(data[idx:]) <= 12:
-            logger.debug("Too short reply to cmd " + bytes(command).hex())
-            return False
-
-        if data[12 + idx] != sum(data[idx : 12 + idx]) & 0xFF:
-            logger.debug("Bad checksum in reply to cmd " + bytes(command).hex())
-            return False
-
-        _, _, _, length = unpack_from(">BBBB", data, idx)
-
-        if length == 8:
-            return data[4 + idx : length + 4 + idx]
-        else:
-            logger.debug(
-                ">>> ERROR: Incorrect Reply to CMD "
-                + bytes(command).hex()
-                + ": 0x"
-                + bytes(data).hex()
-            )
-            return False
+        reply = bytearray()
+        for _ in range(sentences_to_receive):
+            next = self.read_sentence(ser, command)
+            if not next:
+                return False
+            reply += next
+        self.runtime = time() - time_start
+        return reply
 
     # Read data from previously opened serial port
     def read_serialport_data(
@@ -737,3 +695,43 @@ class Daly(Battery):
             logger.error("write soc failed")
         return True
 
+    """ read one 13 byte sentence from daly smart bms. 
+        return false if less than 13 bytes received in timeout secs or frame errors occured
+        return received bytearray else
+    """
+
+    def read_sentence(self, ser, expected_reply, timeout=0.5):
+        time_start = time()
+
+        reply = ser.read_until(b"\xA5")
+        if not reply or b"\xA5" not in reply:
+            logger.error("read_sentence: no sentence start received")
+            return False
+
+        idx = reply.index(b"\xA5")
+        reply = reply[idx:]
+        toread = ser.inWaiting()
+        while toread < 12:
+            logger.info(f"sleep for: {12- toread} ms")  # debug
+            sleep((12 - toread) * 0.001)
+            toread = ser.inWaiting()
+            time_run = time() - time_start
+            if time_run > timeout:
+                logger.warning("read_sentence timeout")
+                return False
+
+        reply += ser.read(12)
+        _, id, cmd, length = unpack_from(">BBBB", reply)
+
+        logger.info(f"reply: {bytes(reply).hex()}")  # debug
+
+        if id != 1 or length != 8 or cmd != int.from_bytes(expected_reply, "big"):
+            logger.error("read_sentence wrong header")
+            return False
+
+        chk = unpack_from(">B", reply, 12)[0]
+        if sum(reply[:12]) & 0xFF != chk:
+            logger.warning("read_sentence wrong checksum")
+            return False
+
+        return reply[4:12]
