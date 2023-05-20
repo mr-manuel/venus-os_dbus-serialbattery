@@ -20,6 +20,7 @@
 * Added: Daly BMS - Read production date and build unique identifier by @transistorgit
 * Added: Daly BMS - Set SoC by @transistorgit
 * Added: Daly BMS - Show "battery code" field that can be set in the Daly app by @transistorgit
+* Added: Daly BMS - Discharge / Charge Mosfet switching over remote console/GUI https://github.com/Louisvdw/dbus-serialbattery/issues/26 by @transistorgit
 * Added: Device name field (found in the GUI -> SerialBattery -> Device), that show a custom string that can be set in some BMS, if available by @mr-manuel
 * Added: Driver uninstall script by @mr-manuel
 * Added: Rename TAR file after USB/SD card install to not overwrite the data on every reboot https://github.com/Louisvdw/dbus-serialbattery/issues/638 by @mr-manuel
@@ -76,6 +77,7 @@
 * Changed: Fix for https://github.com/Louisvdw/dbus-serialbattery/issues/397 by @transistorgit
 * Changed: Fix for https://github.com/Louisvdw/dbus-serialbattery/issues/421 by @mr-manuel
 * Changed: Fix for https://github.com/Louisvdw/dbus-serialbattery/issues/450 by @mr-manuel
+* Changed: Fix for https://github.com/Louisvdw/dbus-serialbattery/issues/648 by @mr-manuel
 * Changed: Fixed black lint errors by @mr-manuel
 * Changed: Fixed cell balancing background for cells 17-24 by @mr-manuel
 * Changed: Fixed cell balancing display for JBD/LLT BMS https://github.com/Louisvdw/dbus-serialbattery/issues/359 by @mr-manuel
