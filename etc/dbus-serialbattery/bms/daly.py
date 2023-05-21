@@ -342,18 +342,21 @@ class Daly(Battery):
         if self.cell_count is None:
             return True
 
+        # calculate how many sentences we will receive
+        # in each sentence, the bms will send 3 cell voltages
+        # so for a 4s, we will receive 2 sentences
         if (int(self.cell_count) % 3) == 0:
-            sentence_cnt = int(self.cell_count / 3)
+            sentences_expected = int(self.cell_count / 3)
         else:
-            sentence_cnt = int(self.cell_count / 3) + 1
+            sentences_expected = int(self.cell_count / 3) + 1
 
         cells_volts_data = self.request_data(
-            ser, self.command_cell_volts, sentences_to_receive=sentence_cnt
+            ser, self.command_cell_volts, sentences_to_receive=sentences_expected
         )
 
         if cells_volts_data is False:
             logger.debug(
-                "No data received in read_cells_volts()"
+                "No or invalid data has been received in read_cells_volts()"
             )  # just debug level, as there are DALY BMS that send broken packages occasionally
             return False
 
@@ -369,7 +372,8 @@ class Daly(Battery):
 
         # logger.warning("data " + bytes(cells_volts_data).hex())
 
-        for i in range(sentence_cnt):
+        # from each of the received sentences, read up to 3 voltages
+        for i in range(sentences_expected):
             (
                 frame,
                 frameCell[0],
@@ -384,7 +388,6 @@ class Daly(Battery):
                 self.cells[cellnum].voltage = (
                     None if cellVoltage < lowMin else cellVoltage
                 )
-
         return True
 
     def read_cell_voltage_range_data(self, ser):
