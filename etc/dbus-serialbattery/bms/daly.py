@@ -21,7 +21,7 @@ class Daly(Battery):
         self.poll_interval = 1000
         self.type = self.BATTERYTYPE
         self.has_settings = 1
-        self.reset_soc = 100
+        self.reset_soc = 0
         self.soc_to_set = None
         self.runtime = 0  # TROUBLESHOOTING for no reply errors
         self.trigger_force_disable_discharge = None
@@ -85,6 +85,7 @@ class Daly(Battery):
         try:
             with open_serial_port(self.port, self.baud_rate) as ser:
                 result = self.read_soc_data(ser)
+                self.reset_soc = self.soc if self.soc else 0
                 if self.runtime > 0.200:  # TROUBLESHOOTING for no reply errors
                     logger.info(
                         "  |- refresh_data: read_soc_data - result: "
