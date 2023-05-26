@@ -365,11 +365,11 @@ class Daly(Battery):
             return False
         elif cells_volts_data is False:
             # memorize that this read was bad and bail out, ignoring it
-            self.cell_volts_data_lastreadbad = True
+            self.cells_volts_data_lastreadbad = True
             return True
         else:
             # this read was good, so reset error flag
-            self.cell_volts_data_lastreadbad = False
+            self.cells_volts_data_lastreadbad = False
 
         frameCell = [0, 0, 0]
         lowMin = utils.MIN_CELL_VOLTAGE / 2
