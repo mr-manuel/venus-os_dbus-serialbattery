@@ -35,7 +35,7 @@ def _get_list_from_config(
 # if not specified: baud = 9600
 
 # Constants - Need to dynamically get them in future
-DRIVER_VERSION = "1.0.20230518dev"
+DRIVER_VERSION = "1.0.20230525dev"
 zero_char = chr(48)
 degree_sign = "\N{DEGREE SIGN}"
 
@@ -294,6 +294,12 @@ TEMP_1_NAME = config["DEFAULT"]["TEMP_1_NAME"]
 # Temperature sensor 2 name
 TEMP_2_NAME = config["DEFAULT"]["TEMP_2_NAME"]
 
+# Temperature sensor 3 name
+TEMP_3_NAME = config["DEFAULT"]["TEMP_3_NAME"]
+
+# Temperature sensor 2 name
+TEMP_4_NAME = config["DEFAULT"]["TEMP_4_NAME"]
+
 
 # --------- BMS specific settings ---------
 
@@ -314,6 +320,11 @@ GREENMETER_ADDRESS = int(config["DEFAULT"]["GREENMETER_ADDRESS"])
 LIPRO_START_ADDRESS = int(config["DEFAULT"]["LIPRO_START_ADDRESS"])
 LIPRO_END_ADDRESS = int(config["DEFAULT"]["LIPRO_END_ADDRESS"])
 LIPRO_CELL_COUNT = int(config["DEFAULT"]["LIPRO_CELL_COUNT"])
+
+# -- HeltecModbus device settings
+HELTEC_MODBUS_ADDR = _get_list_from_config(
+    "DEFAULT", "HELTEC_MODBUS_ADDR", lambda v: int(v)
+)
 
 
 # --------- Battery monitor specific settings ---------
