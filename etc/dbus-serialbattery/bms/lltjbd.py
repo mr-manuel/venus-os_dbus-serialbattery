@@ -582,16 +582,24 @@ class LltJbd(Battery):
         self.min_battery_voltage = utils.MIN_CELL_VOLTAGE * self.cell_count
 
         # 0 = MOS, 1 = temp 1, 2 = temp 2
-        for t in range(self.temp_sensors):
-            if len(gen_data) < 23 + (2 * t) + 2:
-                logger.warn(
-                    "Expected %d temperature sensors, but received only %d sensor readings!",
-                    self.temp_sensors,
-                    t,
-                )
-                return True
-            temp1 = unpack_from(">H", gen_data, 23 + (2 * t))[0]
-            self.to_temp(t, utils.kelvin_to_celsius(temp1 / 10))
+
+        # if there are more temperature sensors, loop through them
+        if self.temp_sensors > 1:
+            for t in range(self.temp_sensors):
+                if len(gen_data) < 23 + (2 * t) + 2:
+                    logger.warn(
+                        "Expected %d temperature sensors, but received only %d sensor readings!",
+                        self.temp_sensors,
+                        t,
+                    )
+                    return True
+                temperature = unpack_from(">H", gen_data, 23 + (2 * t))[0]
+                self.to_temp(t, utils.kelvin_to_celsius(temperature / 10))
+
+        # if there is one temperature sensor only, use it as the battery temperature
+        elif self.temp_sensors == 1:
+            temperature = unpack_from(">H", gen_data, 23 + (2))[0]
+            self.to_temp(1, utils.kelvin_to_celsius(self.temp1))
 
         return True
 
