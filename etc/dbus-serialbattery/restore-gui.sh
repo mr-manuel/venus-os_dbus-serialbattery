@@ -24,9 +24,7 @@ if [ -f /opt/victronenergy/gui/qml/PageLynxIonIo.qml.backup ]; then
     echo "PageLynxIonIo.qml was restored."
 fi
 
-#stop gui
-svc -d /service/gui
-#sleep 1 sec
-sleep 1
-#start gui
-svc -u /service/gui
+service_path="/service/start-gui"
+if [ -d $service_path ] && [ -f "$service_path/supervise/status" ]; then
+    svc -d -u "$service_path"
+fi
