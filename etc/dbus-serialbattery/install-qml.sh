@@ -121,9 +121,10 @@ fi
 
 # if files changed, restart gui
 if [ $filesChanged -gt 0 ]; then
+    echo "New QML files were installed"
     service_path="/service/start-gui"
     if [ -d $service_path ] && [ -f "$service_path/supervise/status" ]; then
         svc -d -u "$service_path"
+        echo "The GUI was restarted"
     fi
-    echo "New QML files were installed and the GUI was restarted."
 fi
