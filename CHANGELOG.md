@@ -6,6 +6,10 @@
 
 ## Breaking changes
 
+* Driver version greater or equal to `v1.4.20240625beta`
+
+  * `Lifepower` was renamed to `EG4_Lifepower`. You need to change it, if you have specified it in the `config.ini`.
+
 * Driver version greater or equal to `v1.2.20240219beta`
 
   * The temperature limitation variables where changed to match the other variable names.
@@ -54,16 +58,23 @@
   * `BULK_AFTER_DAYS` -> `SOC_RESET_AFTER_DAYS`
 
 
-## v1.3.x
+## v1.4.x
 * Added: Automatically increase polling time, if polling take too long by @mr-manuel
-* Added: Fields for debugging switch to float/bulk by @mr-manuel
+* Added: EG4 LL BMS by @tuxntoast
+* Added: JKBMS PB Model with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/39 by @KoljaWindeler
 * Added: Multiple BMS on one USB to RS485/Modbus adapter now possible. The BMS needs to be able to set different addresses to each battery by @mr-manuel
+* Added: Show details about driver internals in GUI -> Serialbattery -> Parameters by setting `GUI_PARAMETERS_SHOW_ADDITIONAL_INFO` to `True` by @mr-manuel
+* Changed: Optimized code and error handling by @mr-manuel
+* Changed: Renamed Lifepower to EG4_Lifepower by @mr-manuel
+
+## v1.3.20240624
+* Added: Fields for debugging switch to float/bulk by @mr-manuel
 * Added: Possibility to add custom polling interval to reduce the CPU load. Fixes https://github.com/Louisvdw/dbus-serialbattery/issues/1022 by @mr-manuel
 * Added: Possibility to select if min/max battery voltage, CVL, CCL and DCL are used from driver or BMS. Fixes https://github.com/Louisvdw/dbus-serialbattery/issues/1056 by @mr-manuel
 * Added: Possibility to use port name as unique identifier https://github.com/Louisvdw/dbus-serialbattery/issues/1035 by @mr-manuel
 * Added: Show in the remote console/GUI if a non blocking error was triggered by @mr-manuel
 * Added: Use current measurement from other dbus path by @mr-manuel
-* Changed: Daly BMS CAN - Prevent recognition if this BMS, if there is none connected by @mr-manuel
+* Changed: Daly BMS CAN - Prevent recognition of this BMS, if it's not connected by @mr-manuel
 * Changed: Fixed failed GUI restart on some GX devices by @SenH
 * Changed: Fixed problem with I-Controller https://github.com/Louisvdw/dbus-serialbattery/issues/1041 by @mr-manuel
 * Changed: Fixed problem with linear limitation disabled https://github.com/Louisvdw/dbus-serialbattery/issues/1037 by @mr-manuel

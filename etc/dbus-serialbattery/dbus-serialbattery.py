@@ -27,10 +27,12 @@ import math
 # import battery classes
 from bms.daly import Daly
 from bms.ecs import Ecs
+from bms.eg4_lifepower import EG4_Lifepower
+from bms.eg4_ll import EG4_LL
 from bms.heltecmodbus import HeltecModbus
 from bms.hlpdatabms4s import HLPdataBMS4S
 from bms.jkbms import Jkbms
-from bms.lifepower import Lifepower
+from bms.jkbms_pb import Jkbms_pb
 from bms.lltjbd import LltJbd
 from bms.renogy import Renogy
 from bms.seplos import Seplos
@@ -48,10 +50,12 @@ supported_bms_types = [
     {"bms": Daly, "baud": 9600, "address": b"\x40"},
     {"bms": Daly, "baud": 9600, "address": b"\x80"},
     {"bms": Ecs, "baud": 19200},
+    {"bms": EG4_Lifepower, "baud": 9600},
+    {"bms": EG4_LL, "baud": 9600, "address": b"\x7C"},
     {"bms": HeltecModbus, "baud": 9600},
     {"bms": HLPdataBMS4S, "baud": 9600},
     {"bms": Jkbms, "baud": 115200},
-    {"bms": Lifepower, "baud": 9600},
+    {"bms": Jkbms_pb, "baud": 115200, "address": b"\x01"},
     {"bms": LltJbd, "baud": 9600},
     {"bms": Renogy, "baud": 9600, "address": b"\x30"},
     {"bms": Renogy, "baud": 9600, "address": b"\xF7"},
