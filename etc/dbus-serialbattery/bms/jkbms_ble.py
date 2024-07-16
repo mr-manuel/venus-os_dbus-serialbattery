@@ -17,7 +17,6 @@ class Jkbms_Ble(Battery):
     resetting = False
 
     def __init__(self, port, baud, address):
-        # add "ble_" to the port name, since only numbers are not valid
         super(Jkbms_Ble, self).__init__(
             port, baud, address
         )
