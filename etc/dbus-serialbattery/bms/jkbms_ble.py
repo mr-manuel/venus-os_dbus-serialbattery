@@ -19,7 +19,7 @@ class Jkbms_Ble(Battery):
     def __init__(self, port, baud, address):
         # add "ble_" to the port name, since only numbers are not valid
         super(Jkbms_Ble, self).__init__(
-            "ble_" + address.replace(":", "").lower(), baud, address
+            port, baud, address
         )
         self.address = address
         self.type = self.BATTERYTYPE
