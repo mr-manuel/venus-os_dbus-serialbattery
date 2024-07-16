@@ -25,9 +25,8 @@ class LltJbd_Ble(LltJbd):
     BATTERYTYPE = "LltJbd_Ble"
 
     def __init__(self, port: Optional[str], baud: Optional[int], address: str):
-        # add "ble_" to the port name, since only numbers are not valid
         super(LltJbd_Ble, self).__init__(
-            "ble_" + address.replace(":", "").lower(), -1, address
+            port, -1, address
         )
 
         self.address = address
