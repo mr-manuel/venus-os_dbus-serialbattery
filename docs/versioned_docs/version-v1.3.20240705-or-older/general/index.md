@@ -5,6 +5,12 @@ slug: /
 sidebar_position: 1
 ---
 
+<!-- redirect to new documentation -->
+<head>
+  <meta http-equiv="refresh" content="1; url=https://mr-manuel.github.io/venus-os_dbus-serialbattery_docs/" />
+  <link rel="canonical" href="https://mr-manuel.github.io/venus-os_dbus-serialbattery_docs/" />
+</head>
+
 # dbus-serialbattery
 This driver is for Venus OS devices (any GX device sold by Victron or a Raspberry Pi running the Venus OS image).
 

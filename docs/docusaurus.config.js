@@ -159,6 +159,9 @@ const config = {
         }),
 
     scripts: [{
+        src: `/${projectName}/redirect.js`,
+        async: false
+    },{
         src: `/${projectName}/matomo.js`,
         async: true
     }],
