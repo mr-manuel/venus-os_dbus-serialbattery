@@ -49,10 +49,9 @@ class Seplosv3(Battery):
             minimalmodbus._SLAVEADDRESS_BROADCAST = 0xF0
         else:
             minimalmodbus._SLAVEADDRESS_BROADCAST = 0
-        
+
         if self.mbdev is not None and slaveaddress == self.slaveaddress:
             return self.mbdev
-
 
         mbdev = minimalmodbus.Instrument(
             self.port,
