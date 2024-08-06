@@ -2,7 +2,7 @@
 
 # NOTES
 # Added by https://github.com/cpttinkering/venus-os_dbus-serialbattery-daren485
-# Adds support for various chinese BMS, based on the 'Daren' BMS, 
+# Adds support for various chinese BMS, based on the 'Daren' BMS,
 # e.g. DR-JC03, DR48100JC-03-V2, using the DR-1363 protocol.
 # See https://github.com/cpttinkering/daren-485 for protocol research information
 
@@ -127,8 +127,8 @@ class Daren485(Battery):
                     if ser.is_open:
                         result = self.get_realtime_data(ser)
 
-                        # get cells_params to get max (dis)charge params, 
-                        # but use the FET status registers from realtime data 
+                        # get cells_params to get max (dis)charge params,
+                        # but use the FET status registers from realtime data
                         # to set them to 0 when needed.
                         result = result and self.get_cells_params(ser)
 
@@ -275,8 +275,8 @@ class Daren485(Battery):
                     self.protection.high_voltage = 1
                 else:
                     self.protection.high_voltage = 0
-                # NOTE: high_voltage_cell not implemented. 
-                # Now incorporated in voltage_high alarm. 
+                # NOTE: high_voltage_cell not implemented.
+                # Now incorporated in voltage_high alarm.
                 # Split if high_voltage_cell ever implemented.
 
                 # check bit 3 for TOT_UNDV_PROT
