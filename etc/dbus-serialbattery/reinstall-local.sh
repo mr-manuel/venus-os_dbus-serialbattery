@@ -317,23 +317,12 @@ if [ "$bluetooth_length" -gt 0 ]; then
             echo "exec 2>&1"
             echo "echo"
             echo "echo"
-            echo "echo \"INFO:Preparing Bluetooth for connection to BMS\""
-            echo "echo \"INFO:Bluetooth details\""
-            # close all open connections, else the driver can't connect
-            echo "bluetoothctl disconnect $3"
-
-            # enable bluetoothctl scan in background to display signal strength (RSSI), else it's missing
-            echo "bluetoothctl scan on | grep \"$3\" | grep \"RSSI\" &"
-            # with multiple Bluetooth BMS one scan for all should be enough. Check if that can be changed globally, maybe with a cronjob after reboot?
-            # echo "bluetoothctl scan on > /dev/null &"
-
-            # wait 5 seconds to finish the scan
-            echo "sleep 5"
-            # display some Bluetooth device details
-            echo "bluetoothctl info $3 | grep -E \"Device|Alias|Pair|Trusted|Blocked|Connected|RSSI|Power\""
+            echo "echo \"INFO:Starting dbus-serialbattery.py\""
             echo "echo"
+	    # close earlier unclosed conections to the BMS, timeout after 4s
+	    echo "python3 -c \"import os, time; os.popen('bluetoothctl disconnect $3');time.sleep(4)\""
+            # start the service
             echo "python /opt/victronenergy/dbus-serialbattery/dbus-serialbattery.py $2 $3"
-            echo "pkill -f \"bluetoothctl scan on\""
         } > "/service/dbus-blebattery.$1/run"
         chmod 755 "/service/dbus-blebattery.$1/run"
     }
