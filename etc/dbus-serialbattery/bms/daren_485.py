@@ -239,7 +239,7 @@ class Daren485(Battery):
         response = self.read_response(ser)
 
         if response != False:
-            payload = response[13:len(response)-5]
+            payload = response[13 : len(response) - 5]
             if len(payload) >= 118:
                 self.soc = int(payload[2:6], base=16) / 100
                 self.voltage = int(payload[6:10], base=16) / 100
@@ -303,8 +303,8 @@ class Daren485(Battery):
 
                 # check bit 4 for DISCH_OC_1_PROT, bit 5 for DISCH_OC_2_PROT and bit 3 for Short_circuit_PROT
                 if (
-                    currentstatus & (1 << 4) 
-                    or currentstatus & (1 << 5) 
+                    currentstatus & (1 << 4)
+                    or currentstatus & (1 << 5)
                     or currentstatus & (1 << 3)
                 ):
                     self.protection.high_discharge_current = 2
@@ -554,7 +554,7 @@ class Daren485(Battery):
             return False
 
         try:
-            chksum = int(buff[len(buff) - 5:], base=16)
+            chksum = int(buff[len(buff) - 5 :], base=16)
             calculated_chksum = self.calculate_checksum(buff[1 : len(buff) - 5])
             if calculated_chksum == chksum:
                 logger.debug("Checksum ok.")
@@ -639,14 +639,14 @@ class Daren485(Battery):
         command += cid1.hex().upper()  # B4=CID1
         command += cid2.hex().upper()  # B5=CID2
 
-        if len(info)>0:
+        if len(info) > 0:
             length = len(info)
             length = self.length_checksum(length)
             command += format(length, "x").upper()
             command += info
         else:
             command += "0000"  # Length = 0, LenID=0, Lchecksum=0
-        checksum = self.calculate_checksum(command[1:len(command)])
+        checksum = self.calculate_checksum(command[1 : len(command)])
 
         command += format(checksum, "x").upper()
         command += "\r"  # Last Byte=EOI, \r
