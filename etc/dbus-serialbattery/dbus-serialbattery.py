@@ -270,7 +270,22 @@ def main():
         # check if MODBUS_ADDRESSES is not empty
         if utils.MODBUS_ADDRESSES:
             for address in utils.MODBUS_ADDRESSES:
-                battery[address] = get_battery(port, address)
+                checkbatt = get_battery(port, address)
+                if checkbatt is not None:
+                    battery[address] = checkbatt
+                    logger.info(
+                        "Successful battery connection at "
+                        + port
+                        + " and this Modbus address "
+                        + str(address)
+                    )
+                else:
+                    logger.warning(
+                        "No battery connection at "
+                        + port
+                        + " and this Modbus address "
+                        + str(address)
+                    )
         # use default address
         else:
             battery[0] = get_battery(port)
@@ -281,15 +296,6 @@ def main():
     for key_address in battery:
         if battery[key_address] is not None:
             battery_found = True
-        elif key_address != 0:
-            # remove item from battery dict so that only the found batteries are used
-            del battery[key_address]
-            logger.warning(
-                "No battery connection at "
-                + port
-                + " and this Modbus address "
-                + str(key_address)
-            )
 
     if not battery_found:
         logger.error(

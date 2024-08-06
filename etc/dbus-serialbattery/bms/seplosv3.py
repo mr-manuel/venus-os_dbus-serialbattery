@@ -42,14 +42,17 @@ class Seplosv3(Battery):
         return struct.unpack("<h", packval)[0]
 
     def get_modbus(self, slaveaddress=0) -> minimalmodbus.Instrument:
-        if self.mbdev is not None and slaveaddress == self.slaveaddress:
-            return self.mbdev
-
         # hack to allow communication to the Seplos BMS using minimodbus which uses slaveaddress 0 as broadcast
+        # Make sure we re-set these values whenever we want to access the modbus. Just in case of a
+        # multi-device setup with different addresses and subsequent tries on a different address modified it.
         if slaveaddress == 0:
             minimalmodbus._SLAVEADDRESS_BROADCAST = 0xF0
         else:
             minimalmodbus._SLAVEADDRESS_BROADCAST = 0
+        
+        if self.mbdev is not None and slaveaddress == self.slaveaddress:
+            return self.mbdev
+
 
         mbdev = minimalmodbus.Instrument(
             self.port,
