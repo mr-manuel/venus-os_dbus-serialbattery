@@ -20,7 +20,7 @@ class Daren485(Battery):
         super(Daren485, self).__init__(port, baud, address)
         self.type = self.BATTERYTYPE
 
-        # Uses address to build request commands, so has to be set 
+        # Uses address to build request commands, so has to be set
         # to address reflecting the position of the DIP-switches on the unit(s), starting at '01'.
         self.address = address
         self.serial_number = ""
@@ -160,13 +160,13 @@ class Daren485(Battery):
         ser.write(req.encode())
         logger.debug("get_mfg_params request sent: {}".format(req))
 
-        sleep(0.4) # Allow the BMS some time to send a full response
+        sleep(0.4)  # Allow the BMS some time to send a full response
 
         response = self.read_response(ser)
 
         if response != False:
             # Payload starts at offset 13(packet header) + 12 (command_info)
-            payload = response[(13+12):len(response)-5]
+            payload = response[(13 + 12) : len(response) - 5]
             if len(payload) >= 30:
                 serial_byte_array = bytearray.fromhex(payload[0:30])
                 self.serial_number = serial_byte_array.decode()
@@ -194,14 +194,14 @@ class Daren485(Battery):
         ser.write(req.encode())
         logger.debug("get_cap_params request sent: {}".format(req))
 
-        sleep(0.4) # Allow the BMS some time to send a full response
+        sleep(0.4)  # Allow the BMS some time to send a full response
 
         response = self.read_response(ser)
 
         if response != False:
             # Payload starts at offset 13(packet header) + 12 (command_info)
             payload = response[(13 + 12) : len(response) - 5]
-            if len(payload) >= 36: # 9*4 bytes in full request.
+            if len(payload) >= 36:  # 9*4 bytes in full request.
                 self.capacity_remaining = int(int(payload[0:4], base=16) / 100)
                 self.capacity = int(int(payload[4:8], base=16) / 100)
                 # design_capacity = int(payload[8:12], base=16) / 100 #Not used, for future use.
@@ -210,7 +210,7 @@ class Daren485(Battery):
                 self.history.total_ah_drawn = int(payload[20:28], base=16)
                 self.history.charged_energy = int(int(payload[28:32], base=16) / 10)
                 self.history.discharged_energy = int(int(payload[32:36], base=16) / 10)
-                
+
                 result = True
             else:
                 logger.error("get_cap_params response length error!")
@@ -234,7 +234,7 @@ class Daren485(Battery):
         ser.write(req.encode())
         logger.debug("get_realtime_data request sent: {}".format(req))
 
-        sleep(0.5) # Allow the BMS some time to send a full response
+        sleep(0.5)  # Allow the BMS some time to send a full response
 
         response = self.read_response(ser)
 
@@ -256,7 +256,7 @@ class Daren485(Battery):
                 self.to_temp(4, temp4)
                 self.capacity = int(payload[120:124], base=16) / 100
                 self.capacity_remaining = int(payload[124:128], base=16) / 100
-                self.history.charge_cycles = int(payload[128:132], base=16) 
+                self.history.charge_cycles = int(payload[128:132], base=16)
                 fetstatus = int(payload[148:152], base=16)
 
                 voltagestatus = int(payload[132:136], base=16)
@@ -270,10 +270,10 @@ class Daren485(Battery):
                 # check bit 6 for TOT_OVV_alarm and 4 for cell_OVV_alarm
                 elif voltagestatus & (1 << 6) or voltagestatus & (1 << 4):
                     self.protection.high_voltage = 1
-                else: 
+                else:
                     self.protection.high_voltage = 0
                 # NOTE: high_voltage_cell not implemented. Now incorporated in voltage_high alarm. Split if high_voltage_cell ever implemented.
-                
+
                 # check bit 3 for TOT_UNDV_PROT
                 if voltagestatus & (1 << 3):
                     self.protection.low_voltage = 2
@@ -282,7 +282,7 @@ class Daren485(Battery):
                     self.protection.low_voltage = 1
                 else:
                     self.protection.low_voltage = 0
-                
+
                 # check bit 1 for cell_UNDV_PROT
                 if voltagestatus & (1 << 1):
                     self.protection.low_cell_voltage = 2
@@ -298,16 +298,20 @@ class Daren485(Battery):
                 # check bit 6 for CHG_C_alarm
                 elif currentstatus & (1 << 6):
                     self.protection.high_charge_current = 1
-                else: 
+                else:
                     self.protection.high_charge_current = 0
 
                 # check bit 4 for DISCH_OC_1_PROT, bit 5 for DISCH_OC_2_PROT and bit 3 for Short_circuit_PROT
-                if currentstatus & (1 << 4) or currentstatus & (1 << 5) or currentstatus & (1 << 3):
+                if (
+                    currentstatus & (1 << 4) 
+                    or currentstatus & (1 << 5) 
+                    or currentstatus & (1 << 3)
+                ):
                     self.protection.high_discharge_current = 2
                 # check bit 7 for DISCH_C_alarm
                 elif currentstatus & (1 << 7):
                     self.protection.high_discharge_current = 1
-                else: 
+                else:
                     self.protection.high_discharge_current = 0
 
                 # check bit 14 for V_DIF_PROT
@@ -333,7 +337,7 @@ class Daren485(Battery):
                 # check bit 8 for CHG_H_TEMP_alarm
                 elif tempstatus & (1 << 8):
                     self.protection.high_charge_temp = 1
-                else: 
+                else:
                     self.protection.high_charge_temp = 0
 
                 # check bit 1 for CHG_L_TEMP_PROT
@@ -342,7 +346,7 @@ class Daren485(Battery):
                 # check bit 9 for CHG_L_TEMP_alarm
                 elif tempstatus & (1 << 9):
                     self.protection.low_charge_temp = 1
-                else: 
+                else:
                     self.protection.low_charge_temp = 0
 
                 # check bit 0 for CHG_H_TEMP_PROT and bit 2 for DISCH_H_TEMP_PROT
@@ -351,7 +355,7 @@ class Daren485(Battery):
                 # check bit 8 for CHG_H_TEMP_alarm and bit 10 for DISCH_H_TEMP_alarm
                 elif tempstatus & (1 << 8) or tempstatus & (1 << 10):
                     self.protection.high_temperature = 1
-                else: 
+                else:
                     self.protection.high_temperature = 0
 
                 # check bit 1 for CHG_L_TEMP_PROT and bit 3 for DISCH_L_TEMP_PROT
@@ -360,7 +364,7 @@ class Daren485(Battery):
                 # check bit 9 for CHG_L_TEMP_alarm and bit 11 for DISCH_L_TEMP_alarm
                 elif tempstatus & (1 << 9) or tempstatus & (1 << 11):
                     self.protection.low_temperature = 1
-                else: 
+                else:
                     self.protection.low_temperature = 0
 
                 # check bit 6 for MOS_H_TEMP_PROT and 4 for ENV_H_TEMP_PROT
@@ -369,7 +373,7 @@ class Daren485(Battery):
                 # check bit 14 for MOS_H_TEMP_alarm and 12 for ENV_H_TEMP_alarm
                 elif tempstatus & (1 << 14) or tempstatus & (1 << 12):
                     self.protection.high_internal_temp = 1
-                else: 
+                else:
                     self.protection.high_internal_temp = 0
 
                 if fetstatus & (1 << 0):
@@ -412,13 +416,13 @@ class Daren485(Battery):
         ser.write(req.encode())
         logger.debug("get_manufacturer_info request sent: {}".format(req))
 
-        sleep(0.4) # Allow the BMS some time to send a full response
+        sleep(0.4)  # Allow the BMS some time to send a full response
 
         response = self.read_response(ser)
 
         if response != False:
-            payload = response[13:len(response)-5]
-            if len(payload) >= (3*20)+10:
+            payload = response[13 : len(response) - 5]
+            if len(payload) >= (3 * 20) + 10:
                 hardware_type_byte_array = bytearray.fromhex(payload[0:20])
                 hardware_type = (
                     hardware_type_byte_array.decode().replace("\0", "").strip()
@@ -426,18 +430,18 @@ class Daren485(Battery):
 
                 product_code_byte_array = bytearray.fromhex(payload[20:40])
                 product_code = (
-                    product_code_byte_array.decode().replace("\0","").strip()
+                    product_code_byte_array.decode().replace("\0", "").strip()
                 )
 
                 project_code_byte_array = bytearray.fromhex(payload[40:60])
                 project_code = (
-                    project_code_byte_array.decode().replace("\0","").strip()
+                    project_code_byte_array.decode().replace("\0", "").strip()
                 )
 
                 software_version_array = findall("..", payload[60:66])
                 seperator = "."
                 software_version = seperator.join(software_version_array)
-                self.hardware_version = product_code + " " 
+                self.hardware_version = product_code + " "
                 self.hardware_version += project_code + " "
                 self.hardware_version += hardware_type + " "
                 self.hardware_version += software_version + " "
@@ -465,12 +469,12 @@ class Daren485(Battery):
         ser.write(req.encode())
         logger.debug("get_cells_params request sent: {}".format(req))
 
-        sleep(0.4) # Allow the BMS some time to send a full response
+        sleep(0.4)  # Allow the BMS some time to send a full response
 
         response = self.read_response(ser)
 
         if response != False:
-            payload = response[13:len(response)-5]
+            payload = response[13 : len(response) - 5]
             if len(payload) >= 129:
                 # cell_v_upper_limit = int(payload[2:6], base=16) / 1000
                 # cell_V_lower_limit = int(payload[6:10], base=16) / 1000
@@ -479,16 +483,16 @@ class Daren485(Battery):
                 # upper_limit_of_CHG_C = int(payload[18:22], base=16) / 100
                 # TOT_V_upper_limit = int(payload[22:26], base=16) / 1000
                 # TOT_V_lower_limit = int(payload[26:30], base=16) / 1000
-                num_of_cells = int(payload[30:34], base=16) 
+                num_of_cells = int(payload[30:34], base=16)
                 CHG_C_limit = int(int(payload[34:38], base=16) / 100)
                 # design_capacity_none = int(payload[38:42], base=16) / 100
-                # historical_data_storage_interval = int(payload[42:46], base=16) 
+                # historical_data_storage_interval = int(payload[42:46], base=16)
                 # balanced_mode = int(payload[46:50], base=16)
                 # product_barcode_byte_array = bytearray.fromhex(payload[50:90])
                 # product_barcode = product_barcode_byte_array.decode()
                 # BMS_barcode_byte_array = bytearray.fromhex(payload[90:130])
                 # BMS_barcode = BMS_barcode_byte_array.decode()
-                
+
                 self.cell_count = num_of_cells
                 if self.charge_fet == True:
                     self.max_battery_charge_current = CHG_C_limit
@@ -504,7 +508,7 @@ class Daren485(Battery):
                 logger.error("get_cells_params response length error!")
         else:
             logger.error("get_cells_params response error!")
-        
+
         return result
 
     def read_response(self, ser):
@@ -550,12 +554,16 @@ class Daren485(Battery):
             return False
 
         try:
-            chksum = int(buff[len(buff)-5:], base=16)
-            calculated_chksum = self.calculate_checksum(buff[1:len(buff)-5])
+            chksum = int(buff[len(buff) - 5:], base=16)
+            calculated_chksum = self.calculate_checksum(buff[1 : len(buff) - 5])
             if calculated_chksum == chksum:
                 logger.debug("Checksum ok.")
             else:
-                logger.error("Checksum error. Calculated: {}, Received: {}".format(calculated_chksum, chksum))
+                logger.error(
+                    "Checksum error. Calculated: {}, Received: {}".format(
+                        calculated_chksum, chksum
+                    )
+                )
                 return False
 
         except Exception as e:
@@ -564,14 +572,16 @@ class Daren485(Battery):
 
         logger.debug("read_response Data valid!")
         return buff
-    
+
     def create_command_get_cells_params(self):
         """
         Generates command that utilizes Service 47 of the BMS.
         Example command (mark the \r at the end):
         ~22014A47E00201FD23␍
         """
-        return self.create_command(self.address, b"\x4A", b"\x47", self.address.hex().upper())
+        return self.create_command(
+            self.address, b"\x4A", b"\x47", self.address.hex().upper()
+        )
 
     def create_command_get_mfg_params(self):
         """
@@ -580,13 +590,14 @@ class Daren485(Battery):
         ~22014AB0600A010103FF00FB6C␍
         """
         commandinfo = ""
-        commandinfo += self.address.hex().upper() # commandgroup
-        commandinfo += "01" # operation
-        commandinfo += "03" # module (01 = OCV_Param, 02, HW_PROT, 03=MFG_Params, 04=CAP_params)
-        commandinfo += "FF" # functionid
-        commandinfo += "00" # functionLEN
+        commandinfo += self.address.hex().upper()  # commandgroup
+        commandinfo += "01"  # operation
+        # module (01 = OCV_Param, 02, HW_PROT, 03=MFG_Params, 04=CAP_params)
+        commandinfo += "03"
+        commandinfo += "FF"  # functionid
+        commandinfo += "00"  # functionLEN
         return self.create_command(self.address, b"\x4A", b"\xB0", commandinfo)
-    
+
     def create_command_get_cap_params(self):
         """
         Generates command that utilizes Service B0, module 4 of the BMS.
@@ -594,11 +605,12 @@ class Daren485(Battery):
         ~22014AB0600A010104FF00FB6B␍
         """
         commandinfo = ""
-        commandinfo += self.address.hex().upper() # commandgroup
-        commandinfo += "01" # operation
-        commandinfo += "04" # module (01 = OCV_Param, 02, HW_PROT, 03=MFG_Params, 04=CAP_params)
-        commandinfo += "FF" # functionid
-        commandinfo += "00" # functionLEN
+        commandinfo += self.address.hex().upper()  # commandgroup
+        commandinfo += "01"  # operation
+        # module (01 = OCV_Param, 02, HW_PROT, 03=MFG_Params, 04=CAP_params)
+        commandinfo += "04"
+        commandinfo += "FF"  # functionid
+        commandinfo += "00"  # functionLEN
         return self.create_command(self.address, b"\x4A", b"\xB0", commandinfo)
 
     def create_command_get_realtime_data(self):
@@ -607,7 +619,9 @@ class Daren485(Battery):
         Example command (mark the \r at the end):
         ~22014A42E00201FD28␍
         """
-        return self.create_command(self.address, b"\x4A", b"\x42", self.address.hex().upper())
+        return self.create_command(
+            self.address, b"\x4A", b"\x42", self.address.hex().upper()
+        )
 
     def create_command_get_manufacturer_info(self):
         """
@@ -619,23 +633,23 @@ class Daren485(Battery):
 
     def create_command(self, addr, cid1, cid2, info=""):
         command = ""
-        command += "~" # B1=SOI
-        command += "22" # B2=Version
-        command += addr.hex().upper() # B3=ADDR
-        command += cid1.hex().upper() # B4=CID1
-        command += cid2.hex().upper() # B5=CID2
+        command += "~"  # B1=SOI
+        command += "22"  # B2=Version
+        command += addr.hex().upper()  # B3=ADDR
+        command += cid1.hex().upper()  # B4=CID1
+        command += cid2.hex().upper()  # B5=CID2
 
         if len(info)>0:
             length = len(info)
             length = self.length_checksum(length)
-            command += format(length,"x").upper()
+            command += format(length, "x").upper()
             command += info
         else:
-            command += "0000" # Length = 0, LenID=0, Lchecksum=0
+            command += "0000"  # Length = 0, LenID=0, Lchecksum=0
         checksum = self.calculate_checksum(command[1:len(command)])
 
-        command += format(checksum,"x").upper()
-        command += "\r" # Last Byte=EOI, \r
+        command += format(checksum, "x").upper()
+        command += "\r"  # Last Byte=EOI, \r
 
         # logger.info("Command: {}".format(command))
         return command
