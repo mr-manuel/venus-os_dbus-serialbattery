@@ -2,15 +2,16 @@
 
 # NOTES
 # Added by https://github.com/cpttinkering/venus-os_dbus-serialbattery-daren485
-# Adds support for various chinese BMS, based on the 'Daren' BMS, e.g. DR-JC03, DR48100JC-03-V2, using the DR-1363 protocol.
+# Adds support for various chinese BMS, based on the 'Daren' BMS, 
+# e.g. DR-JC03, DR48100JC-03-V2, using the DR-1363 protocol.
 # See https://github.com/cpttinkering/daren-485 for protocol research information
 
 # avoid importing wildcards, remove unused imports
 from battery import Battery, Cell
-from utils import is_bit_set, open_serial_port, logger
+from utils import open_serial_port, logger
 import utils
-from time import sleep, time
-from struct import pack, unpack_from, unpack
+from time import sleep
+from struct import unpack
 from re import findall
 import sys
 
@@ -73,7 +74,7 @@ class Daren485(Battery):
         result = False
         try:
             with open_serial_port(self.port, self.baud_rate) as ser:
-                if ser != False:
+                if ser:
                     if ser.is_open:
                         result = self.get_serial(ser)
 
@@ -122,11 +123,13 @@ class Daren485(Battery):
         result = False
         try:
             with open_serial_port(self.port, self.baud_rate) as ser:
-                if ser != False:
+                if ser:
                     if ser.is_open:
                         result = self.get_realtime_data(ser)
 
-                        # get cells_params to get max (dis)charge params, but use the FET status registers from realtime data to set them to 0 when needed.
+                        # get cells_params to get max (dis)charge params, 
+                        # but use the FET status registers from realtime data 
+                        # to set them to 0 when needed.
                         result = result and self.get_cells_params(ser)
 
                         result = result and self.get_cap_params(ser)
@@ -164,7 +167,7 @@ class Daren485(Battery):
 
         response = self.read_response(ser)
 
-        if response != False:
+        if response:
             # Payload starts at offset 13(packet header) + 12 (command_info)
             payload = response[(13 + 12) : len(response) - 5]
             if len(payload) >= 30:
@@ -198,7 +201,7 @@ class Daren485(Battery):
 
         response = self.read_response(ser)
 
-        if response != False:
+        if response:
             # Payload starts at offset 13(packet header) + 12 (command_info)
             payload = response[(13 + 12) : len(response) - 5]
             if len(payload) >= 36:  # 9*4 bytes in full request.
@@ -238,7 +241,7 @@ class Daren485(Battery):
 
         response = self.read_response(ser)
 
-        if response != False:
+        if response:
             payload = response[13 : len(response) - 5]
             if len(payload) >= 118:
                 self.soc = int(payload[2:6], base=16) / 100
@@ -272,7 +275,9 @@ class Daren485(Battery):
                     self.protection.high_voltage = 1
                 else:
                     self.protection.high_voltage = 0
-                # NOTE: high_voltage_cell not implemented. Now incorporated in voltage_high alarm. Split if high_voltage_cell ever implemented.
+                # NOTE: high_voltage_cell not implemented. 
+                # Now incorporated in voltage_high alarm. 
+                # Split if high_voltage_cell ever implemented.
 
                 # check bit 3 for TOT_UNDV_PROT
                 if voltagestatus & (1 << 3):
@@ -420,7 +425,7 @@ class Daren485(Battery):
 
         response = self.read_response(ser)
 
-        if response != False:
+        if response:
             payload = response[13 : len(response) - 5]
             if len(payload) >= (3 * 20) + 10:
                 hardware_type_byte_array = bytearray.fromhex(payload[0:20])
@@ -473,7 +478,7 @@ class Daren485(Battery):
 
         response = self.read_response(ser)
 
-        if response != False:
+        if response:
             payload = response[13 : len(response) - 5]
             if len(payload) >= 129:
                 # cell_v_upper_limit = int(payload[2:6], base=16) / 1000
@@ -494,11 +499,11 @@ class Daren485(Battery):
                 # BMS_barcode = BMS_barcode_byte_array.decode()
 
                 self.cell_count = num_of_cells
-                if self.charge_fet == True:
+                if self.charge_fet is True:
                     self.max_battery_charge_current = CHG_C_limit
                 else:
                     self.max_battery_charge_current = 0
-                if self.discharge_fet == True:
+                if self.discharge_fet is True:
                     self.max_battery_discharge_current = CHG_C_limit
                 else:
                     self.max_battery_discharge_current = 0
@@ -524,7 +529,8 @@ class Daren485(Battery):
                 buff += chr.decode()
                 if chr == b"\r":
                     break
-            except:
+            except Exception as e:
+                logger.error("Exception during inWaiting(): {}".format(e))
                 pass
 
         try:
@@ -533,8 +539,8 @@ class Daren485(Battery):
                 logger.error("CID2_Decode error!")
                 logger.error("Buffer contents: {}".format(buff))
                 return False
-        except:
-            logger.error("read_response Data invalid!")
+        except Exception as e:
+            logger.error("read_response Data invalid!: {}".format(e))
             logger.error("Received data: {}".format(buff))
             return False
 
