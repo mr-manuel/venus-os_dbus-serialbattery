@@ -21,6 +21,7 @@ import math
 
 # import battery classes
 from bms.daly import Daly
+from bms.daren_485 import Daren485
 from bms.ecs import Ecs
 from bms.eg4_lifepower import EG4_Lifepower
 from bms.eg4_ll import EG4_LL
@@ -44,6 +45,7 @@ if "Sinowealth" in utils.BMS_TYPE:
 supported_bms_types = [
     {"bms": Daly, "baud": 9600, "address": b"\x40"},
     {"bms": Daly, "baud": 9600, "address": b"\x80"},
+    {"bms": Daren485, "baud": 19200, "address": b"\x01"},
     {"bms": Ecs, "baud": 19200},
     {"bms": EG4_Lifepower, "baud": 9600, "address": b"\x01"},
     {"bms": EG4_LL, "baud": 9600, "address": b"\x01"},
