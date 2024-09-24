@@ -43,7 +43,10 @@ if "Sinowealth" in utils.BMS_TYPE:
     from bms.sinowealth import Sinowealth
 
 supported_bms_types = [
-    # {"bms": Daly, "baud": 9600},          # For multiple boards (1-16) in parallel, specify board addresses (0x40-0x4F) via MODBUS_ADDRESSES in config.ini (see "BMSTYPE = Daly" in config.default.ini), and comment out the following 2 Daly lines if desired.
+    # For multiple boards (1-16) in parallel, specify board addresses (0x40-0x4F) via MODBUS_ADDRESSES in config.ini
+    #     (see "BMSTYPE = Daly" in config.default.ini), and enable the following line... optionally disable
+    #     the 2 Daly lines following.
+    # {"bms": Daly, "baud": 9600},
     {"bms": Daly, "baud": 9600, "address": b"\x40"},
     {"bms": Daly, "baud": 9600, "address": b"\x80"},
     {"bms": Daren485, "baud": 19200, "address": b"\x01"},
