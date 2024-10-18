@@ -10,9 +10,6 @@ import sys
 
 from gi.repository import GLib as gobject
 
-# Victron packages
-# from ve_utils import exit_on_error
-
 from dbushelper import DbusHelper
 from utils import logger
 import utils
