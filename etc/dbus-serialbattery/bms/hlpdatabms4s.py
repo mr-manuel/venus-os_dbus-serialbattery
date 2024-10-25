@@ -22,10 +22,13 @@ class HLPdataBMS4S(Battery):
         result = False
         try:
             # get settings to check if the data is valid and the connection is working
-            result = self.get_settings()
+            result = self.read_test_data()
             # get the rest of the data to be sure, that all data is valid and the correct battery type is recognized
             # only read next data if the first one was successful, this saves time when checking multiple battery types
-            result = result and self.read_test_data()
+            if result == True:
+                result = self.get_settings()
+            if result == True:
+                result = self.refresh_data()
         except Exception:
             (
                 exception_type,
@@ -34,7 +37,9 @@ class HLPdataBMS4S(Battery):
             ) = sys.exc_info()
             file = exception_traceback.tb_frame.f_code.co_filename
             line = exception_traceback.tb_lineno
-            logger.error(f"Exception occurred: {repr(exception_object)} of type {exception_type} in {file} line #{line}")
+            logger.error(
+                f"Exception occurred: {repr(exception_object)} of type {exception_type} in {file} line #{line}"
+            )
             result = False
 
         # give the user a feedback that no BMS was found
@@ -67,8 +72,11 @@ class HLPdataBMS4S(Battery):
             pass
         return result
 
+    def unique_identifier(self) -> str:
+        return "BMS4S_" + str(int(self.capacity))
+
     def read_test_data(self):
-        test_data = self.read_serial_data_HLPdataBMS4S(b"pv\n", 0.2, 12)
+        test_data = self.read_serial_data_HLPdataBMS4S(b"pv\n", 0.3, 12)
         if test_data is False:
             return False
         s1 = str(test_data)
@@ -79,12 +87,6 @@ class HLPdataBMS4S(Battery):
             self.poll_interval = 10000
             self.control_discharge_current = 1000
             self.control_charge_current = 1000
-            self.soc = 50
-            self.voltage = 13.2
-            self.current = 0
-            self.min_battery_voltage = 12.0
-            self.max_battery_voltage = 14.4
-
             if self.cell_count is None:
                 self.cell_count = 4
                 for c in range(self.cell_count):
@@ -93,38 +95,58 @@ class HLPdataBMS4S(Battery):
         return False
 
     def read_settings_data(self):
-        test_data = self.read_serial_data_HLPdataBMS4S(b"ps\n", 3, 700)
+        test_data = self.read_serial_data_HLPdataBMS4S(b"ps\n", 2.0, 700)
         if test_data is False:
             return False
         s = str(test_data)
         s = s.replace(",", ".")
         par = get_par("BatterySize= ", s)
         if par is False:
+            logger.error(">>> ERROR: BatterySize")
             return False
         self.capacity = int(par)
         v = get_par("VoltHigh= ", s)
         if v is False:
+            logger.error(">>> ERROR: VoltHigh")
             return False
         self.max_battery_voltage = float(v) * float(4)
         v = get_par("VoltLow= ", s)
         if v is False:
+            logger.error(">>> ERROR: VoltLow")
             return False
         self.min_battery_voltage = float(v) * float(4)
-
         return True
 
     def read_status_data(self):
-        status_data = self.read_serial_data_HLPdataBMS4S(b"m1\n", 0.2, 40)
+        if self.cell_count is None:
+            return False
+        status_data = self.read_serial_data_HLPdataBMS4S(b"m1\n", 0.3, 40)
         if status_data is False:
             return False
-        par1 = str(status_data)
+        par2 = str(status_data)
+        ix = par2.find("m1")
+        if ix == -1:
+            logger.error(">>> ERROR: m1 " + par1)
+            return False
+        par1 = par2[ix : len(par2)]
         par = par1.split(",")
-        if len(par) < 8:
+        if len(par) < 13:
+            logger.error(">>> ERROR: <13 " + par1)
             return False
         if len(par[0]) < 7:
+            logger.error(">>> ERROR: <7 " + par1)
             return False
         p0 = str(par[0])
         ix = p0.find(".")
+        if ix == -1:
+            logger.error(">>> ERROR: ix " + par1)
+            return False
+        if str(par[3]).find(".") == -1:
+            logger.error(">>> ERROR: par[3] " + par1)
+            return False
+        if str(par[11]).isdigit() is False:
+            logger.error(">>> ERROR: par[11] " + par1)
+            return False
         par0 = p0[ix - 1 : len(p0)]
 
         # v1,v2,v3,v4,current,soc,chargeoff,loadoff,vbat2,socnow,adj,beep,led,temp1,temp2...
@@ -137,10 +159,12 @@ class HLPdataBMS4S(Battery):
         self.cells[3].voltage = float(par[3])
         self.current = float(par[4])
         self.soc = int(par[5])
-        self.control_allow_charge = par[6]
-        self.charge_fet = par[6]
-        self.control_allow_discharge = par[7]
-        self.discharge_fet = par[7]
+        st = int(par[6]) == 1
+        self.control_allow_charge = st
+        self.charge_fet = st
+        st = int(par[7]) == 1
+        self.control_allow_discharge = st
+        self.discharge_fet = st
 
         beep = int(par[11])
         if beep == 2:
@@ -159,7 +183,6 @@ class HLPdataBMS4S(Battery):
             self.protection.high_voltage = 2
         else:
             self.protection.high_voltage = 0
-
         if len(par) > 13:
             nb = 0
             min = int(1000)
@@ -170,26 +193,27 @@ class HLPdataBMS4S(Battery):
                 ix += 1
                 if len(tmp) == 2:
                     name = tmp[0]
-                    temp = int("".join(filter(str.isdigit, tmp[1])))
                     if name[0] == "b":
+                        temp = int("".join(filter(str.isdigit, tmp[1])))
                         nb += 1
                         if temp > max:
                             max = temp
                         if temp < min:
                             min = temp
+                else:
+                    logger.error(">>> ERROR: temp")
             if nb == 1:
                 self.temp1 = max
             if nb > 1:
                 self.temp1 = max
                 self.temp2 = min
-
         return True
 
     def manage_charge_voltage(self):
         self.allow_max_voltage = True
         self.control_voltage = self.max_battery_voltage
 
-    def manage_charge_and_discharge_current(self):
+    def manage_charge_current(self):
         self.control_charge_current = 1000
         self.control_discharge_current = 1000
 
@@ -200,7 +224,7 @@ class HLPdataBMS4S(Battery):
 
 def read_serial_data(command, port, baud, time, min_len):
     try:
-        with serial.Serial(port, baudrate=baud, timeout=0.5) as ser:
+        with serial.Serial(port, baudrate=baud, timeout=2.5) as ser:
             ret = read_serialport_data(ser, command, time, min_len)
         return ret
 
