@@ -25,10 +25,8 @@ class HLPdataBMS4S(Battery):
             result = self.read_test_data()
             # get the rest of the data to be sure, that all data is valid and the correct battery type is recognized
             # only read next data if the first one was successful, this saves time when checking multiple battery types
-            if result == True:
-                result = self.get_settings()
-            if result == True:
-                result = self.refresh_data()
+            result = result and self.get_settings()
+            result = result and self.refresh_data()
         except Exception:
             (
                 exception_type,
@@ -37,9 +35,7 @@ class HLPdataBMS4S(Battery):
             ) = sys.exc_info()
             file = exception_traceback.tb_frame.f_code.co_filename
             line = exception_traceback.tb_lineno
-            logger.error(
-                f"Exception occurred: {repr(exception_object)} of type {exception_type} in {file} line #{line}"
-            )
+            logger.error(f"Exception occurred: {repr(exception_object)} of type {exception_type} in {file} line #{line}")
             result = False
 
         # give the user a feedback that no BMS was found
@@ -213,7 +209,7 @@ class HLPdataBMS4S(Battery):
         self.allow_max_voltage = True
         self.control_voltage = self.max_battery_voltage
 
-    def manage_charge_current(self):
+    def manage_charge_and_discharge_current(self):
         self.control_charge_current = 1000
         self.control_discharge_current = 1000
 
