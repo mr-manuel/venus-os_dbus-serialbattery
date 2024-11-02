@@ -85,8 +85,6 @@ class HLPdataBMS4S(Battery):
             self.hardware_version = s1[ix : len(s1) - 1]
             self.version = self.hardware_version
             self.poll_interval = 10000
-            self.control_discharge_current = 1000
-            self.control_charge_current = 1000
             if self.cell_count is None:
                 self.cell_count = 4
                 for c in range(self.cell_count):
