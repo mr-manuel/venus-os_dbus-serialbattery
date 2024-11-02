@@ -213,10 +213,6 @@ class HLPdataBMS4S(Battery):
         self.allow_max_voltage = True
         self.control_voltage = self.max_battery_voltage
 
-    def manage_charge_and_discharge_current(self):
-        self.control_charge_current = 1000
-        self.control_discharge_current = 1000
-
     def read_serial_data_HLPdataBMS4S(self, command, time, min_len):
         data = read_serial_data(command, self.port, self.baud_rate, time, min_len)
         return data
