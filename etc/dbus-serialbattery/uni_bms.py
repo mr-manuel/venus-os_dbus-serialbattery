@@ -111,8 +111,6 @@ class uni_bms:
 
     def init_bms_types(self):
         self.supported_bms_types = [
-        {"bms": Jkbms, "baud": 115200},
-        {"bms": Jkbms_pb, "baud": 115200, "address": b"\x01"},
         {"bms": Daly, "baud": 9600, "address": b"\x40"},
         {"bms": Daly, "baud": 9600, "address": b"\x80"},
         {"bms": Daren485, "baud": 19200, "address": b"\x01"},
@@ -121,6 +119,8 @@ class uni_bms:
         {"bms": EG4_LL, "baud": 9600, "address": b"\x01"},
         {"bms": HeltecModbus, "baud": 9600, "address": b"\x01"},
         {"bms": HLPdataBMS4S, "baud": 9600},
+        {"bms": Jkbms, "baud": 115200},
+        {"bms": Jkbms_pb, "baud": 115200, "address": b"\x01"},
         {"bms": LltJbd, "baud": 9600},
         {"bms": Renogy, "baud": 9600, "address": b"\x30"},
         {"bms": Renogy, "baud": 9600, "address": b"\xF7"},
@@ -201,8 +201,8 @@ class uni_bms:
 
                 # only try CAN BMS on CAN port
                 self.supported_bms_types = [
-                    {"bms": Daly_Can, "baud": 250000},
-                    {"bms": Jkbms_Can, "baud": 250000},
+                    {"bms": Daly_Can, "baud": utils.CAN_SPEED},
+                    {"bms": Jkbms_Can, "baud": utils.CAN_SPEED},
                 ]
 
             self.expected_bms_types = [
@@ -221,19 +221,9 @@ class uni_bms:
                     checkbatt = self.get_battery(self.devpath, address)
                     if checkbatt is not None:
                         self.battery[address] = checkbatt
-                        logger.info(
-                            "Successful battery connection at "
-                            + self.devpath
-                            + " and this Modbus address "
-                            + str(address)
-                        )
+                        logger.info("Successful battery connection at " + self.devpath + " and this Modbus address " + str(address))
                     else:
-                        logger.warning(
-                            "No battery connection at "
-                            + self.devpath
-                            + " and this Modbus address "
-                            + str(address)
-                        )
+                        logger.warning("No battery connection at " + self.devpath + " and this Modbus address " + str(address))
             # use default address
             else:
                 self.battery[0] = self.get_battery(self.devpath)
@@ -273,9 +263,7 @@ class uni_bms:
         retry = 1
         retries = 2
         while retry <= retries:
-            logging.info(
-                "-- Testing BMS: " + str(retry) + " of " + str(retries) + " rounds"
-            )
+            logging.info("-- Testing BMS: " + str(retry) + " of " + str(retries) + " rounds")
             # create a new battery object that can read the battery and run connection test
             for test in self.expected_bms_types:
                 # noinspection PyBroadException
@@ -291,23 +279,13 @@ class uni_bms:
                     logging.info(
                         "Testing "
                         + test["bms"].__name__
-                        + (
-                            ' at address "'
-                            + utils.bytearray_to_string(_bms_address)
-                            + '"'
-                            if _bms_address is not None
-                            else ""
-                        )
+                        + (' at address "' + utils.bytearray_to_string(_bms_address) + '"' if _bms_address is not None else "")
                     )
                     batteryClass = test["bms"]
                     baud = test["baud"]
-                    battery: Battery = batteryClass(
-                        port=_port, baud=baud, address=_bms_address
-                    )
+                    battery: Battery = batteryClass(port=_port, baud=baud, address=_bms_address)
                     if battery.test_connection() and battery.validate_data():
-                        logging.info(
-                            "Connection established to " + battery.__class__.__name__
-                        )
+                        logging.info("Connection established to " + battery.__class__.__name__)
                         return battery
                 except KeyboardInterrupt:
                     return None
@@ -319,10 +297,7 @@ class uni_bms:
                     ) = sys.exc_info()
                     file = exception_traceback.tb_frame.f_code.co_filename
                     line = exception_traceback.tb_lineno
-                    logging.error(
-                        "Non blocking exception occurred: "
-                        + f"{repr(exception_object)} of type {exception_type} in {file} line #{line}"
-                    )
+                    logging.error("Non blocking exception occurred: " + f"{repr(exception_object)} of type {exception_type} in {file} line #{line}")
                     # Ignore any malfunction test_function()
                     pass
             retry += 1
