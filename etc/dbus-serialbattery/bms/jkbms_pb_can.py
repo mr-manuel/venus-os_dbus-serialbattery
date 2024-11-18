@@ -73,23 +73,24 @@ class Jkbms_Pb_Can(Battery):
     #       10	CELLVOL	    Zellenspannung	        Erweiterter Rahmen	0x18E028F4	1000 ms
     #       11	BMSChg_INFO	BMS-Ladeanforderung	    Erweiterter Rahmen	0x1806E5F4	500 ms
 
+    #
     CAN_FRAMES = {
-        BATT_STAT: [0x02F4],
-        CELL_VOLT: [0x04F4],
-        CELL_TEMP: [0x05F4],
-        ALM_INFO: [0x07F4],
-        BATT_STAT_EXT: [0x18F128F4],
-        ALL_TEMP: [0x18F228F4],
-        BMSERR_INFO: [0x18F328F4],
-        BMS_INFO: [0x18F428F4],
-        BMS_SWITCH_STATE: [0x18F528F4],
-        CELL_VOLT_EXT1: [0x18E028F4],
-        CELL_VOLT_EXT2: [0x18E128F4],
-        CELL_VOLT_EXT3: [0x18E228F4],
-        CELL_VOLT_EXT4: [0x18E328F4],
-        CELL_VOLT_EXT5: [0x18E428F4],
-        CELL_VOLT_EXT6: [0x18E528F4],
-        BMS_CHG_INFO: [0x1806E5F4],
+        BATT_STAT: [0x02F4, 0x02F5, 0x02F6, 0x02F7],
+        CELL_VOLT: [0x04F4, 0x04F5, 0x04F6, 0x04F7],
+        CELL_TEMP: [0x05F4, 0x05F5, 0x05F6, 0x05F7],
+        ALM_INFO: [0x07F4, 0x07F5, 0x07F6, 0x07F7],
+        BATT_STAT_EXT: [0x18F128F4, 0x18F128F5, 0x18F128F6, 0x18F128F7],
+        ALL_TEMP: [0x18F228F4, 0x18F228F5, 0x18F228F6, 0x18F228F7],
+        BMSERR_INFO: [0x18F328F4, 0x18F328F5, 0x18F328F6, 0x18F328F7],
+        BMS_INFO: [0x18F428F4, 0x18F428F5, 0x18F428F6, 0x18F428F7],
+        BMS_SWITCH_STATE: [0x18F528F4, 0x18F528F5, 0x18F528F6, 0x18F528F7],
+        CELL_VOLT_EXT1: [0x18E028F4, 0x18E028F5, 0x18E028F6, 0x18E028F7],
+        CELL_VOLT_EXT2: [0x18E128F4, 0x18E128F5, 0x18E128F6, 0x18E128F7],
+        CELL_VOLT_EXT3: [0x18E228F4, 0x18E228F5, 0x18E228F6, 0x18E228F7],
+        CELL_VOLT_EXT4: [0x18E328F4, 0x18E328F5, 0x18E328F6, 0x18E328F7],
+        CELL_VOLT_EXT5: [0x18E428F4, 0x18E428F5, 0x18E428F6, 0x18E428F7],
+        CELL_VOLT_EXT6: [0x18E528F4, 0x18E528F5, 0x18E528F6, 0x18E528F7],
+        BMS_CHG_INFO: [0x1806E5F4, 0x1806E5F5, 0x1806E5F6, 0x1806E5F7],
     }
 
     def connection_name(self) -> str:
@@ -200,7 +201,7 @@ class Jkbms_Pb_Can(Battery):
     def read_jkbms_can(self):
         if self.can_bus is False:
             logger.debug("Can bus init")
-            # intit the can interface
+            # init the can interface
             try:
                 self.can_bus = can.interface.Bus(bustype=self.CAN_BUS_TYPE, channel=self.port, bitrate=self.baud_rate)
             except can.CanError as e:
