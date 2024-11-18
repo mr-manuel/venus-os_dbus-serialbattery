@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 
 # NOTES
-# Added by https://github.com/IrisCrimson
+# mostly copied from https://github.com/IrisCrimson
+# extended for JK Inverter BMS CAN https://github.com/Hooorny/venus-os_dbus-serialbattery
 
 
 from __future__ import absolute_import, division, print_function, unicode_literals
@@ -45,25 +46,24 @@ class Jkbms_Pb_Can(Battery):
     ALL_TEMP = "ALL_TEMP"
     BMSERR_INFO = "BMSERR_INFO"
     BMS_INFO = "BMS_INFO"
-    BMSSwSta = "BMSSwSta"
+    BMS_SWITCH_STATE = "BMS_SWITCH_STATE"
     CELLVOL = "CELLVOL"
-    BMSChg_INFO = "BMSChg_INFO"
+    BMS_CHG_INFO = "BMS_CHG_INFO"
 
     MESSAGES_TO_READ = 100
 
-#     Nummer	Name	Beschreibung	                Rahmenformat	    ID	        Sender	    Empfänger	Nachrichtenzyklus
-#       1	BATT_ST1	Batteriezustandsinformationen 1	Standardrahmen	    0x02F4	    BMS	        Peripherie	20 ms
-#       2	BATT_ST2	Batteriezustandsinformationen 2	Erweiterter Rahmen	0x18F128F4	BMS	        Peripherie	100 ms
-#       3	CELL_VOLT	Zellenspannung	                Standardrahmen	    0x04F4	    BMS	        Peripherie	100 ms
-#       4	CELL_TEMP	Zelltemperatur	                Standardrahmen	    0x05F4	    BMS	        Peripherie	500 ms
-#       5	ALL_TEMP	Alle Zelltemperaturen	        Erweiterter Rahmen	0x18F228F4	BMS	        Peripherie	500 ms
-#       6	ALM_INFO	Alarminformationen	            Standardrahmen	    0x07F4	    BMS	        Peripherie	100 ms
-#       7	BMSERR_INFO	BMS-Fehlerinformationen	        Erweiterter Rahmen	0x18F328F4	BMS	        Peripherie	100 ms
-#       8	BMS_INFO	BMS-Informationen	            Erweiterter Rahmen	0x18F428F4	BMS	        Peripherie	500 ms
-#       9	BMSSwSta	BMS-Schalterzustand	            Erweiterter Rahmen	0x18F528F4	BMS	        Peripherie	500 ms
-#       10	CELLVOL	    Zellenspannung	                Erweiterter Rahmen	0x18E028F4	BMS	        Peripherie	1000 ms
-#       11	BMSChg_INFO	BMS-Ladeanforderung	            Erweiterter Rahmen	0x1806E5F4	BMS	        Peripherie	500 ms
-#       12	Ctrl_INFO	Steuerinformationen	            Erweiterter Rahmen	0x18F0F428	Peripherie	BMS	        -
+    #     Nummer	Name	Beschreibung            Rahmenformat	    ID	        Zyklus
+    #       1	BATT_ST1	Bet Info 1	            Standardrahmen	    0x02F4	    20 ms
+    #       2	BATT_ST2	Batt Info 2	            Erweiterter Rahmen	0x18F128F4	100 ms
+    #       3	CELL_VOLT	Zellenspannung	        Standardrahmen	    0x04F4	    100 ms
+    #       4	CELL_TEMP	Zelltemperatur	        Standardrahmen	    0x05F4	    500 ms
+    #       5	ALL_TEMP	Alle Zelltemperaturen	Erweiterter Rahmen	0x18F228F4	500 ms
+    #       6	ALM_INFO	Alarminformationen	    Standardrahmen	    0x07F4	    100 ms
+    #       7	BMSERR_INFO	BMS-Fehlerinformationen	Erweiterter Rahmen	0x18F328F4	100 ms
+    #       8	BMS_INFO	BMS-Informationen	    Erweiterter Rahmen	0x18F428F4	500 ms
+    #       9	BMSSwSta	BMS-Schalterzustand	    Erweiterter Rahmen	0x18F528F4	500 ms
+    #       10	CELLVOL	    Zellenspannung	        Erweiterter Rahmen	0x18E028F4	1000 ms
+    #       11	BMSChg_INFO	BMS-Ladeanforderung	    Erweiterter Rahmen	0x1806E5F4	500 ms
 
     CAN_FRAMES = {
         BATT_STAT: [0x02F4],
