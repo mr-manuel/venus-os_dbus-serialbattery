@@ -8,10 +8,8 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 from battery import Battery, Cell
 from utils import (
-    is_bit_set,
     logger,
     JKBMS_CAN_CELL_COUNT,
-    ZERO_CHAR,
 )
 from struct import unpack_from
 import can
