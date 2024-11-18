@@ -18,9 +18,9 @@ import sys
 import time
 
 
-class Jkbms_Can(Battery):
+class Jkbms_Pb_Can(Battery):
     def __init__(self, port, baud, address):
-        super(Jkbms_Can, self).__init__(port, baud, address)
+        super(Jkbms_Pb_Can, self).__init__(port, baud, address)
         self.can_bus = False
         self.cell_count = 1
         self.poll_interval = 1500
@@ -34,7 +34,7 @@ class Jkbms_Can(Battery):
             self.can_bus = False
             logger.debug("bus shutdown")
 
-    BATTERYTYPE = "JKBMS CAN"
+    BATTERYTYPE = "JKBMS PB CAN"
     CAN_BUS_TYPE = "socketcan"
 
     CURRENT_ZERO_CONSTANT = 400
@@ -42,17 +42,34 @@ class Jkbms_Can(Battery):
     CELL_VOLT = "CELL_VOLT"
     CELL_TEMP = "CELL_TEMP"
     ALM_INFO = "ALM_INFO"
+    ALL_TEMP = "ALL_TEMP"
+    BMSERR_INFO = "BMSERR_INFO"
+    BMS_INFO = "BMS_INFO"
+    BMSSwSta = "BMSSwSta"
+    CELLVOL = "CELLVOL"
+    BMSChg_INFO = "BMSChg_INFO"
 
     MESSAGES_TO_READ = 100
 
-    # B2A... Black is using 0x0XF4
-    # B2A... Silver is using 0x0XF5
-    # See https://github.com/Louisvdw/dbus-serialbattery/issues/950
+#     Nummer	Name	Beschreibung	                Rahmenformat	    ID	        Sender	    Empfänger	Nachrichtenzyklus
+#       1	BATT_ST1	Batteriezustandsinformationen 1	Standardrahmen	    0x02F4	    BMS	        Peripherie	20 ms
+#       2	BATT_ST2	Batteriezustandsinformationen 2	Erweiterter Rahmen	0x18F128F4	BMS	        Peripherie	100 ms
+#       3	CELL_VOLT	Zellenspannung	                Standardrahmen	    0x04F4	    BMS	        Peripherie	100 ms
+#       4	CELL_TEMP	Zelltemperatur	                Standardrahmen	    0x05F4	    BMS	        Peripherie	500 ms
+#       5	ALL_TEMP	Alle Zelltemperaturen	        Erweiterter Rahmen	0x18F228F4	BMS	        Peripherie	500 ms
+#       6	ALM_INFO	Alarminformationen	            Standardrahmen	    0x07F4	    BMS	        Peripherie	100 ms
+#       7	BMSERR_INFO	BMS-Fehlerinformationen	        Erweiterter Rahmen	0x18F328F4	BMS	        Peripherie	100 ms
+#       8	BMS_INFO	BMS-Informationen	            Erweiterter Rahmen	0x18F428F4	BMS	        Peripherie	500 ms
+#       9	BMSSwSta	BMS-Schalterzustand	            Erweiterter Rahmen	0x18F528F4	BMS	        Peripherie	500 ms
+#       10	CELLVOL	    Zellenspannung	                Erweiterter Rahmen	0x18E028F4	BMS	        Peripherie	1000 ms
+#       11	BMSChg_INFO	BMS-Ladeanforderung	            Erweiterter Rahmen	0x1806E5F4	BMS	        Peripherie	500 ms
+#       12	Ctrl_INFO	Steuerinformationen	            Erweiterter Rahmen	0x18F0F428	Peripherie	BMS	        -
+
     CAN_FRAMES = {
-        BATT_STAT: [0x02F4, 0x02F5],
-        CELL_VOLT: [0x04F4, 0x04F5],
-        CELL_TEMP: [0x05F4, 0x05F5],
-        ALM_INFO: [0x07F4, 0x07F5],
+        BATT_STAT: [0x02F4],
+        CELL_VOLT: [0x04F4],
+        CELL_TEMP: [0x05F4],
+        ALM_INFO: [0x07F4],
     }
 
     def connection_name(self) -> str:
@@ -96,7 +113,7 @@ class Jkbms_Can(Battery):
             for c in range(missing_instances):
                 self.cells.append(Cell(False))
 
-        self.hardware_version = "JKBMS CAN " + str(self.cell_count) + "S"
+        self.hardware_version = "JKBMS PB CAN " + str(self.cell_count) + "S"
         return True
 
     def refresh_data(self):
@@ -106,7 +123,7 @@ class Jkbms_Can(Battery):
         return self.read_status_data()
 
     def read_status_data(self):
-        status_data = self.read_serial_data_jkbms_CAN()
+        status_data = self.read_jkbms_can()
         # check if connection success
         if status_data is False:
             return False
@@ -165,7 +182,7 @@ class Jkbms_Can(Battery):
         self.protection.internal_failure = 0
         self.protection.internal_failure = 0
 
-    def read_serial_data_jkbms_CAN(self):
+    def read_jkbms_can(self):
         if self.can_bus is False:
             logger.debug("Can bus init")
             # intit the can interface

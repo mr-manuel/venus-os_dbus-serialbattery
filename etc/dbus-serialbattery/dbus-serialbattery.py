@@ -237,11 +237,13 @@ def main():
         """
         from bms.daly_can import Daly_Can
         from bms.jkbms_can import Jkbms_Can
+        from bms.jkbms_pb_can import Jkbms_Pb_Can
 
         # only try CAN BMS on CAN port
         supported_bms_types = [
             {"bms": Daly_Can, "baud": utils.CAN_SPEED},
             {"bms": Jkbms_Can, "baud": utils.CAN_SPEED},
+            {"bms": Jkbms_Pb_Can, "baud": utils.CAN_SPEED},
         ]
 
         expected_bms_types = [
