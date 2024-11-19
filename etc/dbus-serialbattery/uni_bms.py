@@ -79,6 +79,7 @@ from bmshelper import DbusHelper
 from utils import logger
 import utils
 from battery import Battery
+sys.path.insert(1, os.path.join(os.path.dirname(__file__), "ext"))
 
 # import battery classes
 from bms.daly import Daly
@@ -102,8 +103,6 @@ if "MNB" in utils.BMS_TYPE:
     from bms.mnb import MNB
 if "Sinowealth" in utils.BMS_TYPE:
     from bms.sinowealth import Sinowealth
-
-
 
 #########################################
 ##class
