@@ -209,6 +209,9 @@ class BatteryTemplate(Battery):
         # high battery voltage alarm (int)
         self.protection.high_voltage = VALUE_FROM_BMS
 
+        # high cell voltage alarm (int)
+        self.protection.high_cell_voltage = VALUE_FROM_BMS
+
         # low battery voltage alarm (int)
         self.protection.low_voltage = VALUE_FROM_BMS
 

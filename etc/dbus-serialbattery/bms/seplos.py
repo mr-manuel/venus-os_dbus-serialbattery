@@ -174,9 +174,7 @@ class Seplos(Battery):
         logger.debug("alarm info decoded {}".format(data))
         voltage_alarm_byte = data[30]
         self.protection.low_cell_voltage = Seplos.decode_alarm_byte(data_byte=voltage_alarm_byte, alarm_bit=3, warn_bit=2)
-        # cell high voltage is actually unused because DBUS does not seem to support it, decoding anyway
-        # c.f. https://github.com/victronenergy/venus/wiki/dbus#battery
-        self.protection.voltage_cell_high = Seplos.decode_alarm_byte(data_byte=voltage_alarm_byte, alarm_bit=1, warn_bit=0)
+        self.protection.high_cell_voltage = Seplos.decode_alarm_byte(data_byte=voltage_alarm_byte, alarm_bit=1, warn_bit=0)
         self.protection.low_voltage = Seplos.decode_alarm_byte(data_byte=voltage_alarm_byte, alarm_bit=7, warn_bit=6)
         self.protection.high_voltage = Seplos.decode_alarm_byte(data_byte=voltage_alarm_byte, alarm_bit=5, warn_bit=4)
 

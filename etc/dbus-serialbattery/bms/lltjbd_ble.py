@@ -1,4 +1,8 @@
 # -*- coding: utf-8 -*-
+
+# Notes
+# Updated by https://github.com/idstein
+
 import asyncio
 import atexit
 import functools

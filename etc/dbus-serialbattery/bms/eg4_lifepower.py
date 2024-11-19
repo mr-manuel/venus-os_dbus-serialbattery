@@ -6,7 +6,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 from battery import Battery, Cell
-from utils import read_serial_data, logger
+from utils import read_serial_data, logger, bytearray_to_string
 from struct import unpack_from
 import re
 import sys
@@ -17,9 +17,9 @@ class EG4_Lifepower(Battery):
         super(EG4_Lifepower, self).__init__(port, baud, address)
         self.type = self.BATTERYTYPE
         self.address = address
-        self.command_general = b"\x7E" + address + b"\x01\x00\xFE\x0D"
+        self.command_general = b"\x7E" + address + b"\x01\x00" + self.get_command_general_part() + b"\x0D"
         self.command_hardware_version = b"\x7E" + address + b"\x42\x00\xFC\x0D"
-        self.command_firmware_version = b"\x7E" + address + b"\x33\x00\xFE\x0D"
+        self.command_firmware_version = b"\x7E" + address + b"\x33\x00" + self.get_command_general_part() + b"\x0D"
 
     balancing = 0
     BATTERYTYPE = "EG4 Lifepower"
@@ -53,11 +53,44 @@ class EG4_Lifepower(Battery):
 
         return result
 
+    def get_command_general_part(self):
+        """
+        Get the second last byte of the command_general command
+
+        0x00:\x7E\x01\x01\x00\x00\x0D
+        0x01:\x7E\x01\x01\x00\xFE\x0D
+        0x02:\x7E\x02\x01\x00\xFC\x0D
+        0x03:\x7E\x03\x01\x00\xFE\x0D
+        0x04:\x7E\x04\x01\x00\xF8\x0D
+        0x05:\x7E\x05\x01\x00\xFE\x0D
+        0x06:\x7E\x06\x01\x00\xFC\x0D
+        0x07:\x7E\x07\x01\x00\xFE\x0D
+        0x08:\x7E\x08\x01\x00\xF0\x0D
+        0x09:\x7E\x09\x01\x00\xFE\x0D
+        0x0A:\x7E\x0A\x01\x00\xFC\x0D
+        0x0B:\x7E\x0B\x01\x00\xFE\x0D
+        0x0C:\x7E\x0C\x01\x00\xF8\x0D
+        0x0D:\x7E\x0D\x01\x00\xFE\x0D
+        0x0E:\x7E\x0E\x01\x00\xFC\x0D
+        0x0F:\x7E\x0D\x01\x00\xFE\x0D
+        """
+        if self.address == b"\x00":
+            return b"\x00"
+        elif self.address == b"\x02" or self.address == b"\x06" or self.address == b"\x0A" or self.address == b"\x0E":
+            return b"\xFC"
+        elif self.address == b"\x04" or self.address == b"\x0C":
+            return b"\xF8"
+        elif self.address == b"\x08":
+            return b"\xF0"
+        else:
+            return b"\xFE"
+
     def get_settings(self):
         # After successful connection get_settings() will be called to set up the battery
         # Set the current limits, populate cell count, etc
         # Return True if success, False for failure
         result = False
+        result_2 = False
 
         hardware_version = self.read_serial_data_eg4(self.command_hardware_version)
         if hardware_version:
@@ -68,27 +101,26 @@ class EG4_Lifepower(Battery):
                 "",
                 str(hardware_version, encoding="utf-8", errors="ignore"),
             )
-            logger.info("Hardware Version:" + self.hardware_version)
+            logger.info(f"Hardware Version for address {bytearray_to_string(self.address)}: {self.hardware_version}")
 
             result = True
 
-        if result:
-            version = self.read_serial_data_eg4(self.command_firmware_version)
-            if version:
-                self.version = re.sub(
-                    r"[^a-zA-Z0-9-._ ]",
-                    "",
-                    str(version, encoding="utf-8", errors="ignore"),
-                )
-                logger.info("Firmware Version:" + self.version)
+        version = self.read_serial_data_eg4(self.command_firmware_version)
+        if version:
+            self.version = re.sub(
+                r"[^a-zA-Z0-9-._ ]",
+                "",
+                str(version, encoding="utf-8", errors="ignore"),
+            )
+            logger.info(f"Firmware Version for address {bytearray_to_string(self.address)}: {self.version}")
 
-            result = True
+            result_2 = True
 
         # polling every second seems to create some error messages
         # change to 2 seconds
         self.poll_interval = 2000
 
-        return result
+        return result or result_2
 
     def refresh_data(self):
         # call all functions that will refresh the battery data.

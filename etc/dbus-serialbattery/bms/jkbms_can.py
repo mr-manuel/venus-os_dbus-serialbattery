@@ -122,7 +122,7 @@ class Jkbms_Can(Battery):
         tmp = bin(byte_data | 0xFF00000000)
         pos = len(tmp)
         logger.debug(tmp)
-        self.protection.cell_overvoltage = 2 if int(tmp[pos - 2 : pos], 2) > 0 else 0
+        self.protection.high_cell_voltage = 2 if int(tmp[pos - 2 : pos], 2) > 0 else 0
         self.protection.low_cell_voltage = 2 if int(tmp[pos - 4 : pos - 2], 2) > 0 else 0
         self.protection.high_voltage = 2 if int(tmp[pos - 6 : pos - 4], 4) > 0 else 0
         self.protection.low_voltage = 2 if int(tmp[pos - 8 : pos - 6], 2) > 0 else 0
@@ -144,7 +144,7 @@ class Jkbms_Can(Battery):
         self.protection.internal_failure = 2 if int(tmp[pos - 30 : pos - 28], 2) > 0 else 0
 
     def reset_protection_bits(self):
-        self.protection.cell_overvoltage = 0
+        self.protection.high_cell_voltage = 0
         self.protection.low_cell_voltage = 0
         self.protection.high_voltage = 0
         self.protection.low_voltage = 0

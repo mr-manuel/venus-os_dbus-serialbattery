@@ -1,4 +1,8 @@
 # -*- coding: utf-8 -*-
+
+# Notes
+# Updated by https://github.com/peterohman
+
 from battery import Battery, Cell
 from utils import logger
 import serial
@@ -81,8 +85,6 @@ class HLPdataBMS4S(Battery):
             self.hardware_version = s1[ix : len(s1) - 1]
             self.version = self.hardware_version
             self.poll_interval = 10000
-            self.control_discharge_current = 1000
-            self.control_charge_current = 1000
             if self.cell_count is None:
                 self.cell_count = 4
                 for c in range(self.cell_count):
@@ -208,10 +210,6 @@ class HLPdataBMS4S(Battery):
     def manage_charge_voltage(self):
         self.allow_max_voltage = True
         self.control_voltage = self.max_battery_voltage
-
-    def manage_charge_and_discharge_current(self):
-        self.control_charge_current = 1000
-        self.control_discharge_current = 1000
 
     def read_serial_data_HLPdataBMS4S(self, command, time, min_len):
         data = read_serial_data(command, self.port, self.baud_rate, time, min_len)

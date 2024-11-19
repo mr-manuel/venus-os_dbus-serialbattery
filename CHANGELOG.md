@@ -63,10 +63,17 @@
 
 
 ## v1.5.x
+* Added: Configurable threshold to prevent rapid switching (flapping) of `CCL` or `DCL` when 0 by @mr-manuel
 * Added: Daly BMS - Connect multiple BMS to the same RS485 port by @CaptKrisp
+* Added: EG LifePower - Connect multiple BMS to the same RS485 port by @mr-manuel
+* Added: GUIv2 by @mr-manuel
+* Added: High cell voltage alarm was added to venus-platform with https://github.com/victronenergy/venus-platform/commit/d686955aa15b7e246a92ee1f4c3eef3b62b153b7 and now also to this driver by @mr-manuel
 * Added: Possibility to change the CAN bus speed by @mr-manuel
-* Added: Threshold, if `CCL = 0` or `DCL = 0` is reached to prevent flapping @mr-manuel
 * Changed: Calculate Time-to-Go until ESS -> Minimum SOC (unless grid fails), Active SOC limit or `SOC_LOW_WARNING` from `config.ini` by @mr-manuel
+* Changed: HLPDATA BMS - BMS control of max charge and discharge is removed by @peterohman
+* Changed: HLPDATA BMS - improved driver with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/96 by @peterohman
+* Changed: JKBMS PB Model fixed firmware version and temperature sensors by @KoljaWindeler
+* Changed: Optimized auto increase of the polling time by @mr-manuel
 * Changed: Rewritten code for external current sensor and fixed https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/60 by @mr-manuel
 
 ## v1.4.20240928

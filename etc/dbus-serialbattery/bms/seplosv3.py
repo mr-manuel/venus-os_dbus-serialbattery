@@ -19,7 +19,7 @@ RETRYCNT = 3
 class Seplosv3(Battery):
     def __init__(self, port, baud, address):
         super(Seplosv3, self).__init__(port, baud, address)
-        self.type = "Seplosv3_BMS_modbus"
+        self.type = "Seplos v3"
         self.serialnumber = ""
         self.mbdev: Union[minimalmodbus.Instrument, None] = None
         if address is not None and len(address) > 0:
@@ -224,7 +224,7 @@ class Seplosv3(Battery):
             #   ALARM = 2 , WARNING = 1 , OK = 0
             self.protection.high_voltage = 2 if sfa[0x05] == 0 else 1 if sfa[0x04] == 0 else 0
             self.protection.low_voltage = 2 if sfa[0x06] == 0 else 1 if sfa[0x06] == 0 else 0
-            # self.protection.voltage_cell_high =  1 if  sfa[0x00] == 0 else 0 + 1 if  sfa[0x01] == 0 else 0
+            self.protection.high_cell_voltage = 1 if sfa[0x00] == 0 else 0 + 1 if sfa[0x01] == 0 else 0
             self.protection.low_cell_voltage = 2 if sfa[0x03] == 0 else 1 if sfa[0x02] == 0 else 0
             self.protection.low_soc = 2 if sfa[0x30] == 0 else 0
             self.protection.high_charge_current = 2 if sfa[0x21] == 0 else 1 if sfa[0x20] == 0 else 0

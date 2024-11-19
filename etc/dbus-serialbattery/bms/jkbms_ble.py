@@ -1,4 +1,10 @@
 # -*- coding: utf-8 -*-
+
+# Notes
+# Added by https://github.com/baranator
+# https://github.com/Louisvdw/dbus-serialbattery/pull/372
+# Updated by https://github.com/mr-manuel
+
 from battery import Battery, Cell
 from typing import Callable
 from utils import logger, AUTO_RESET_SOC
@@ -212,8 +218,8 @@ class Jkbms_Ble(Battery):
         else:
             self.protection.cell_imbalance = 0
 
-        self.protection.high_voltage = 2 if st["warnings"]["cell_overvoltage"] else 0
-        self.protection.low_voltage = 2 if st["warnings"]["cell_undervoltage"] else 0
+        self.protection.high_cell_voltage = 2 if st["warnings"]["cell_overvoltage"] else 0
+        self.protection.low_cell_voltage = 2 if st["warnings"]["cell_undervoltage"] else 0
 
         self.protection.high_charge_current = 2 if (st["warnings"]["charge_overcurrent"] or st["warnings"]["discharge_overcurrent"]) else 0
         self.protection.set_IC_inspection = 2 if st["cell_info"]["temperature_mos"] > 80 else 0

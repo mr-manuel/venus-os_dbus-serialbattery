@@ -1,4 +1,8 @@
 # -*- coding: utf-8 -*-
+
+# Notes
+# Updated by https://github.com/transistorgit
+
 from battery import Battery, Cell
 from utils import (
     bytearray_to_string,

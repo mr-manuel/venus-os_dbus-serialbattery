@@ -1,4 +1,8 @@
 # -*- coding: utf-8 -*-
+
+# Notes
+# Updated by https://github.com/mr-manuel
+
 from battery import Battery, Cell
 from utils import bytearray_to_string, is_bit_set, read_serial_data, logger, ZERO_CHAR
 from struct import unpack_from
@@ -293,14 +297,16 @@ class Jkbms(Battery):
         self.protection.high_charge_current = 1 if is_bit_set(tmp[pos - 5]) else 0
         # discharge over current alarm
         self.protection.high_discharge_current = 1 if is_bit_set(tmp[pos - 6]) else 0
-        # core differential pressure alarm OR unit overvoltage alarm
-        self.protection.cell_imbalance = 2 if is_bit_set(tmp[pos - 7]) else 1 if is_bit_set(tmp[pos - 10]) else 0
-        # unit undervoltage alarm
-        self.protection.low_cell_voltage = 1 if is_bit_set(tmp[pos - 11]) else 0
+        # core differential pressure alarm
+        self.protection.cell_imbalance = 1 if is_bit_set(tmp[pos - 7]) else 0
         # battery overtemperature alarm OR overtemperature alarm in the battery box
         alarm_temp_high = 1 if is_bit_set(tmp[pos - 4]) or is_bit_set(tmp[pos - 8]) else 0
         # battery low temperature alarm
         alarm_temp_low = 1 if is_bit_set(tmp[pos - 9]) else 0
+        # cell overvoltage alarm
+        self.protection.high_cell_voltage = 1 if is_bit_set(tmp[pos - 10]) else 0
+        # cell undervoltage alarm
+        self.protection.low_cell_voltage = 1 if is_bit_set(tmp[pos - 11]) else 0
         # check if low/high temp alarm arise during charging
         self.protection.high_charge_temp = 1 if self.current > 0 and alarm_temp_high == 1 else 0
         self.protection.low_charge_temp = 1 if self.current > 0 and alarm_temp_low == 1 else 0

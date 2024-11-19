@@ -139,7 +139,7 @@ class Jkbms_pb(Battery):
         status_data = self.read_serial_data_jkbms_pb(self.command_about, 300)
         serial_nr = status_data[86:96].decode("utf-8")
         vendor_id = status_data[6:18].decode("utf-8")
-        hw_version = (status_data[22:26].decode("utf-8") + " / " + status_data[30:34].decode("utf-8")).replace("\x00", "")
+        hw_version = (status_data[22:26].decode("utf-8") + " / " + status_data[30:35].decode("utf-8")).replace("\x00", "")
         sw_version = status_data[30:34].decode("utf-8")  # will be overridden
 
         self.unique_identifier_tmp = serial_nr
@@ -185,20 +185,17 @@ class Jkbms_pb(Battery):
         # Temperature sensors
         temp1 = unpack_from("<h", status_data, 162)[0] / 10
         temp2 = unpack_from("<h", status_data, 164)[0] / 10
-        temp3 = unpack_from("<h", status_data, 254)[0] / 10
-        temp4 = unpack_from("<h", status_data, 256)[0] / 10
-        temp5 = unpack_from("<h", status_data, 258)[0] / 10
+        temp3 = unpack_from("<h", status_data, 256)[0] / 10
+        temp4 = unpack_from("<h", status_data, 258)[0] / 10
 
         if unpack_from("<B", status_data, 214)[0] & 0x02:
             self.to_temp(1, temp1 if temp1 < 99 else (100 - temp1))
         if unpack_from("<B", status_data, 214)[0] & 0x04:
             self.to_temp(2, temp2 if temp2 < 99 else (100 - temp2))
-        if unpack_from("<B", status_data, 214)[0] & 0x08:
-            self.to_temp(3, temp3 if temp3 < 99 else (100 - temp3))
         if unpack_from("<B", status_data, 214)[0] & 0x10:
-            self.to_temp(4, temp4 if temp4 < 99 else (100 - temp4))
+            self.to_temp(3, temp3 if temp3 < 99 else (100 - temp3))
         if unpack_from("<B", status_data, 214)[0] & 0x20:
-            self.to_temp(5, temp5 if temp5 < 99 else (100 - temp5))
+            self.to_temp(4, temp4 if temp4 < 99 else (100 - temp4))
 
         # Battery voltage
         self.voltage = unpack_from("<I", status_data, 150)[0] / 1000
@@ -319,7 +316,9 @@ class Jkbms_pb(Battery):
         self.protection.high_discharge_current = (byte_data & 0x00002000) * 2
         # core differential pressure alarm OR unit overvoltage alarm
         self.protection.cell_imbalance = 0
-        # unit undervoltage alarm
+        # cell overvoltage alarm
+        self.protection.high_cell_voltage = (byte_data & 0x00000010) * 2
+        # cell undervoltage alarm
         self.protection.low_cell_voltage = (byte_data & 0x00001000) * 2
         # battery overtemperature alarm OR overtemperature alarm in the battery box
         self.protection.high_charge_temp = (byte_data & 0x00000100) * 2

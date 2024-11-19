@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+
 from battery import Battery, Cell
 from utils import bytearray_to_string, read_serial_data, unpack_from, logger
 from struct import unpack
