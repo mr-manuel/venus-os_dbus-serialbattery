@@ -559,13 +559,24 @@ echo "CUSTOM SETTINGS: If you want to add custom settings, then check the settin
 echo "                 and add them to \"/data/etc/dbus-serialbattery/config.ini\" to persist future driver updates."
 echo
 echo
-echo "GUIv2: If you want to try the new GUIv2 follow this link:"
-echo "       https://github.com/mr-manuel/venus-os_dbus-serialbattery/tree/master/gui-v2"
-echo
-echo
 # print which version was installed
 # fetch line 40 from utils.py
 line=$(cat /data/etc/dbus-serialbattery/utils.py | grep DRIVER_VERSION | awk -F'"' '{print "v" $2}')
 echo "*** dbus-serialbattery $line was installed. ***"
+echo
+echo
+echo "####################################"
+echo "# Help to keep this project alive! #"
+echo "####################################"
+echo
+echo "Your support keeps this project alive!"
+echo "If you find this project valuable, please consider making a donation."
+echo "Your contribution helps me continue improving and maintaining it."
+echo "Every donation, no matter the size, makes a difference."
+echo "Copy the link below and paste it into your browser to donate:"
+echo
+echo "https://www.paypal.com/donate/?hosted_button_id=3NEVZBDM5KABW"
+echo
+echo "Cheers, mr-manuel"
 echo
 echo

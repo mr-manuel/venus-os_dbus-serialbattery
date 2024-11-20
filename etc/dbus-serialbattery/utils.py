@@ -14,7 +14,7 @@ import serial
 
 
 # CONSTANTS
-DRIVER_VERSION: str = "1.5.20241109dev"
+DRIVER_VERSION: str = "1.5.20241119dev"
 """
 current version of the driver
 """
@@ -39,538 +39,550 @@ PATH_CONFIG_USER: str = "config.ini"
 
 config = configparser.ConfigParser()
 path = Path(__file__).parents[0]
-default_config_file_path = path.joinpath(PATH_CONFIG_DEFAULT).absolute().__str__()
-custom_config_file_path = path.joinpath(PATH_CONFIG_USER).absolute().__str__()
+default_config_file_path = str(path.joinpath(PATH_CONFIG_DEFAULT).absolute())
+custom_config_file_path = str(path.joinpath(PATH_CONFIG_USER).absolute())
 config.read([default_config_file_path, custom_config_file_path])
 
-# get logging level from config file
-if config["DEFAULT"]["LOGGING"].upper() == "ERROR":
-    logger.setLevel(logging.ERROR)
-elif config["DEFAULT"]["LOGGING"].upper() == "WARNING":
-    logger.setLevel(logging.WARNING)
-elif config["DEFAULT"]["LOGGING"].upper() == "DEBUG":
-    logger.setLevel(logging.DEBUG)
-else:
-    logger.setLevel(logging.INFO)
+# Map config logging levels to logging module levels
+LOGGING_LEVELS = {
+    "ERROR": logging.ERROR,
+    "WARNING": logging.WARNING,
+    "INFO": logging.INFO,
+    "DEBUG": logging.DEBUG,
+}
 
+# Set logging level from config file
+logger.setLevel(LOGGING_LEVELS.get(config["DEFAULT"].get("LOGGING").upper()))
 
-# list to store config errors
-# this is needed else the errors are not instantly visible
+# List to store config errors
+# This is needed else the errors are not instantly visible
 errors_in_config = []
 
 
-# FUNCTIONS needed for config parsing
-def _get_list_from_config(group: str, option: str, mapper: Callable[[Any], Any] = lambda v: v) -> List[Any]:
+# --------- Helper Functions ---------
+def get_bool_from_config(group: str, option: str) -> bool:
     """
-    Get a string with comma separated values from the config file and return a list of values
+    Get a boolean value from the config file.
+
+    :param group: Group in the config file
+    :param option: Option in the config file
+    :return: Boolean value
+    """
+    return config[group].get(option, "False").lower() == "true"
+
+
+def get_float_from_config(group: str, option: str) -> float:
+    """
+    Get a float value from the config file.
+
+    :param group: Group in the config file
+    :param option: Option in the config file
+    :return: Float value
+    """
+    return float(config[group][option])
+
+
+def get_int_from_config(group: str, option: str) -> int:
+    """
+    Get an integer value from the config file.
+
+    :param group: Group in the config file
+    :param option: Option in the config file
+    :return: Integer value
+    """
+    return int(config[group][option])
+
+
+def get_list_from_config(group: str, option: str, mapper: Callable[[Any], Any] = lambda v: v) -> List[Any]:
+    """
+    Get a string with comma-separated values from the config file and return a list of values.
 
     :param group: Group in the config file
     :param option: Option in the config file
     :param mapper: Function to map the values to the correct type
     :return: List of values
     """
-    rawList = config[group][option].split(",")
-    return list(
-        map(
-            mapper,
-            [item.strip() for item in rawList if item != "" and item is not None],
-        )
-    )
+    try:
+        raw_list = config[group][option].split(",")
+        return [mapper(item.strip()) for item in raw_list if item.strip()]
+    except KeyError:
+        logger.error(f"Missing config option '{option}' in group '{group}'")
+        errors_in_config.append(f"Missing config option '{option}' in group '{group}'")
+        return []
+
+
+def check_config_issue(condition: bool, message: str):
+    """
+    Check a condition and append a message to the errors_in_config list if the condition is True.
+
+    :param condition: The condition to check
+    :param message: The message to append if the condition is True
+    """
+    if condition:
+        errors_in_config.append(f"**CONFIG ISSUE**: {message}")
 
 
 # SAVE CONFIG VALUES to constants
-# --------- Battery Current limits ---------
-MAX_BATTERY_CHARGE_CURRENT: float = float(config["DEFAULT"]["MAX_BATTERY_CHARGE_CURRENT"])
+# --------- Battery Current Limits ---------
+MAX_BATTERY_CHARGE_CURRENT: float = get_float_from_config("DEFAULT", "MAX_BATTERY_CHARGE_CURRENT")
 """
 Defines the maximum charge current that the battery can accept.
 """
-MAX_BATTERY_DISCHARGE_CURRENT: float = float(config["DEFAULT"]["MAX_BATTERY_DISCHARGE_CURRENT"])
+MAX_BATTERY_DISCHARGE_CURRENT: float = get_float_from_config("DEFAULT", "MAX_BATTERY_DISCHARGE_CURRENT")
 """
 Defines the maximum discharge current that the battery can deliver.
 """
 
 # --------- Cell Voltages ---------
-MIN_CELL_VOLTAGE: float = float(config["DEFAULT"]["MIN_CELL_VOLTAGE"])
+MIN_CELL_VOLTAGE: float = get_float_from_config("DEFAULT", "MIN_CELL_VOLTAGE")
 """
 Defines the minimum cell voltage that the battery can have.
 Used for:
 - Limit CVL range
 - SoC calculation (if enabled)
 """
-MAX_CELL_VOLTAGE: float = float(config["DEFAULT"]["MAX_CELL_VOLTAGE"])
+MAX_CELL_VOLTAGE: float = get_float_from_config("DEFAULT", "MAX_CELL_VOLTAGE")
 """
 Defines the maximum cell voltage that the battery can have.
 Used for:
 - Limit CVL range
 - SoC calculation (if enabled)
 """
-
-FLOAT_CELL_VOLTAGE: float = float(config["DEFAULT"]["FLOAT_CELL_VOLTAGE"])
+FLOAT_CELL_VOLTAGE: float = get_float_from_config("DEFAULT", "FLOAT_CELL_VOLTAGE")
 """
 Defines the cell voltage that the battery should have when it is fully charged.
 """
 
-# make some checks for most common missconfigurations
+# make some checks for most common misconfigurations
 if FLOAT_CELL_VOLTAGE > MAX_CELL_VOLTAGE:
-    errors_in_config.append(
-        f"**CONFIG ISSUE**: FLOAT_CELL_VOLTAGE ({FLOAT_CELL_VOLTAGE} V) is greater than MAX_CELL_VOLTAGE ({MAX_CELL_VOLTAGE} V). "
-        + "To ensure that the driver still works correctly, FLOAT_CELL_VOLTAGE was set to MAX_CELL_VOLTAGE. Please check the configuration."
+    check_config_issue(
+        True,
+        f"FLOAT_CELL_VOLTAGE ({FLOAT_CELL_VOLTAGE} V) is greater than MAX_CELL_VOLTAGE ({MAX_CELL_VOLTAGE} V). "
+        + "To ensure that the driver still works correctly, FLOAT_CELL_VOLTAGE was set to MAX_CELL_VOLTAGE. Please check the configuration.",
     )
     FLOAT_CELL_VOLTAGE = MAX_CELL_VOLTAGE
-
-# make some checks for most common missconfigurations
-if FLOAT_CELL_VOLTAGE < MIN_CELL_VOLTAGE:
-    errors_in_config.append(
-        "**CONFIG ISSUE**: FLOAT_CELL_VOLTAGE ({FLOAT_CELL_VOLTAGE} V) is less than MIN_CELL_VOLTAGE ({MIN_CELL_VOLTAGE} V). "
-        + "To ensure that the driver still works correctly, FLOAT_CELL_VOLTAGE was set to MIN_CELL_VOLTAGE. Please check the configuration."
+elif FLOAT_CELL_VOLTAGE < MIN_CELL_VOLTAGE:
+    check_config_issue(
+        True,
+        "FLOAT_CELL_VOLTAGE ({FLOAT_CELL_VOLTAGE} V) is less than MIN_CELL_VOLTAGE ({MIN_CELL_VOLTAGE} V). "
+        + "To ensure that the driver still works correctly, FLOAT_CELL_VOLTAGE was set to MIN_CELL_VOLTAGE. Please check the configuration.",
     )
     FLOAT_CELL_VOLTAGE = MIN_CELL_VOLTAGE
 
-SOC_RESET_VOLTAGE: float = float(config["DEFAULT"]["SOC_RESET_VOLTAGE"])
-SOC_RESET_AFTER_DAYS: int = int(config["DEFAULT"]["SOC_RESET_AFTER_DAYS"]) if config["DEFAULT"]["SOC_RESET_AFTER_DAYS"] != "" else False
 
-# make some checks for most common missconfigurations
+# --------- SoC Reset Voltage (must match BMS settings) ---------
+SOC_RESET_VOLTAGE: float = get_float_from_config("DEFAULT", "SOC_RESET_VOLTAGE")
+SOC_RESET_AFTER_DAYS: Union[int, bool] = get_int_from_config("DEFAULT", "SOC_RESET_AFTER_DAYS") if config["DEFAULT"]["SOC_RESET_AFTER_DAYS"] != "" else False
+
+# make some checks for most common misconfigurations
 if SOC_RESET_AFTER_DAYS and SOC_RESET_VOLTAGE < MAX_CELL_VOLTAGE:
-    errors_in_config.append(
-        "**CONFIG ISSUE**: SOC_RESET_VOLTAGE ({SOC_RESET_VOLTAGE} V) is less than MAX_CELL_VOLTAGE ({MAX_CELL_VOLTAGE} V). "
-        + "To ensure that the driver still works correctly, SOC_RESET_VOLTAGE was set to MAX_CELL_VOLTAGE. Please check the configuration."
+    check_config_issue(
+        True,
+        f"SOC_RESET_VOLTAGE ({SOC_RESET_VOLTAGE} V) is less than MAX_CELL_VOLTAGE ({MAX_CELL_VOLTAGE} V). "
+        "To ensure that the driver still works correctly, SOC_RESET_VOLTAGE was set to MAX_CELL_VOLTAGE. Please check the configuration.",
     )
     SOC_RESET_VOLTAGE = MAX_CELL_VOLTAGE
 
+
+# --------- SoC Calculation ---------
+SOC_CALCULATION: bool = get_bool_from_config("DEFAULT", "SOC_CALCULATION")
+SOC_RESET_CURRENT: float = get_float_from_config("DEFAULT", "SOC_RESET_CURRENT")
+SOC_RESET_TIME: int = get_int_from_config("DEFAULT", "SOC_RESET_TIME")
+SOC_CALC_CURRENT_REPORTED_BY_BMS: list = get_list_from_config("DEFAULT", "SOC_CALC_CURRENT_REPORTED_BY_BMS", float)
+SOC_CALC_CURRENT_MEASURED_BY_USER: list = get_list_from_config("DEFAULT", "SOC_CALC_CURRENT_MEASURED_BY_USER", float)
+
+# check if lists are different
+# this allows to calculate linear relationship between the two lists only if needed
+SOC_CALC_CURRENT: bool = SOC_CALC_CURRENT_REPORTED_BY_BMS != SOC_CALC_CURRENT_MEASURED_BY_USER
+
+
 # --------- CAN BMS ---------
-CAN_SPEED: int = int(config["DEFAULT"]["CAN_SPEED"]) * 1000
+CAN_SPEED: int = get_int_from_config("DEFAULT", "CAN_SPEED") * 1000
 """
 Speed of the CAN bus in bps
 """
 
+
 # --------- Modbus (multiple BMS on one serial adapter) ---------
-MODBUS_ADDRESSES: list = _get_list_from_config("DEFAULT", "MODBUS_ADDRESSES", lambda v: str(v))
+MODBUS_ADDRESSES: list = get_list_from_config("DEFAULT", "MODBUS_ADDRESSES", str)
 
-# --------- BMS disconnect behaviour ---------
-BLOCK_ON_DISCONNECT: bool = "True" == config["DEFAULT"]["BLOCK_ON_DISCONNECT"]
-BLOCK_ON_DISCONNECT_TIMEOUT_MINUTES: float = float(config["DEFAULT"]["BLOCK_ON_DISCONNECT_TIMEOUT_MINUTES"])
-BLOCK_ON_DISCONNECT_VOLTAGE_MIN: float = float(config["DEFAULT"]["BLOCK_ON_DISCONNECT_VOLTAGE_MIN"])
-BLOCK_ON_DISCONNECT_VOLTAGE_MAX: float = float(config["DEFAULT"]["BLOCK_ON_DISCONNECT_VOLTAGE_MAX"])
+# --------- BMS Disconnect Behavior ---------
+BLOCK_ON_DISCONNECT: bool = get_bool_from_config("DEFAULT", "BLOCK_ON_DISCONNECT")
+BLOCK_ON_DISCONNECT_TIMEOUT_MINUTES: float = get_float_from_config("DEFAULT", "BLOCK_ON_DISCONNECT_TIMEOUT_MINUTES")
+BLOCK_ON_DISCONNECT_VOLTAGE_MIN: float = get_float_from_config("DEFAULT", "BLOCK_ON_DISCONNECT_VOLTAGE_MIN")
+BLOCK_ON_DISCONNECT_VOLTAGE_MAX: float = get_float_from_config("DEFAULT", "BLOCK_ON_DISCONNECT_VOLTAGE_MAX")
 
-# make some checks for most common missconfigurations
+# make some checks for most common misconfigurations
 if not BLOCK_ON_DISCONNECT:
     if BLOCK_ON_DISCONNECT_VOLTAGE_MIN < MIN_CELL_VOLTAGE:
-        errors_in_config.append(
-            f"**CONFIG ISSUE**: BLOCK_ON_DISCONNECT_VOLTAGE_MIN ({BLOCK_ON_DISCONNECT_VOLTAGE_MIN} V) is less than MIN_CELL_VOLTAGE ({MIN_CELL_VOLTAGE} V). "
-            + "To ensure that the driver still works correctly, BLOCK_ON_DISCONNECT_VOLTAGE_MIN was set to MIN_CELL_VOLTAGE. Please check the configuration."
+        check_config_issue(
+            True,
+            f"BLOCK_ON_DISCONNECT_VOLTAGE_MIN ({BLOCK_ON_DISCONNECT_VOLTAGE_MIN} V) is less than MIN_CELL_VOLTAGE ({MIN_CELL_VOLTAGE} V). "
+            "To ensure that the driver still works correctly, BLOCK_ON_DISCONNECT_VOLTAGE_MIN was set to MIN_CELL_VOLTAGE. Please check the configuration.",
         )
         BLOCK_ON_DISCONNECT_VOLTAGE_MIN = MIN_CELL_VOLTAGE
 
     if BLOCK_ON_DISCONNECT_VOLTAGE_MAX > MAX_CELL_VOLTAGE:
-        errors_in_config.append(
-            f"**CONFIG ISSUE**: BLOCK_ON_DISCONNECT_VOLTAGE_MAX ({BLOCK_ON_DISCONNECT_VOLTAGE_MAX} V) is greater than MAX_CELL_VOLTAGE ({MAX_CELL_VOLTAGE} V). "
-            + "To ensure that the driver still works correctly, BLOCK_ON_DISCONNECT_VOLTAGE_MAX was set to MAX_CELL_VOLTAGE. Please check the configuration."
+        check_config_issue(
+            True,
+            f"BLOCK_ON_DISCONNECT_VOLTAGE_MAX ({BLOCK_ON_DISCONNECT_VOLTAGE_MAX} V) is greater than MAX_CELL_VOLTAGE ({MAX_CELL_VOLTAGE} V). "
+            "To ensure that the driver still works correctly, BLOCK_ON_DISCONNECT_VOLTAGE_MAX was set to MAX_CELL_VOLTAGE. Please check the configuration.",
         )
         BLOCK_ON_DISCONNECT_VOLTAGE_MAX = MAX_CELL_VOLTAGE
 
     if BLOCK_ON_DISCONNECT_VOLTAGE_MIN >= BLOCK_ON_DISCONNECT_VOLTAGE_MAX:
-        errors_in_config.append(
-            f"**CONFIG ISSUE**: BLOCK_ON_DISCONNECT_VOLTAGE_MIN ({BLOCK_ON_DISCONNECT_VOLTAGE_MIN} V) "
-            + f"is greater or equal to BLOCK_ON_DISCONNECT_VOLTAGE_MAX ({BLOCK_ON_DISCONNECT_VOLTAGE_MAX} V). "
-            + "For safety reasons BLOCK_ON_DISCONNECT was set to True. Please check the configuration."
+        check_config_issue(
+            True,
+            f"BLOCK_ON_DISCONNECT_VOLTAGE_MIN ({BLOCK_ON_DISCONNECT_VOLTAGE_MIN} V) "
+            f"is greater or equal to BLOCK_ON_DISCONNECT_VOLTAGE_MAX ({BLOCK_ON_DISCONNECT_VOLTAGE_MAX} V). "
+            "For safety reasons BLOCK_ON_DISCONNECT was set to True. Please check the configuration.",
         )
         BLOCK_ON_DISCONNECT = True
 
 
 # --------- Charge mode ---------
-LINEAR_LIMITATION_ENABLE: bool = "True" == config["DEFAULT"]["LINEAR_LIMITATION_ENABLE"]
-LINEAR_RECALCULATION_EVERY: int = int(config["DEFAULT"]["LINEAR_RECALCULATION_EVERY"])
-LINEAR_RECALCULATION_ON_PERC_CHANGE: int = int(config["DEFAULT"]["LINEAR_RECALCULATION_ON_PERC_CHANGE"])
+LINEAR_LIMITATION_ENABLE: bool = get_bool_from_config("DEFAULT", "LINEAR_LIMITATION_ENABLE")
+LINEAR_RECALCULATION_EVERY: int = get_int_from_config("DEFAULT", "LINEAR_RECALCULATION_EVERY")
+LINEAR_RECALCULATION_ON_PERC_CHANGE: int = get_int_from_config("DEFAULT", "LINEAR_RECALCULATION_ON_PERC_CHANGE")
+
 
 # --------- External current sensor ---------
-EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE: str = (
-    config["DEFAULT"]["EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE"] if config["DEFAULT"]["EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE"] != "" else None
-)
-EXTERNAL_CURRENT_SENSOR_DBUS_PATH: str = (
-    config["DEFAULT"]["EXTERNAL_CURRENT_SENSOR_DBUS_PATH"] if config["DEFAULT"]["EXTERNAL_CURRENT_SENSOR_DBUS_PATH"] != "" else None
-)
+EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE: Union[str, None] = config["DEFAULT"]["EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE"] or None
+EXTERNAL_CURRENT_SENSOR_DBUS_PATH: Union[str, None] = config["DEFAULT"]["EXTERNAL_CURRENT_SENSOR_DBUS_PATH"] or None
 
-# --------- Charge Voltage limitation (affecting CVL) ---------
-CVCM_ENABLE: bool = "True" == config["DEFAULT"]["CVCM_ENABLE"]
+
+# --------- Charge Voltage Limitation (affecting CVL) ---------
+CVCM_ENABLE: bool = get_bool_from_config("DEFAULT", "CVCM_ENABLE")
 """
 Charge voltage control management
 
 Limits max charging voltage (CVL). Switch from max to float voltage and back.
 """
+CELL_VOLTAGE_DIFF_KEEP_MAX_VOLTAGE_UNTIL: float = get_float_from_config("DEFAULT", "CELL_VOLTAGE_DIFF_KEEP_MAX_VOLTAGE_UNTIL")
+CELL_VOLTAGE_DIFF_KEEP_MAX_VOLTAGE_TIME_RESTART: float = get_float_from_config("DEFAULT", "CELL_VOLTAGE_DIFF_KEEP_MAX_VOLTAGE_TIME_RESTART")
+CELL_VOLTAGE_DIFF_TO_RESET_VOLTAGE_LIMIT: float = get_float_from_config("DEFAULT", "CELL_VOLTAGE_DIFF_TO_RESET_VOLTAGE_LIMIT")
+MAX_VOLTAGE_TIME_SEC: int = get_int_from_config("DEFAULT", "MAX_VOLTAGE_TIME_SEC")
+SOC_LEVEL_TO_RESET_VOLTAGE_LIMIT: int = get_int_from_config("DEFAULT", "SOC_LEVEL_TO_RESET_VOLTAGE_LIMIT")
 
-CELL_VOLTAGE_DIFF_KEEP_MAX_VOLTAGE_UNTIL: float = float(config["DEFAULT"]["CELL_VOLTAGE_DIFF_KEEP_MAX_VOLTAGE_UNTIL"])
-CELL_VOLTAGE_DIFF_KEEP_MAX_VOLTAGE_TIME_RESTART: float = float(config["DEFAULT"]["CELL_VOLTAGE_DIFF_KEEP_MAX_VOLTAGE_TIME_RESTART"])
-CELL_VOLTAGE_DIFF_TO_RESET_VOLTAGE_LIMIT: float = float(config["DEFAULT"]["CELL_VOLTAGE_DIFF_TO_RESET_VOLTAGE_LIMIT"])
 
-MAX_VOLTAGE_TIME_SEC: int = int(config["DEFAULT"]["MAX_VOLTAGE_TIME_SEC"])
-SOC_LEVEL_TO_RESET_VOLTAGE_LIMIT: int = int(config["DEFAULT"]["SOC_LEVEL_TO_RESET_VOLTAGE_LIMIT"])
+# --------- Cell Voltage Limitation (affecting CVL) ---------
+CVL_ICONTROLLER_MODE: bool = get_bool_from_config("DEFAULT", "CVL_ICONTROLLER_MODE")
+CVL_ICONTROLLER_FACTOR: float = get_float_from_config("DEFAULT", "CVL_ICONTROLLER_FACTOR")
 
-CCCM_CV_ENABLE: bool = "True" == config["DEFAULT"]["CCCM_CV_ENABLE"]
+
+# --------- Cell Voltage Current Limitation (affecting CCL/DCL) ---------
+CCCM_CV_ENABLE: bool = get_bool_from_config("DEFAULT", "CCCM_CV_ENABLE")
 """
 Charge current control management referring to cell-voltage
 """
-
-DCCM_CV_ENABLE: bool = "True" == config["DEFAULT"]["DCCM_CV_ENABLE"]
+DCCM_CV_ENABLE: bool = get_bool_from_config("DEFAULT", "DCCM_CV_ENABLE")
 """
 Discharge current control management referring to cell-voltage
 """
+CELL_VOLTAGES_WHILE_CHARGING: List[float] = get_list_from_config("DEFAULT", "CELL_VOLTAGES_WHILE_CHARGING", float)
+MAX_CHARGE_CURRENT_CV: List[float] = get_list_from_config("DEFAULT", "MAX_CHARGE_CURRENT_CV_FRACTION", lambda v: MAX_BATTERY_CHARGE_CURRENT * float(v))
 
-CELL_VOLTAGES_WHILE_CHARGING: list = _get_list_from_config("DEFAULT", "CELL_VOLTAGES_WHILE_CHARGING", lambda v: float(v))
-MAX_CHARGE_CURRENT_CV: list = _get_list_from_config(
-    "DEFAULT",
-    "MAX_CHARGE_CURRENT_CV_FRACTION",
-    lambda v: MAX_BATTERY_CHARGE_CURRENT * float(v),
+
+# Common configuration checks
+check_config_issue(
+    CELL_VOLTAGES_WHILE_CHARGING[0] < MAX_CELL_VOLTAGE and MAX_CHARGE_CURRENT_CV[0] == 0,
+    f"Maximum value of CELL_VOLTAGES_WHILE_CHARGING ({CELL_VOLTAGES_WHILE_CHARGING[0]} V) is lower than MAX_CELL_VOLTAGE ({MAX_CELL_VOLTAGE} V). "
+    "MAX_CELL_VOLTAGE will never be reached this way and battery will not change to float. Please check the configuration.",
 )
-# make some checks for most common missconfigurations
-if CELL_VOLTAGES_WHILE_CHARGING[0] < MAX_CELL_VOLTAGE and MAX_CHARGE_CURRENT_CV[0] == 0:
-    errors_in_config.append(
-        f"**CONFIG ISSUE**: Maximum value of CELL_VOLTAGES_WHILE_CHARGING ({CELL_VOLTAGES_WHILE_CHARGING[0]} V) "
-        + f"is lower than MAX_CELL_VOLTAGE ({MAX_CELL_VOLTAGE} V). MAX_CELL_VOLTAGE will never be reached this way "
-        + "and battery will not change to float. Please check the configuration."
-    )
-# make some checks for most common missconfigurations
-if SOC_RESET_AFTER_DAYS is not False and CELL_VOLTAGES_WHILE_CHARGING[0] < SOC_RESET_VOLTAGE and MAX_CHARGE_CURRENT_CV[0] == 0:
-    errors_in_config.append(
-        f"**CONFIG ISSUE**: Maximum value of CELL_VOLTAGES_WHILE_CHARGING ({CELL_VOLTAGES_WHILE_CHARGING[0]} V) "
-        + f"is lower than SOC_RESET_VOLTAGE ({SOC_RESET_VOLTAGE} V). SOC_RESET_VOLTAGE will never be reached this way "
-        + "and battery will not change to float. Please check the configuration."
-    )
-# make some checks for most common missconfigurations
-if MAX_BATTERY_CHARGE_CURRENT not in MAX_CHARGE_CURRENT_CV:
-    errors_in_config.append(
-        f"**CONFIG ISSUE**: In MAX_CHARGE_CURRENT_CV_FRACTION ({', '.join(map(str, _get_list_from_config('DEFAULT', 'MAX_CHARGE_CURRENT_CV_FRACTION', lambda v: float(v))))}) "
-        + "there is no value set to 1. This means that the battery will never use the maximum charge current. Please check the configuration."
-    )
 
-CELL_VOLTAGES_WHILE_DISCHARGING: list = _get_list_from_config("DEFAULT", "CELL_VOLTAGES_WHILE_DISCHARGING", lambda v: float(v))
-MAX_DISCHARGE_CURRENT_CV: list = _get_list_from_config(
-    "DEFAULT",
-    "MAX_DISCHARGE_CURRENT_CV_FRACTION",
-    lambda v: MAX_BATTERY_DISCHARGE_CURRENT * float(v),
+check_config_issue(
+    SOC_RESET_AFTER_DAYS and CELL_VOLTAGES_WHILE_CHARGING[0] < SOC_RESET_VOLTAGE and MAX_CHARGE_CURRENT_CV[0] == 0,
+    f"Maximum value of CELL_VOLTAGES_WHILE_CHARGING ({CELL_VOLTAGES_WHILE_CHARGING[0]} V) is lower than SOC_RESET_VOLTAGE ({SOC_RESET_VOLTAGE} V). "
+    "SOC_RESET_VOLTAGE will never be reached this way and battery will not change to float. Please check the configuration.",
 )
-# make some checks for most common missconfigurations
-if CELL_VOLTAGES_WHILE_DISCHARGING[0] > MIN_CELL_VOLTAGE and MAX_DISCHARGE_CURRENT_CV[0] == 0:
-    errors_in_config.append(
-        f"**CONFIG ISSUE**: Minimum value of CELL_VOLTAGES_WHILE_DISCHARGING ({CELL_VOLTAGES_WHILE_DISCHARGING[0]} V) "
-        + f"is higher than MIN_CELL_VOLTAGE ({MIN_CELL_VOLTAGE} V). MIN_CELL_VOLTAGE will never be reached this way. "
-        + "Please check the configuration."
-    )
-# make some checks for most common missconfigurations
-if MAX_BATTERY_DISCHARGE_CURRENT not in MAX_DISCHARGE_CURRENT_CV:
-    errors_in_config.append(
-        f"**CONFIG ISSUE**: In MAX_DISCHARGE_CURRENT_CV_FRACTION ({', '.join(map(str, _get_list_from_config('DEFAULT', 'MAX_DISCHARGE_CURRENT_CV_FRACTION', lambda v: float(v))))}) "
-        + "there is no value set to 1. This means that the battery will never use the maximum discharge current. Please check the configuration."
-    )
 
-# --------- Cell Voltage limitation (affecting CVL) ---------
+check_config_issue(
+    MAX_BATTERY_CHARGE_CURRENT not in MAX_CHARGE_CURRENT_CV,
+    f"In MAX_CHARGE_CURRENT_CV_FRACTION ({', '.join(map(str, get_list_from_config('DEFAULT', 'MAX_CHARGE_CURRENT_CV_FRACTION', float)))}) "
+    "there is no value set to 1. This means that the battery will never use the maximum charge current. Please check the configuration.",
+)
 
-CVL_ICONTROLLER_MODE: bool = "True" == config["DEFAULT"]["CVL_ICONTROLLER_MODE"]
-CVL_ICONTROLLER_FACTOR: float = float(config["DEFAULT"]["CVL_ICONTROLLER_FACTOR"])
+CELL_VOLTAGES_WHILE_DISCHARGING: List[float] = get_list_from_config("DEFAULT", "CELL_VOLTAGES_WHILE_DISCHARGING", float)
+MAX_DISCHARGE_CURRENT_CV: List[float] = get_list_from_config("DEFAULT", "MAX_DISCHARGE_CURRENT_CV_FRACTION", lambda v: MAX_BATTERY_DISCHARGE_CURRENT * float(v))
 
-# --------- Temperature limitation (affecting CCL/DCL) ---------
-CCCM_T_ENABLE: bool = "True" == config["DEFAULT"]["CCCM_T_ENABLE"]
+check_config_issue(
+    CELL_VOLTAGES_WHILE_DISCHARGING[0] > MIN_CELL_VOLTAGE and MAX_DISCHARGE_CURRENT_CV[0] == 0,
+    f"Minimum value of CELL_VOLTAGES_WHILE_DISCHARGING ({CELL_VOLTAGES_WHILE_DISCHARGING[0]} V) is higher than MIN_CELL_VOLTAGE ({MIN_CELL_VOLTAGE} V). "
+    "MIN_CELL_VOLTAGE will never be reached this way. Please check the configuration.",
+)
+
+check_config_issue(
+    MAX_BATTERY_DISCHARGE_CURRENT not in MAX_DISCHARGE_CURRENT_CV,
+    f"In MAX_DISCHARGE_CURRENT_CV_FRACTION ({', '.join(map(str, get_list_from_config('DEFAULT', 'MAX_DISCHARGE_CURRENT_CV_FRACTION', float)))}) "
+    "there is no value set to 1. This means that the battery will never use the maximum discharge current. Please check the configuration.",
+)
+
+# --------- Temperature Limitation (affecting CCL/DCL) ---------
+CCCM_T_ENABLE: bool = get_bool_from_config("DEFAULT", "CCCM_T_ENABLE")
 """
 Charge current control management referring to temperature
 """
-
-DCCM_T_ENABLE: bool = "True" == config["DEFAULT"]["DCCM_T_ENABLE"]
+DCCM_T_ENABLE: bool = get_bool_from_config("DEFAULT", "DCCM_T_ENABLE")
 """
 Discharge current control management referring to temperature
 """
+TEMPERATURES_WHILE_CHARGING: List[float] = get_list_from_config("DEFAULT", "TEMPERATURES_WHILE_CHARGING", float)
+MAX_CHARGE_CURRENT_T: List[float] = get_list_from_config("DEFAULT", "MAX_CHARGE_CURRENT_T_FRACTION", lambda v: MAX_BATTERY_CHARGE_CURRENT * float(v))
 
-TEMPERATURES_WHILE_CHARGING: list = _get_list_from_config("DEFAULT", "TEMPERATURES_WHILE_CHARGING", lambda v: float(v))
-MAX_CHARGE_CURRENT_T: list = _get_list_from_config(
-    "DEFAULT",
-    "MAX_CHARGE_CURRENT_T_FRACTION",
-    lambda v: MAX_BATTERY_CHARGE_CURRENT * float(v),
+check_config_issue(
+    MAX_BATTERY_CHARGE_CURRENT not in MAX_CHARGE_CURRENT_T,
+    f"In MAX_CHARGE_CURRENT_T_FRACTION ({', '.join(map(str, get_list_from_config('DEFAULT', 'MAX_CHARGE_CURRENT_T_FRACTION', float)))}) "
+    "there is no value set to 1. This means that the battery will never use the maximum charge current. Please check the configuration.",
 )
-# make some checks for most common missconfigurations
-if MAX_BATTERY_CHARGE_CURRENT not in MAX_CHARGE_CURRENT_T:
-    errors_in_config.append(
-        f"**CONFIG ISSUE**: In MAX_CHARGE_CURRENT_T_FRACTION ({', '.join(map(str, _get_list_from_config('DEFAULT', 'MAX_CHARGE_CURRENT_T_FRACTION', lambda v: float(v))))}) "
-        + "there is no value set to 1. This means that the battery will never use the maximum discharge current. Please check the configuration."
-    )
 
-TEMPERATURES_WHILE_DISCHARGING: list = _get_list_from_config("DEFAULT", "TEMPERATURES_WHILE_DISCHARGING", lambda v: float(v))
-MAX_DISCHARGE_CURRENT_T: list = _get_list_from_config(
-    "DEFAULT",
-    "MAX_DISCHARGE_CURRENT_T_FRACTION",
-    lambda v: MAX_BATTERY_DISCHARGE_CURRENT * float(v),
+TEMPERATURES_WHILE_DISCHARGING: List[float] = get_list_from_config("DEFAULT", "TEMPERATURES_WHILE_DISCHARGING", float)
+MAX_DISCHARGE_CURRENT_T: List[float] = get_list_from_config("DEFAULT", "MAX_DISCHARGE_CURRENT_T_FRACTION", lambda v: MAX_BATTERY_DISCHARGE_CURRENT * float(v))
+
+check_config_issue(
+    MAX_BATTERY_DISCHARGE_CURRENT not in MAX_DISCHARGE_CURRENT_T,
+    f"In MAX_DISCHARGE_CURRENT_T_FRACTION ({', '.join(map(str, get_list_from_config('DEFAULT', 'MAX_DISCHARGE_CURRENT_T_FRACTION', float)))}) "
+    "there is no value set to 1. This means that the battery will never use the maximum discharge current. Please check the configuration.",
 )
-# make some checks for most common missconfigurations
-if MAX_BATTERY_DISCHARGE_CURRENT not in MAX_DISCHARGE_CURRENT_T:
-    errors_in_config.append(
-        f"**CONFIG ISSUE**: In MAX_DISCHARGE_CURRENT_T_FRACTION ({', '.join(map(str, _get_list_from_config('DEFAULT', 'MAX_DISCHARGE_CURRENT_T_FRACTION', lambda v: float(v))))}) "
-        + "there is no value set to 1. This means that the battery will never use the maximum discharge current. Please check the configuration."
-    )
 
-# --------- SOC limitation (affecting CCL/DCL) ---------
-CCCM_SOC_ENABLE: bool = "True" == config["DEFAULT"]["CCCM_SOC_ENABLE"]
+# --------- SoC Limitation (affecting CCL/DCL) ---------
+CCCM_SOC_ENABLE: bool = get_bool_from_config("DEFAULT", "CCCM_SOC_ENABLE")
 """
 Charge current control management referring to SoC
 """
-
-DCCM_SOC_ENABLE: bool = "True" == config["DEFAULT"]["DCCM_SOC_ENABLE"]
+DCCM_SOC_ENABLE: bool = get_bool_from_config("DEFAULT", "DCCM_SOC_ENABLE")
 """
 Discharge current control management referring to SoC
 """
+SOC_WHILE_CHARGING: List[float] = get_list_from_config("DEFAULT", "SOC_WHILE_CHARGING", float)
+MAX_CHARGE_CURRENT_SOC: List[float] = get_list_from_config("DEFAULT", "MAX_CHARGE_CURRENT_SOC_FRACTION", lambda v: MAX_BATTERY_CHARGE_CURRENT * float(v))
 
-SOC_WHILE_CHARGING: list = _get_list_from_config("DEFAULT", "SOC_WHILE_CHARGING", lambda v: float(v))
-MAX_CHARGE_CURRENT_SOC: list = _get_list_from_config(
-    "DEFAULT",
-    "MAX_CHARGE_CURRENT_SOC_FRACTION",
-    lambda v: MAX_BATTERY_CHARGE_CURRENT * float(v),
+check_config_issue(
+    MAX_BATTERY_CHARGE_CURRENT not in MAX_CHARGE_CURRENT_SOC,
+    f"In MAX_CHARGE_CURRENT_SOC_FRACTION ({', '.join(map(str, get_list_from_config('DEFAULT', 'MAX_CHARGE_CURRENT_SOC_FRACTION', float)))}) "
+    "there is no value set to 1. This means that the battery will never use the maximum charge current. Please check the configuration.",
 )
-# make some checks for most common missconfigurations
-if MAX_BATTERY_CHARGE_CURRENT not in MAX_CHARGE_CURRENT_SOC:
-    errors_in_config.append(
-        f"**CONFIG ISSUE**: In MAX_CHARGE_CURRENT_SOC_FRACTION ({', '.join(map(str, _get_list_from_config('DEFAULT', 'MAX_CHARGE_CURRENT_SOC_FRACTION', lambda v: float(v))))}) "
-        + "there is no value set to 1. This means that the battery will never use the maximum charge current. Please check the configuration."
-    )
 
-SOC_WHILE_DISCHARGING: list = _get_list_from_config("DEFAULT", "SOC_WHILE_DISCHARGING", lambda v: float(v))
-MAX_DISCHARGE_CURRENT_SOC: list = _get_list_from_config(
-    "DEFAULT",
-    "MAX_DISCHARGE_CURRENT_SOC_FRACTION",
-    lambda v: MAX_BATTERY_DISCHARGE_CURRENT * float(v),
+SOC_WHILE_DISCHARGING: List[float] = get_list_from_config("DEFAULT", "SOC_WHILE_DISCHARGING", float)
+MAX_DISCHARGE_CURRENT_SOC: List[float] = get_list_from_config(
+    "DEFAULT", "MAX_DISCHARGE_CURRENT_SOC_FRACTION", lambda v: MAX_BATTERY_DISCHARGE_CURRENT * float(v)
 )
-# make some checks for most common missconfigurations
-if MAX_BATTERY_DISCHARGE_CURRENT not in MAX_DISCHARGE_CURRENT_SOC:
-    errors_in_config.append(
-        f"**CONFIG ISSUE**: In MAX_DISCHARGE_CURRENT_SOC_FRACTION ({', '.join(map(str, _get_list_from_config('DEFAULT', 'MAX_DISCHARGE_CURRENT_SOC_FRACTION', lambda v: float(v))))}) "
-        + "there is no value set to 1. This means that the battery will never use the maximum discharge current. Please check the configuration."
-    )
+
+check_config_issue(
+    MAX_BATTERY_DISCHARGE_CURRENT not in MAX_DISCHARGE_CURRENT_SOC,
+    f"In MAX_DISCHARGE_CURRENT_SOC_FRACTION ({', '.join(map(str, get_list_from_config('DEFAULT', 'MAX_DISCHARGE_CURRENT_SOC_FRACTION', float)))}) "
+    "there is no value set to 1. This means that the battery will never use the maximum discharge current. Please check the configuration.",
+)
+
+
+# --------- CCL/DCL Recovery Threshold ---------
+CHARGE_CURRENT_RECOVERY_THRESHOLD_PERCENT: float = get_float_from_config("DEFAULT", "CHARGE_CURRENT_RECOVERY_THRESHOLD_PERCENT")
+"""
+Defines the percentage of the maximum charge current that the battery has to reach to recover from a limitation.
+"""
+DISCHARGE_CURRENT_RECOVERY_THRESHOLD_PERCENT: float = get_float_from_config("DEFAULT", "DISCHARGE_CURRENT_RECOVERY_THRESHOLD_PERCENT")
+"""
+Defines the percentage of the maximum discharge current that the battery has to reach to recover from a limitation.
+"""
+
 
 # --------- Time-To-Go ---------
-TIME_TO_GO_ENABLE: bool = "True" == config["DEFAULT"]["TIME_TO_GO_ENABLE"]
+TIME_TO_GO_ENABLE: bool = get_bool_from_config("DEFAULT", "TIME_TO_GO_ENABLE")
 
 # --------- Time-To-Soc ---------
-TIME_TO_SOC_POINTS: list = _get_list_from_config("DEFAULT", "TIME_TO_SOC_POINTS", lambda v: int(v))
-TIME_TO_SOC_VALUE_TYPE: int = int(config["DEFAULT"]["TIME_TO_SOC_VALUE_TYPE"])
-TIME_TO_SOC_RECALCULATE_EVERY: int = (
-    int(config["DEFAULT"]["TIME_TO_SOC_RECALCULATE_EVERY"]) if int(config["DEFAULT"]["TIME_TO_SOC_RECALCULATE_EVERY"]) > 5 else 5
-)
-TIME_TO_SOC_INC_FROM: bool = "True" == config["DEFAULT"]["TIME_TO_SOC_INC_FROM"]
-
-# --------- SOC calculation ---------
-SOC_CALCULATION: bool = "True" == config["DEFAULT"]["SOC_CALCULATION"]
-SOC_RESET_CURRENT: float = float(config["DEFAULT"]["SOC_RESET_CURRENT"])
-SOC_RESET_TIME: int = int(config["DEFAULT"]["SOC_RESET_TIME"])
-SOC_CALC_CURRENT_REPORTED_BY_BMS: list = _get_list_from_config("DEFAULT", "SOC_CALC_CURRENT_REPORTED_BY_BMS", lambda v: float(v))
-SOC_CALC_CURRENT_MEASURED_BY_USER: list = _get_list_from_config("DEFAULT", "SOC_CALC_CURRENT_MEASURED_BY_USER", lambda v: float(v))
-# check if lists are different
-# this allows to calculate linear relationship between the two lists only if needed
-if SOC_CALC_CURRENT_REPORTED_BY_BMS == SOC_CALC_CURRENT_MEASURED_BY_USER:
-    SOC_CALC_CURRENT: bool = False
-else:
-    SOC_CALC_CURRENT: bool = True
+TIME_TO_SOC_POINTS: List[int] = get_list_from_config("DEFAULT", "TIME_TO_SOC_POINTS", int)
+TIME_TO_SOC_VALUE_TYPE: int = get_int_from_config("DEFAULT", "TIME_TO_SOC_VALUE_TYPE")
+TIME_TO_SOC_RECALCULATE_EVERY: int = max(get_int_from_config("DEFAULT", "TIME_TO_SOC_RECALCULATE_EVERY"), 5)
+TIME_TO_SOC_INC_FROM: bool = get_bool_from_config("DEFAULT", "TIME_TO_SOC_INC_FROM")
 
 # --------- Additional settings ---------
-BMS_TYPE: list = _get_list_from_config("DEFAULT", "BMS_TYPE", lambda v: str(v))
-
-EXCLUDED_DEVICES: list = _get_list_from_config("DEFAULT", "EXCLUDED_DEVICES", lambda v: str(v))
-
-POLL_INTERVAL: float = float(config["DEFAULT"]["POLL_INTERVAL"]) * 1000 if config["DEFAULT"]["POLL_INTERVAL"] != "" else None
+BMS_TYPE: List[str] = get_list_from_config("DEFAULT", "BMS_TYPE", str)
+EXCLUDED_DEVICES: List[str] = get_list_from_config("DEFAULT", "EXCLUDED_DEVICES", str)
+POLL_INTERVAL: Union[float, None] = float(config["DEFAULT"]["POLL_INTERVAL"]) * 1000 if config["DEFAULT"]["POLL_INTERVAL"] else None
 """
 Poll interval in milliseconds
 """
-
-# Auto reset SoC
-AUTO_RESET_SOC: bool = "True" == config["DEFAULT"]["AUTO_RESET_SOC"]
-
-# Publish the config settings to the dbus path "/Info/Config/"
-PUBLISH_CONFIG_VALUES: bool = "True" == config["DEFAULT"]["PUBLISH_CONFIG_VALUES"]
-
-BATTERY_CELL_DATA_FORMAT: int = int(config["DEFAULT"]["BATTERY_CELL_DATA_FORMAT"])
-
-MIDPOINT_ENABLE: bool = "True" == config["DEFAULT"]["MIDPOINT_ENABLE"]
-
-TEMP_BATTERY: int = int(config["DEFAULT"]["TEMP_BATTERY"])
-
+PUBLISH_CONFIG_VALUES: bool = get_bool_from_config("DEFAULT", "PUBLISH_CONFIG_VALUES")
+BATTERY_CELL_DATA_FORMAT: int = get_int_from_config("DEFAULT", "BATTERY_CELL_DATA_FORMAT")
+MIDPOINT_ENABLE: bool = get_bool_from_config("DEFAULT", "MIDPOINT_ENABLE")
+TEMP_BATTERY: int = get_int_from_config("DEFAULT", "TEMP_BATTERY")
 TEMP_1_NAME: str = config["DEFAULT"]["TEMP_1_NAME"]
 TEMP_2_NAME: str = config["DEFAULT"]["TEMP_2_NAME"]
 TEMP_3_NAME: str = config["DEFAULT"]["TEMP_3_NAME"]
 TEMP_4_NAME: str = config["DEFAULT"]["TEMP_4_NAME"]
+GUI_PARAMETERS_SHOW_ADDITIONAL_INFO: bool = get_bool_from_config("DEFAULT", "GUI_PARAMETERS_SHOW_ADDITIONAL_INFO")
+TELEMETRY: bool = get_bool_from_config("DEFAULT", "TELEMETRY")
 
-TELEMETRY: bool = "True" == config["DEFAULT"]["TELEMETRY"]
-
-GUI_PARAMETERS_SHOW_ADDITIONAL_INFO: bool = "True" == config["DEFAULT"]["GUI_PARAMETERS_SHOW_ADDITIONAL_INFO"]
-# --------- BMS specific settings ---------
-
-# -- Unique ID settings
-USE_PORT_AS_UNIQUE_ID: bool = "True" == config["DEFAULT"]["USE_PORT_AS_UNIQUE_ID"]
-
-# -- LltJbd settings
-SOC_LOW_WARNING: float = float(config["DEFAULT"]["SOC_LOW_WARNING"])
-SOC_LOW_ALARM: float = float(config["DEFAULT"]["SOC_LOW_ALARM"])
-
-# -- Daly settings
-BATTERY_CAPACITY: float = float(config["DEFAULT"]["BATTERY_CAPACITY"])
-INVERT_CURRENT_MEASUREMENT: int = int(config["DEFAULT"]["INVERT_CURRENT_MEASUREMENT"])
-
-# -- JK BMS settings
-JKBMS_CAN_CELL_COUNT: int = int(config["DEFAULT"]["JKBMS_CAN_CELL_COUNT"])
-
-# -- ESC GreenMeter and Lipro device settings
-GREENMETER_ADDRESS: int = int(config["DEFAULT"]["GREENMETER_ADDRESS"])
-LIPRO_START_ADDRESS: int = int(config["DEFAULT"]["LIPRO_START_ADDRESS"])
-LIPRO_END_ADDRESS: int = int(config["DEFAULT"]["LIPRO_END_ADDRESS"])
-LIPRO_CELL_COUNT: int = int(config["DEFAULT"]["LIPRO_CELL_COUNT"])
-
-# -- Seplos V3 settings
-SEPLOS_USE_BMS_VALUES: bool = "True" == config["DEFAULT"]["SEPLOS_USE_BMS_VALUES"]
 
 # --------- Voltage drop ---------
-VOLTAGE_DROP: float = float(config["DEFAULT"]["VOLTAGE_DROP"])
+VOLTAGE_DROP: float = get_float_from_config("DEFAULT", "VOLTAGE_DROP")
+
+# --------- BMS specific settings ---------
+AUTO_RESET_SOC: bool = get_bool_from_config("DEFAULT", "AUTO_RESET_SOC")
+USE_PORT_AS_UNIQUE_ID: bool = get_bool_from_config("DEFAULT", "USE_PORT_AS_UNIQUE_ID")
+
+# -- LltJbd settings
+SOC_LOW_WARNING: float = get_float_from_config("DEFAULT", "SOC_LOW_WARNING")
+SOC_LOW_ALARM: float = get_float_from_config("DEFAULT", "SOC_LOW_ALARM")
+
+# -- Daly settings
+BATTERY_CAPACITY: float = get_float_from_config("DEFAULT", "BATTERY_CAPACITY")
+INVERT_CURRENT_MEASUREMENT: int = get_int_from_config("DEFAULT", "INVERT_CURRENT_MEASUREMENT")
+
+# -- JK BMS settings
+JKBMS_CAN_CELL_COUNT: int = get_int_from_config("DEFAULT", "JKBMS_CAN_CELL_COUNT")
+
+# -- ESC GreenMeter and Lipro device settings
+GREENMETER_ADDRESS: int = get_int_from_config("DEFAULT", "GREENMETER_ADDRESS")
+LIPRO_START_ADDRESS: int = get_int_from_config("DEFAULT", "LIPRO_START_ADDRESS")
+LIPRO_END_ADDRESS: int = get_int_from_config("DEFAULT", "LIPRO_END_ADDRESS")
+LIPRO_CELL_COUNT: int = get_int_from_config("DEFAULT", "LIPRO_CELL_COUNT")
+
+# -- Seplos V3 settings
+SEPLOS_USE_BMS_VALUES: bool = get_bool_from_config("DEFAULT", "SEPLOS_USE_BMS_VALUES")
 
 
 # FUNCTIONS
 def constrain(val: float, min_val: float, max_val: float) -> float:
     """
-    Constrain a value between a minimum and maximum value
+    Constrain a value between a minimum and maximum value.
 
     :param val: Value to constrain
     :param min_val: Minimum value
     :param max_val: Maximum value
     :return: Constrained value
     """
-    # Swap min and max if min is greater than max
     if min_val > max_val:
         min_val, max_val = max_val, min_val
     return min(max_val, max(min_val, val))
 
 
-def mapRange(inValue: float, inMin: float, inMax: float, outMin: float, outMax: float) -> float:
+def map_range(in_value: float, in_min: float, in_max: float, out_min: float, out_max: float) -> float:
     """
-    Map a value from one range to another
+    Map a value from one range to another.
 
-    :param inValue: Input value
-    :param inMin: Minimum value of the input range
-    :param inMax: Maximum value of the input range
-    :param outMin: Minimum value of the output range
-    :param outMax: Maximum value of the output range
+    :param in_value: Input value
+    :param in_min: Minimum value of the input range
+    :param in_max: Maximum value of the input range
+    :param out_min: Minimum value of the output range
+    :param out_max: Maximum value of the output range
     :return: Mapped value
     """
-    return outMin + (((inValue - inMin) / (inMax - inMin)) * (outMax - outMin))
+    return out_min + (((in_value - in_min) / (in_max - in_min)) * (out_max - out_min))
 
 
-def mapRangeConstrain(inValue: float, inMin: float, inMax: float, outMin: float, outMax: float) -> float:
+def map_range_constrain(in_value: float, in_min: float, in_max: float, out_min: float, out_max: float) -> float:
     """
-    Map a value from one range to another and constrain it between the output range
+    Map a value from one range to another and constrain it between the output range.
 
-    :param inValue: Input value
-    :param inMin: Minimum value of the input range
-    :param inMax: Maximum value of the input range
-    :param outMin: Minimum value of the output range
-    :param outMax: Maximum value of the output range
+    :param in_value: Input value
+    :param in_min: Minimum value of the input range
+    :param in_max: Maximum value of the input range
+    :param out_min: Minimum value of the output range
+    :param out_max: Maximum value of the output range
     :return: Mapped and constrained value
     """
-    return constrain(mapRange(inValue, inMin, inMax, outMin, outMax), outMin, outMax)
+    return constrain(map_range(in_value, in_min, in_max, out_min, out_max), out_min, out_max)
 
 
-def calcLinearRelationship(inValue: float, inArray: float, outArray: float) -> float:
+def calc_linear_relationship(in_value: float, in_array: List[float], out_array: List[float]) -> float:
     """
-    Calculate a linear relationship between two arrays
+    Calculate a linear relationship between two arrays.
 
-    :param inValue: Input value
-    :param inArray: Input array
-    :param outArray: Output array
+    :param in_value: Input value
+    :param in_array: Input array
+    :param out_array: Output array
     :return: Calculated value
     """
-    # change compare-direction in array
-    if inArray[0] > inArray[-1]:
-        return calcLinearRelationship(inValue, inArray[::-1], outArray[::-1])
-    else:
-        # Handle out of bounds
-        if inValue <= inArray[0]:
-            return outArray[0]
-        if inValue >= inArray[-1]:
-            return outArray[-1]
-
-        # else calculate linear current between the setpoints
-        idx = bisect.bisect(inArray, inValue)
-        upperIN = inArray[idx - 1]  # begin with idx 0 as max value
-        upperOUT = outArray[idx - 1]
-        lowerIN = inArray[idx]
-        lowerOUT = outArray[idx]
-        return mapRangeConstrain(inValue, lowerIN, upperIN, lowerOUT, upperOUT)
-
-
-def calcStepRelationship(inValue: float, inArray: float, outArray: float, returnLower: float) -> float:
-    """
-    Calculate a step relationship between two arrays
-
-    :param inValue: Input value
-    :param inArray: Input array
-    :param outArray: Output array
-    :param returnLower: Return lower value if True, else return higher value
-    :return: Calculated value
-    """
-    # change compare-direction in array
-    if inArray[0] > inArray[-1]:
-        return calcStepRelationship(inValue, inArray[::-1], outArray[::-1], returnLower)
+    # Change compare-direction in array
+    if in_array[0] > in_array[-1]:
+        return calc_linear_relationship(in_value, in_array[::-1], out_array[::-1])
 
     # Handle out of bounds
-    if inValue <= inArray[0]:
-        return outArray[0]
-    if inValue >= inArray[-1]:
-        return outArray[-1]
+    if in_value <= in_array[0]:
+        return out_array[0]
+    if in_value >= in_array[-1]:
+        return out_array[-1]
 
-    # else get index between the setpoints
-    idx = bisect.bisect(inArray, inValue)
+    # Calculate linear current between the setpoints
+    idx = bisect.bisect(in_array, in_value)
+    upper_in = in_array[idx - 1]
+    upper_out = out_array[idx - 1]
+    lower_in = in_array[idx]
+    lower_out = out_array[idx]
+    return map_range_constrain(in_value, lower_in, upper_in, lower_out, upper_out)
 
-    return outArray[idx] if returnLower else outArray[idx - 1]
 
-
-def is_bit_set(tmp: any) -> bool:
+def calc_step_relationship(in_value: float, in_array: List[float], out_array: List[float], return_lower: bool) -> float:
     """
-    Checks if a bit is set high or low
+    Calculate a step relationship between two arrays.
 
-    :param tmp: Value to check
+    :param in_value: Input value
+    :param in_array: Input array
+    :param out_array: Output array
+    :param return_lower: Return lower value if True, else return higher value
+    :return: Calculated value
+    """
+    # Change compare-direction in array
+    if in_array[0] > in_array[-1]:
+        return calc_step_relationship(in_value, in_array[::-1], out_array[::-1], return_lower)
+
+    # Handle out of bounds
+    if in_value <= in_array[0]:
+        return out_array[0]
+    if in_value >= in_array[-1]:
+        return out_array[-1]
+
+    # Get index between the setpoints
+    idx = bisect.bisect(in_array, in_value)
+    return out_array[idx] if return_lower else out_array[idx - 1]
+
+
+def is_bit_set(value: Any) -> bool:
+    """
+    Check if a bit is set high or low.
+
+    :param value: Value to check
     :return: True if bit is set, False if not
     """
-    return False if tmp == ZERO_CHAR else True
+    return value != ZERO_CHAR
 
 
 def kelvin_to_celsius(temp: float) -> float:
     """
-    Convert Kelvin to Celsius
+    Convert Kelvin to Celsius.
 
     :param temp: Temperature in Kelvin
     :return: Temperature in Celsius
     """
-    return temp - 273.1
+    return temp - 273.15
 
 
 def bytearray_to_string(data: bytearray) -> str:
     """
-    Convert a bytearray to a string
+    Convert a bytearray to a string.
 
     :param data: Data to convert
     :return: Converted string
     """
-    return "".join("\\x" + format(byte, "02x") for byte in data)
+    return "".join(f"\\x{byte:02x}" for byte in data)
 
 
-def open_serial_port(port: str, baud: int) -> serial.Serial:
+def open_serial_port(port: str, baud: int) -> Union[serial.Serial, None]:
     """
-    Open a serial port
+    Open a serial port.
 
     :param port: Serial port
     :param baud: Baud rate
-    :return: Opened serial port
+    :return: Opened serial port or None if failed
     """
-    ser = None
     tries = 3
     while tries > 0:
         try:
-            ser = serial.Serial(port, baudrate=baud, timeout=0.1)
-            tries = 0
+            return serial.Serial(port, baudrate=baud, timeout=0.1)
         except serial.SerialException as e:
             logger.error(e)
             tries -= 1
-
-    return ser
+    return None
 
 
 def read_serialport_data(

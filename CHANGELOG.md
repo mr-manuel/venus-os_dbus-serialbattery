@@ -2,17 +2,103 @@
 
 ## Notes
 
-* The Bluetooth and CAN connections are still not stable on some systems. If you want to have a stable connection use the serial connection.
+* The Bluetooth connection is still not stable on some systems. If you want to have a stable connection use the serial connection.
 
-## Breaking changes
+GitHub: https://github.com/mr-manuel/venus-os_dbus-serialbattery
+
+Documentation: https://mr-manuel.github.io/venus-os_dbus-serialbattery_docs/
+
+
+## v1.5.x
+
+### What's Changed
+
+* Added: Configurable threshold to prevent rapid switching (flapping) of `CCL` or `DCL` when 0 by @mr-manuel
+* Added: Daly BMS - Connect multiple BMS to the same RS485 port by @CaptKrisp
+* Added: EG LifePower - Connect multiple BMS to the same RS485 port by @mr-manuel
+* Added: GUIv2 by @mr-manuel
+* Added: High cell voltage alarm was added to venus-platform with https://github.com/victronenergy/venus-platform/commit/d686955aa15b7e246a92ee1f4c3eef3b62b153b7 and now also to this driver by @mr-manuel
+* Added: Possibility to change the CAN bus speed by @mr-manuel
+* Changed: Calculate Time-to-Go until ESS -> Minimum SOC (unless grid fails), Active SOC limit or `SOC_LOW_WARNING` from `config.ini` by @mr-manuel
+* Changed: HLPDATA BMS - BMS control of max charge and discharge is removed by @peterohman
+* Changed: HLPDATA BMS - improved driver with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/96 by @peterohman
+* Changed: JKBMS PB Model fixed firmware version and temperature sensors by @KoljaWindeler
+* Changed: Optimized auto increase of the polling time by @mr-manuel
+* Changed: Rewritten code for external current sensor and fixed https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/60 by @mr-manuel
+
+
+## v1.4.20240928
+
+### Breaking Changes
 
 * Driver version greater or equal to `v1.4.20240714dev`
 
   * Changes to `config.default.ini`: `HELTEC_MODBUS_ADDR` was replaced by `MODBUS_ADDRESSES`.
 
+### What's Changed
+
+* Added: `History()` class that holds all BMS history values by @mr-manuel
+* Added: Automatically increase polling time, if polling take too long by @mr-manuel
+* Added: Connection Information field which was recently added by Victron on the details page by @mr-manuel
+* Added: Daren BMS with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/65 by @cpttinkering
+* Added: Multiple BMS on one USB to RS485/Modbus adapter now possible. The BMS needs to be able to set different addresses to each battery by @mr-manuel
+* Added: Send telemetry data to see which driver versions and BMS are used the most. Can be disabled in the `config.ini` by @mr-manuel
+* Added: Show error in log, if an unknown BMS type was added in the `config.ini` by @mr-manuel
+* Changed: Battery connection loss: Big improvements on handling the situation, fixed battery connection restore without driver restart, improved behaviour when connection is lost, added config options by @mr-manuel
+* Changed: Call `get_settings()` in `test_connection()` for all battery classes, removed `get_settings()` call from `setup_vedbus()` by @mr-manuel
+* Changed: Daly BMS - Fixed issues where faulty readings set values to None by @mr-manuel
+* Changed: Fixed alarms for some BMS and cleaned up `Protection()` class
+* Changed: Fixed how `velib_python` was integrated in this driver by @mr-manuel
+* Changed: Fixed problem with battery status and error code by @mr-manuel
+* Changed: GUIv1 cell voltage page design by @mr-manuel
+* Changed: JKBMS - Fixed issues where faulty readings set values to None by @mr-manuel
+* Changed: JKBMS BLE - Fixes wrong max battery voltage https://github.com/Louisvdw/dbus-serialbattery/issues/1094 by @mr-manuel
+* Changed: JKBMS PB Model fixes by @KoljaWindeler
+* Changed: LLT/JBS BMS - Fix bug in SOC calculation and use SOC comming from BMS. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/47 by @mr-manuel
+* Changed: Renogy BMS - Use port as unique identifier, since it's not possible to change any values on this BMS by @mr-manuel
+* Changed: Reworked, documented and cleaned up a lot of code by @mr-manuel
+* Changed: Set default charge/discharge current from utils in main battery class by @mr-manuel
+* Changed: Show non blocking errors only, if more than 180 occured in the last 3 hours (1 per minute) and do not block inverting/charging by @mr-manuel
+* Changed: The setting `HELTEC_MODBUS_ADDR` was replaced by `MODBUS_ADDRESSES` in the `config.default.ini` by @mr-manuel
+* Changed: Updated `battery_template.py` and added tons of descriptions by @mr-manuel
+
+
+## v1.3.20240705
+
+### Breaking Changes
+
 * Driver version greater or equal to `v1.3.20240625dev`
 
   * `Lifepower` was renamed to `EG4_Lifepower`. You need to change it, if you have specified it in the `config.ini`.
+
+### What's Changed
+
+* Added: EG4 LL BMS by @tuxntoast
+* Added: Fields for debugging switch to float/bulk by @mr-manuel
+* Added: JKBMS PB Model with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/39 by @KoljaWindeler
+* Added: Possibility to add custom polling interval to reduce the CPU load. Fixes https://github.com/Louisvdw/dbus-serialbattery/issues/1022 by @mr-manuel
+* Added: Possibility to select if min/max battery voltage, CVL, CCL and DCL are used from driver or BMS. Fixes https://github.com/Louisvdw/dbus-serialbattery/issues/1056 by @mr-manuel
+* Added: Possibility to use port name as unique identifier https://github.com/Louisvdw/dbus-serialbattery/issues/1035 by @mr-manuel
+* Added: Show details about driver internals in GUI -> Serialbattery -> Parameters by setting `GUI_PARAMETERS_SHOW_ADDITIONAL_INFO` to `True` by @mr-manuel
+* Added: Show in the remote console/GUI if a non blocking error was triggered by @mr-manuel
+* Added: Use current measurement from other dbus path by @mr-manuel
+* Changed: Daly BMS CAN - Prevent recognition of this BMS, if it's not connected by @mr-manuel
+* Changed: Fixed failed GUI restart on some GX devices by @SenH
+* Changed: Fixed problem with I-Controller https://github.com/Louisvdw/dbus-serialbattery/issues/1041 by @mr-manuel
+* Changed: Fixed problem with linear limitation disabled https://github.com/Louisvdw/dbus-serialbattery/issues/1037 by @mr-manuel
+* Changed: Fixed SoC is None on driver startup https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/32 by @mr-manuel
+* Changed: Fixed some wrong paths in the post-hook commands by @juswes
+* Changed: JKBMS BLE - Fixed problem with second temperature sensor, which was introduced with `v1.1.20240128dev` https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/26 by @mr-manuel
+* Changed: Optimized code and error handling by @mr-manuel
+* Changed: Optimized SOC reset to 100% and 0% when `SOC_CALCULATION` is enabled by @mr-manuel
+* Changed: Renamed Lifepower to EG4_Lifepower by @mr-manuel
+* Changed: Renogy BMS - Fixes for unknown serial number by @mr-manuel
+* Changed: Seplos BMS - Fixed temperature display https://github.com/Louisvdw/dbus-serialbattery/issues/1072 by @wollew
+
+
+## v1.2.20240408
+
+### Breaking Changes
 
 * Driver version greater or equal to `v1.2.20240219dev`
 
@@ -42,92 +128,7 @@
 
     `SOC_WHILE_CHARGING`, `MAX_CHARGE_CURRENT_SOC_FRACTION`, `SOC_WHILE_DISCHARGING`, `MAX_DISCHARGE_CURRENT_SOC_FRACTION`
 
-
-* Driver version greater or equal to `v1.1.20231223dev`
-
-  * `PUBLISH_CONFIG_VALUES` now has to be True or False
-
-
-* Driver version greater or equal to `v1.0.20231128dev`
-
-  * The custom name is not saved to the config file anymore, but to the dbus service com.victronenergy.settings. You have to re-enter it once.
-
-  * If you selected a specific device in `Settings -> System setup -> Battery monitor` and/or `Settings -> DVCC -> Controlling BMS` you have to reselect it.
-
-
-* Driver version greater or equal to `v1.0.20230629dev` and smaller or equal to `v1.0.20230926dev`:
-
-  With `v1.0.20230927beta` the following values changed names:
-  * `BULK_CELL_VOLTAGE` -> `SOC_RESET_VOLTAGE`
-  * `BULK_AFTER_DAYS` -> `SOC_RESET_AFTER_DAYS`
-
-
-## v1.5.x
-* Added: Daly BMS - Connect multiple BMS to the same RS485 port by @CaptKrisp
-* Added: EG LifePower - Connect multiple BMS to the same RS485 port by @mr-manuel
-* Added: GUIv2 by @mr-manuel
-* Added: High cell voltage alarm was added to venus-platform with https://github.com/victronenergy/venus-platform/commit/d686955aa15b7e246a92ee1f4c3eef3b62b153b7 and now also to this driver by @mr-manuel
-* Added: Possibility to change the CAN bus speed by @mr-manuel
-* Added: Threshold, if `CCL = 0` or `DCL = 0` is reached to prevent flapping @mr-manuel
-* Changed: Calculate Time-to-Go until ESS -> Minimum SOC (unless grid fails), Active SOC limit or `SOC_LOW_WARNING` from `config.ini` by @mr-manuel
-* Changed: HLPDATA BMS - BMS control of max charge and discharge is removed by @peterohman
-* Changed: HLPDATA BMS - improved driver with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/96 by @peterohman
-* Changed: JKBMS PB Model fixed firmware version and temperature sensors by @KoljaWindeler
-* Changed: Rewritten code for external current sensor and fixed https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/60 by @mr-manuel
-
-## v1.4.20240928
-
-* Added: `History()` class that holds all BMS history values by @mr-manuel
-* Added: Automatically increase polling time, if polling take too long by @mr-manuel
-* Added: Connection Information field which was recently added by Victron on the details page by @mr-manuel
-* Added: Daren BMS with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/65 by @cpttinkering
-* Added: Multiple BMS on one USB to RS485/Modbus adapter now possible. The BMS needs to be able to set different addresses to each battery by @mr-manuel
-* Added: Send telemetry data to see which driver versions and BMS are used the most. Can be disabled in the `config.ini` by @mr-manuel
-* Added: Show error in log, if an unknown BMS type was added in the `config.ini` by @mr-manuel
-* Changed: Battery connection loss: Big improvements on handling the situation, fixed battery connection restore without driver restart, improved behaviour when connection is lost, added config options by @mr-manuel
-* Changed: Call `get_settings()` in `test_connection()` for all battery classes, removed `get_settings()` call from `setup_vedbus()` by @mr-manuel
-* Changed: Daly BMS - Fixed issues where faulty readings set values to None by @mr-manuel
-* Changed: Fixed alarms for some BMS and cleaned up `Protection()` class
-* Changed: Fixed how `velib_python` was integrated in this driver by @mr-manuel
-* Changed: Fixed problem with battery status and error code by @mr-manuel
-* Changed: GUIv1 cell voltage page design by @mr-manuel
-* Changed: JKBMS - Fixed issues where faulty readings set values to None by @mr-manuel
-* Changed: JKBMS BLE - Fixes wrong max battery voltage https://github.com/Louisvdw/dbus-serialbattery/issues/1094 by @mr-manuel
-* Changed: JKBMS PB Model fixes by @KoljaWindeler
-* Changed: LLT/JBS BMS - Fix bug in SOC calculation and use SOC comming from BMS. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/47 by @mr-manuel
-* Changed: Renogy BMS - Use port as unique identifier, since it's not possible to change any values on this BMS by @mr-manuel
-* Changed: Reworked, documented and cleaned up a lot of code by @mr-manuel
-* Changed: Set default charge/discharge current from utils in main battery class by @mr-manuel
-* Changed: Show non blocking errors only, if more than 180 occured in the last 3 hours (1 per minute) and do not block inverting/charging by @mr-manuel
-* Changed: The setting `HELTEC_MODBUS_ADDR` was replaced by `MODBUS_ADDRESSES` in the `config.default.ini` by @mr-manuel
-* Changed: Updated `battery_template.py` and added tons of descriptions by @mr-manuel
-
-## v1.3.20240705
-
-* Added: EG4 LL BMS by @tuxntoast
-* Added: Fields for debugging switch to float/bulk by @mr-manuel
-* Added: JKBMS PB Model with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/39 by @KoljaWindeler
-* Added: Possibility to add custom polling interval to reduce the CPU load. Fixes https://github.com/Louisvdw/dbus-serialbattery/issues/1022 by @mr-manuel
-* Added: Possibility to select if min/max battery voltage, CVL, CCL and DCL are used from driver or BMS. Fixes https://github.com/Louisvdw/dbus-serialbattery/issues/1056 by @mr-manuel
-* Added: Possibility to use port name as unique identifier https://github.com/Louisvdw/dbus-serialbattery/issues/1035 by @mr-manuel
-* Added: Show details about driver internals in GUI -> Serialbattery -> Parameters by setting `GUI_PARAMETERS_SHOW_ADDITIONAL_INFO` to `True` by @mr-manuel
-* Added: Show in the remote console/GUI if a non blocking error was triggered by @mr-manuel
-* Added: Use current measurement from other dbus path by @mr-manuel
-* Changed: Daly BMS CAN - Prevent recognition of this BMS, if it's not connected by @mr-manuel
-* Changed: Fixed failed GUI restart on some GX devices by @SenH
-* Changed: Fixed problem with I-Controller https://github.com/Louisvdw/dbus-serialbattery/issues/1041 by @mr-manuel
-* Changed: Fixed problem with linear limitation disabled https://github.com/Louisvdw/dbus-serialbattery/issues/1037 by @mr-manuel
-* Changed: Fixed SoC is None on driver startup https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/32 by @mr-manuel
-* Changed: Fixed some wrong paths in the post-hook commands by @juswes
-* Changed: JKBMS BLE - Fixed problem with second temperature sensor, which was introduced with `v1.1.20240128dev` https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/26 by @mr-manuel
-* Changed: Optimized code and error handling by @mr-manuel
-* Changed: Optimized SOC reset to 100% and 0% when `SOC_CALCULATION` is enabled by @mr-manuel
-* Changed: Renamed Lifepower to EG4_Lifepower by @mr-manuel
-* Changed: Renogy BMS - Fixes for unknown serial number by @mr-manuel
-* Changed: Seplos BMS - Fixed temperature display https://github.com/Louisvdw/dbus-serialbattery/issues/1072 by @wollew
-
-
-## v1.2.20240408
+### What's Changed
 
 * Added: Check if the device instance is already used by @mr-manuel
 * Added: Check if there is enough space on system and data partitions before installation by @mr-manuel
@@ -160,20 +161,32 @@
 
 ## v1.1.20240121
 
-* Changed: Exit the driver with error, when port is excluded in config, else the serialstarter does not continue by @mr-manuel
-* Changed: Fixed issue on first driver startup, when no device setting in dbus exists by @mr-manuel
-* Changed: Fixed some smaller errors by @mr-manuel
-* Changed: More detailed error output when an exception happens by @mr-manuel
-
-### Known issues for v1.1.20240121
+### Known issues
 
 * If multiple batteries have the same `unique_identifier`, then they are displayed as one battery in the VRM portal and if you change the name,
   it get changed for all dbus-serialbattries. Please change the capacity of the batteries to be unique (if the unique identifier ends with Ah)
   or change the custom field on supported BMS.
   E.g.: 278 Ah, 279 Ah,280 Ah,281 Ah and 282 Ah, if you have 5 batteries with 280 Ah.
 
+### Breaking Changes
 
-## v1.0.20240102beta
+* Driver version greater or equal to `v1.1.20231223dev`
+
+  * `PUBLISH_CONFIG_VALUES` now has to be True or False
+
+* Driver version greater or equal to `v1.0.20231128dev`
+
+  * The custom name is not saved to the config file anymore, but to the dbus service com.victronenergy.settings. You have to re-enter it once.
+
+  * If you selected a specific device in `Settings -> System setup -> Battery monitor` and/or `Settings -> DVCC -> Controlling BMS` you have to reselect it.
+
+* Driver version greater or equal to `v1.0.20230629dev` and smaller or equal to `v1.0.20230926dev`:
+
+  With `v1.0.20230927beta` the following values changed names:
+  * `BULK_CELL_VOLTAGE` -> `SOC_RESET_VOLTAGE`
+  * `BULK_AFTER_DAYS` -> `SOC_RESET_AFTER_DAYS`
+
+### What's Changed
 
 * Added: Bluetooth: Show signal strength of BMS in log by @mr-manuel
 * Added: Configure logging level in `config.ini` by @mr-manuel
@@ -204,9 +217,12 @@
 * Changed: Daly BMS - Fixed https://github.com/Louisvdw/dbus-serialbattery/issues/837 by @mr-manuel
 * Changed: Daly BMS - Fixed readsentence by @transistorgit
 * Changed: Enable BMS that are disabled by default by specifying it in the config file. No more need to edit scripts by @mr-manuel
+* Changed: Exit the driver with error, when port is excluded in config, else the serialstarter does not continue by @mr-manuel
 * Changed: Fixed Building wheel for dbus-fast won't finish on weak systems https://github.com/Louisvdw/dbus-serialbattery/issues/785 by @mr-manuel
 * Changed: Fixed error in `reinstall-local.sh` script for Bluetooth installation by @mr-manuel
+* Changed: Fixed issue on first driver startup, when no device setting in dbus exists by @mr-manuel
 * Changed: Fixed meaningless Time to Go values by @transistorgit
+* Changed: Fixed some smaller errors by @mr-manuel
 * Changed: Fixed typo in `config.ini` sample by @hoschult
 * Changed: For BMS_TYPE now multiple BMS can be specified by @mr-manuel
 * Changed: Improved battery error handling on connection loss by @mr-manuel
@@ -225,6 +241,7 @@
 * Changed: LLT/JBD BMS - Improved error handling and automatical driver restart in case of error. Fixed https://github.com/Louisvdw/dbus-serialbattery/issues/777 by @mr-manuel
 * Changed: LLT/JBD BMS - SOC different in Xiaoxiang app and dbus-serialbattery with https://github.com/Louisvdw/dbus-serialbattery/pull/760 by @idstein
 * Changed: Make CCL and DCL limiting messages more clear by @mr-manuel
+* Changed: More detailed error output when an exception happens by @mr-manuel
 * Changed: Optimized CVL calculation on high cell voltage for smoother charging with https://github.com/Louisvdw/dbus-serialbattery/pull/882 by @cflenker
 * Changed: Reduce the big inrush current if the CVL jumps from Bulk/Absorbtion to Float https://github.com/Louisvdw/dbus-serialbattery/issues/659 by @Rikkert-RS & @ogurevich
 * Changed: Sinowealth BMS - Fixed not loading https://github.com/Louisvdw/dbus-serialbattery/issues/702 by @mr-manuel
@@ -235,7 +252,11 @@
 
 ## v1.0.20230531
 
-### ATTENTION: Breaking changes! The config is now done in the `config.ini`. All values from the `utils.py` get lost. The changes in the `config.ini` will persists future updates.
+### Breaking Changes
+
+* The config is now done in the `config.ini`. All values from the `utils.py` get lost. The changes in the `config.ini` will persists future updates.
+
+### What's Changed
 
 * Added: `self.unique_identifier` to the battery class. Used to identify a BMS when multiple BMS are connected - planned for future use by @mr-manuel
 * Added: Alert is triggered, when BMS communication is lost by @mr-manuel
