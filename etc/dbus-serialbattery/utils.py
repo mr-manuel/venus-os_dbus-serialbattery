@@ -201,6 +201,9 @@ CAN_SPEED: int = get_int_from_config("DEFAULT", "CAN_SPEED") * 1000
 """
 Speed of the CAN bus in bps
 """
+CAN_PORT: list = _get_list_from_config("DEFAULT", "CAN_PORT", lambda v: str(v))
+# --------- CAN device ids (multiple BMS on one can bus) ---------
+CAN_DEVICE_IDS: list = _get_list_from_config("DEFAULT", "CAN_DEVICE_IDS", lambda v: str(v))
 
 
 # --------- Modbus (multiple BMS on one serial adapter) ---------

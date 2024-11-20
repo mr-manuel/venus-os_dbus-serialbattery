@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 
 # NOTES
-# mostly copied from https://github.com/IrisCrimson
-# extended for JK Inverter BMS CAN https://github.com/Hooorny/venus-os_dbus-serialbattery
+# copied some lines from jkbms_can.py
+# extended for JK Inverter BMS CAN from https://github.com/Hooorny/venus-os_dbus-serialbattery
 
 
 from __future__ import absolute_import, division, print_function, unicode_literals
@@ -24,6 +24,11 @@ class Jkbms_Pb_Can(Battery):
         self.cell_count = 1
         self.poll_interval = 1500
         self.type = self.BATTERYTYPE
+
+        # If multiple BMS are used simultaneously, the device address can be set via the Jikong BMS APP
+        # (default address is 0) to change the CAN frame ID sent by the BMS
+        # currently pinned to 0 and allow 1 BMS with default address
+        self.device_id = 0
         self.last_error_time = time.time()
         self.error_active = False
 
@@ -35,8 +40,6 @@ class Jkbms_Pb_Can(Battery):
 
     BATTERYTYPE = "JKBMS PB CAN"
     CAN_BUS_TYPE = "socketcan"
-
-    CURRENT_ZERO_CONSTANT = 400
 
     BATT_STAT = "BATT_STAT"
     CELL_VOLT = "CELL_VOLT"
@@ -58,41 +61,36 @@ class Jkbms_Pb_Can(Battery):
 
     MESSAGES_TO_READ = 100
 
-    #     Nummer	Name	Beschreibung            Rahmenformat	    ID	        Zyklus
-    #       1	BATT_ST1	Bet Info 1	            Standardrahmen	    0x02F4	    20 ms
-    #       2	BATT_ST2	Batt Info 2	            Erweiterter Rahmen	0x18F128F4	100 ms
-    #       3	CELL_VOLT	Zellenspannung	        Standardrahmen	    0x04F4	    100 ms
-    #       4	CELL_TEMP	Zelltemperatur	        Standardrahmen	    0x05F4	    500 ms
-    #       5	ALL_TEMP	Alle Zelltemperaturen	Erweiterter Rahmen	0x18F228F4	500 ms
-    #       6	ALM_INFO	Alarminformationen	    Standardrahmen	    0x07F4	    100 ms
-    #       7	BMSERR_INFO	BMS-Fehlerinformationen	Erweiterter Rahmen	0x18F328F4	100 ms
-    #       8	BMS_INFO	BMS-Informationen	    Erweiterter Rahmen	0x18F428F4	500 ms
-    #       9	BMSSwSta	BMS-Schalterzustand	    Erweiterter Rahmen	0x18F528F4	500 ms
-    #       10	CELLVOL	    Zellenspannung	        Erweiterter Rahmen	0x18E028F4	1000 ms
-    #       11	BMSChg_INFO	BMS-Ladeanforderung	    Erweiterter Rahmen	0x1806E5F4	500 ms
-
-    #
     CAN_FRAMES = {
-        BATT_STAT: [0x02F4, 0x02F5, 0x02F6, 0x02F7],
-        CELL_VOLT: [0x04F4, 0x04F5, 0x04F6, 0x04F7],
-        CELL_TEMP: [0x05F4, 0x05F5, 0x05F6, 0x05F7],
-        ALM_INFO: [0x07F4, 0x07F5, 0x07F6, 0x07F7],
-        BATT_STAT_EXT: [0x18F128F4, 0x18F128F5, 0x18F128F6, 0x18F128F7],
-        ALL_TEMP: [0x18F228F4, 0x18F228F5, 0x18F228F6, 0x18F228F7],
-        BMSERR_INFO: [0x18F328F4, 0x18F328F5, 0x18F328F6, 0x18F328F7],
-        BMS_INFO: [0x18F428F4, 0x18F428F5, 0x18F428F6, 0x18F428F7],
-        BMS_SWITCH_STATE: [0x18F528F4, 0x18F528F5, 0x18F528F6, 0x18F528F7],
-        CELL_VOLT_EXT1: [0x18E028F4, 0x18E028F5, 0x18E028F6, 0x18E028F7],
-        CELL_VOLT_EXT2: [0x18E128F4, 0x18E128F5, 0x18E128F6, 0x18E128F7],
-        CELL_VOLT_EXT3: [0x18E228F4, 0x18E228F5, 0x18E228F6, 0x18E228F7],
-        CELL_VOLT_EXT4: [0x18E328F4, 0x18E328F5, 0x18E328F6, 0x18E328F7],
-        CELL_VOLT_EXT5: [0x18E428F4, 0x18E428F5, 0x18E428F6, 0x18E428F7],
-        CELL_VOLT_EXT6: [0x18E528F4, 0x18E528F5, 0x18E528F6, 0x18E528F7],
-        BMS_CHG_INFO: [0x1806E5F4, 0x1806E5F5, 0x1806E5F6, 0x1806E5F7],
+        BATT_STAT: [0x02F4],
+        CELL_VOLT: [0x04F4],
+        CELL_TEMP: [0x05F4],
+        ALM_INFO: [0x07F4],
+        BATT_STAT_EXT: [0x18F128F4],
+        ALL_TEMP: [0x18F228F4],
+        BMSERR_INFO: [0x18F328F4],
+        BMS_INFO: [0x18F428F4],
+        BMS_SWITCH_STATE: [0x18F528F4],
+        CELL_VOLT_EXT1: [0x18E028F4],
+        CELL_VOLT_EXT2: [0x18E128F4],
+        CELL_VOLT_EXT3: [0x18E228F4],
+        CELL_VOLT_EXT4: [0x18E328F4],
+        CELL_VOLT_EXT5: [0x18E428F4],
+        CELL_VOLT_EXT6: [0x18E528F4],
+        BMS_CHG_INFO: [0x1806E5F4],
     }
 
     def connection_name(self) -> str:
-        return "CAN " + self.port
+        return "CAN " + self.port + " Device ID " + str(self.device_id)
+
+    def unique_identifier(self) -> str:
+        """
+        Used to identify a BMS when multiple BMS are connected
+        Provide a unique identifier from the BMS to identify a BMS, if multiple same BMS are connected
+        e.g. the serial number
+        If there is no such value, please remove this function
+        """
+        return "JK Inverter BMS " + self.port + " addr " + str(self.device_id)
 
     def test_connection(self):
         """
@@ -227,7 +225,8 @@ class Jkbms_Pb_Can(Battery):
                 # print("message received")
                 messages_to_read -= 1
                 # print(messages_to_read)
-                if msg.arbitration_id in self.CAN_FRAMES[self.BATT_STAT]:
+                normalized_arbitration_id = msg.arbitration_id - self.device_id
+                if normalized_arbitration_id in self.CAN_FRAMES[self.BATT_STAT]:
                     voltage = unpack_from("<H", bytes([msg.data[0], msg.data[1]]))[0]
                     self.voltage = voltage / 10
 
@@ -236,37 +235,7 @@ class Jkbms_Pb_Can(Battery):
 
                     self.soc = unpack_from("<B", bytes([msg.data[4]]))[0]
 
-                elif msg.arbitration_id in self.CAN_FRAMES[self.CELL_VOLT]:
-                    max_cell_volt = unpack_from("<H", bytes([msg.data[0], msg.data[1]]))[0] / 1000
-                    max_cell_nr = unpack_from("<B", bytes([msg.data[2]]))[0]
-                    max_cell_cnt = max(max_cell_nr, self.cell_count)
-
-                    min_cell_volt = unpack_from("<H", bytes([msg.data[3], msg.data[4]]))[0] / 1000
-                    min_cell_nr = unpack_from("<B", bytes([msg.data[5]]))[0]
-                    max_cell_cnt = max(min_cell_nr, max_cell_cnt)
-
-                    if max_cell_cnt > self.cell_count:
-                        self.cell_count = max_cell_cnt
-                        self.get_settings()
-
-                    for c_nr in range(len(self.cells)):
-                        self.cells[c_nr].balance = False
-
-                    if self.cell_count == len(self.cells):
-                        self.cells[max_cell_nr - 1].voltage = max_cell_volt
-                        self.cells[max_cell_nr - 1].balance = True
-
-                        self.cells[min_cell_nr - 1].voltage = min_cell_volt
-                        self.cells[min_cell_nr - 1].balance = True
-
-                elif msg.arbitration_id in self.CAN_FRAMES[self.CELL_TEMP]:
-                    max_temp = unpack_from("<B", bytes([msg.data[0]]))[0] - 50
-                    min_temp = unpack_from("<B", bytes([msg.data[2]]))[0] - 50
-                    self.to_temp(1, max_temp if max_temp <= 100 else 100)
-                    self.to_temp(2, min_temp if min_temp <= 100 else 100)
-                    # print(max_temp)
-                    # print(min_temp)
-                elif msg.arbitration_id in self.CAN_FRAMES[self.ALM_INFO]:
+                elif normalized_arbitration_id in self.CAN_FRAMES[self.ALM_INFO]:
                     alarms = unpack_from(
                         "<L",
                         bytes([msg.data[0], msg.data[1], msg.data[2], msg.data[3]]),
@@ -276,13 +245,13 @@ class Jkbms_Pb_Can(Battery):
                     self.error_active = True
                     self.to_protection_bits(alarms)
 
-                elif msg.arbitration_id in self.CAN_FRAMES[self.BATT_STAT_EXT]:
+                elif normalized_arbitration_id in self.CAN_FRAMES[self.BATT_STAT_EXT]:
                     self.capacity_remain = unpack_from("<H", bytes([msg.data[0], msg.data[1]]))[0] / 10
                     self.capacity = unpack_from("<H", bytes([msg.data[2], msg.data[3]]))[0] / 10
                     self.history.total_ah_drawn = unpack_from("<H", bytes([msg.data[4], msg.data[5]]))[0] / 10
                     self.history.charge_cycles = unpack_from("<H", bytes([msg.data[6], msg.data[7]]))[0]
 
-                elif msg.arbitration_id in self.CAN_FRAMES[self.ALL_TEMP]:
+                elif normalized_arbitration_id in self.CAN_FRAMES[self.ALL_TEMP]:
                     # temp_sensor_cnt = unpack_from("<B", bytes([msg.data[0]]))[0]
                     temp1 = unpack_from("<B", bytes([msg.data[1]]))[0] - 50
                     temp2 = unpack_from("<B", bytes([msg.data[2]]))[0] - 50
@@ -296,48 +265,61 @@ class Jkbms_Pb_Can(Battery):
                     self.to_temp(3, temp4)
                     self.to_temp(4, temp5)
 
-                # elif msg.arbitration_id in self.CAN_FRAMES[self.BMSERR_INFO]:
+                # elif normalized_arbitration_id in self.CAN_FRAMES[self.BMSERR_INFO]:
 
-                # elif msg.arbitration_id in self.CAN_FRAMES[self.BMS_INFO]:
+                # elif normalized_arbitration_id in self.CAN_FRAMES[self.BMS_INFO]:
 
-                # elif msg.arbitration_id in self.CAN_FRAMES[self.BMS_SWITCH_STATE]:
+                elif normalized_arbitration_id in self.CAN_FRAMES[self.BMS_SWITCH_STATE]:
+                    switch_state_bytes = unpack_from("<B", bytes([msg.data[0]]))[0]
+                    # logger.info(switch_state_bytes)
+                    self.charge_fet = bool((switch_state_bytes >> 0) & 0x01)
+                    self.discharge_fet = bool((switch_state_bytes >> 1) & 0x01)
+                    # set balance status, if only a common balance status is available (bool)
+                    # not needed, if balance status is available for each cell
+                    self.balancing = bool((switch_state_bytes >> 2) & 0x01)
+                    if self.get_min_cell() is not None and self.get_max_cell() is not None:
+                        for c in range(self.cell_count):
+                            if self.balancing and (self.get_min_cell() == c or self.get_max_cell() == c):
+                                self.cells[c].balance = True
+                            else:
+                                self.cells[c].balance = False
 
-                elif msg.arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT1]:
+                elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT1]:
                     self.cells[0].voltage = unpack_from("<H", bytes([msg.data[0], msg.data[1]]))[0] / 1000
                     self.cells[1].voltage = unpack_from("<H", bytes([msg.data[2], msg.data[3]]))[0] / 1000
                     self.cells[2].voltage = unpack_from("<H", bytes([msg.data[4], msg.data[5]]))[0] / 1000
                     self.cells[3].voltage = unpack_from("<H", bytes([msg.data[6], msg.data[7]]))[0] / 1000
 
-                elif msg.arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT2]:
+                elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT2]:
                     self.cells[4].voltage = unpack_from("<H", bytes([msg.data[0], msg.data[1]]))[0] / 1000
                     self.cells[5].voltage = unpack_from("<H", bytes([msg.data[2], msg.data[3]]))[0] / 1000
                     self.cells[6].voltage = unpack_from("<H", bytes([msg.data[4], msg.data[5]]))[0] / 1000
                     self.cells[7].voltage = unpack_from("<H", bytes([msg.data[6], msg.data[7]]))[0] / 1000
 
-                elif msg.arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT3]:
+                elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT3]:
                     self.cells[8].voltage = unpack_from("<H", bytes([msg.data[0], msg.data[1]]))[0] / 1000
                     self.cells[9].voltage = unpack_from("<H", bytes([msg.data[2], msg.data[3]]))[0] / 1000
                     self.cells[10].voltage = unpack_from("<H", bytes([msg.data[4], msg.data[5]]))[0] / 1000
                     self.cells[11].voltage = unpack_from("<H", bytes([msg.data[6], msg.data[7]]))[0] / 1000
 
-                elif msg.arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT4]:
+                elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT4]:
                     self.cells[12].voltage = unpack_from("<H", bytes([msg.data[0], msg.data[1]]))[0] / 1000
                     self.cells[13].voltage = unpack_from("<H", bytes([msg.data[2], msg.data[3]]))[0] / 1000
                     self.cells[14].voltage = unpack_from("<H", bytes([msg.data[4], msg.data[5]]))[0] / 1000
                     self.cells[15].voltage = unpack_from("<H", bytes([msg.data[6], msg.data[7]]))[0] / 1000
 
-                elif msg.arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT5]:
+                elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT5]:
                     self.cells[16].voltage = unpack_from("<H", bytes([msg.data[0], msg.data[1]]))[0] / 1000
                     self.cells[17].voltage = unpack_from("<H", bytes([msg.data[2], msg.data[3]]))[0] / 1000
                     self.cells[18].voltage = unpack_from("<H", bytes([msg.data[4], msg.data[5]]))[0] / 1000
                     self.cells[19].voltage = unpack_from("<H", bytes([msg.data[6], msg.data[7]]))[0] / 1000
 
-                elif msg.arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT6]:
+                elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT6]:
                     self.cells[20].voltage = unpack_from("<H", bytes([msg.data[0], msg.data[1]]))[0] / 1000
                     self.cells[21].voltage = unpack_from("<H", bytes([msg.data[2], msg.data[3]]))[0] / 1000
                     self.cells[22].voltage = unpack_from("<H", bytes([msg.data[4], msg.data[5]]))[0] / 1000
                     self.cells[23].voltage = unpack_from("<H", bytes([msg.data[6], msg.data[7]]))[0] / 1000
 
-                # elif msg.arbitration_id in self.CAN_FRAMES[self.BMS_CHG_INFO]:
+                # elif normalized_arbitration_id in self.CAN_FRAMES[self.BMS_CHG_INFO]:
 
         return True
