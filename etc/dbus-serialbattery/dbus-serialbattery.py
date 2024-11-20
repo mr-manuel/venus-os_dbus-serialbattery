@@ -260,7 +260,8 @@ def main():
         ]
 
         # check if JKBMS_PB_CAN_DEVICE_ADDRESSES is not empty and expected_bms_types contains Jkbms_Pb_Can
-        if utils.JKBMS_PB_CAN_DEVICE_ADDRESSES and any(entry["bms"] == "Jkbms_Pb_Can" for entry in expected_bms_types):
+        if utils.JKBMS_PB_CAN_DEVICE_ADDRESSES and any(entry["bms"] == Jkbms_Pb_Can for entry in expected_bms_types):
+            logger.info(">>> Jkbms_Pb_Can multi device mode")
             for address in utils.JKBMS_PB_CAN_DEVICE_ADDRESSES:
                 checkbatt = get_battery(port, address)
                 if checkbatt is not None:

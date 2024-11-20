@@ -81,7 +81,7 @@ class Jkbms_Pb_Can(Battery):
     }
 
     def connection_name(self) -> str:
-        return "CAN " + self.port + " Device ID " + str(self.device_id)
+        return "CAN " + self.port + " Device address " + str(self.device_address)
 
     def unique_identifier(self) -> str:
         """
@@ -90,7 +90,7 @@ class Jkbms_Pb_Can(Battery):
         e.g. the serial number
         If there is no such value, please remove this function
         """
-        return "JK Inverter BMS " + self.port + " addr " + str(self.device_id)
+        return "JK Inverter BMS " + self.port + " addr " + str(self.device_address)
 
     def test_connection(self):
         """
