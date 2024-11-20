@@ -201,10 +201,7 @@ CAN_SPEED: int = get_int_from_config("DEFAULT", "CAN_SPEED") * 1000
 """
 Speed of the CAN bus in bps
 """
-CAN_PORT: list = _get_list_from_config("DEFAULT", "CAN_PORT", lambda v: str(v))
-# --------- CAN device ids (multiple BMS on one can bus) ---------
-CAN_DEVICE_IDS: list = _get_list_from_config("DEFAULT", "CAN_DEVICE_IDS", lambda v: str(v))
-
+CAN_PORT: list = get_list_from_config("DEFAULT", "CAN_PORT", str)
 
 # --------- Modbus (multiple BMS on one serial adapter) ---------
 MODBUS_ADDRESSES: list = get_list_from_config("DEFAULT", "MODBUS_ADDRESSES", str)
@@ -433,6 +430,7 @@ INVERT_CURRENT_MEASUREMENT: int = get_int_from_config("DEFAULT", "INVERT_CURRENT
 
 # -- JK BMS settings
 JKBMS_CAN_CELL_COUNT: int = get_int_from_config("DEFAULT", "JKBMS_CAN_CELL_COUNT")
+JKBMS_PB_CAN_DEVICE_ADDRESSES: list = get_list_from_config("DEFAULT", "JKBMS_PB_CAN_DEVICE_ADDRESSES", str)
 
 # -- ESC GreenMeter and Lipro device settings
 GREENMETER_ADDRESS: int = get_int_from_config("DEFAULT", "GREENMETER_ADDRESS")

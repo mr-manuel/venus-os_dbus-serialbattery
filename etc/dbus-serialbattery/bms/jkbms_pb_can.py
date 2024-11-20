@@ -28,7 +28,7 @@ class Jkbms_Pb_Can(Battery):
         # If multiple BMS are used simultaneously, the device address can be set via the Jikong BMS APP
         # (default address is 0) to change the CAN frame ID sent by the BMS
         # currently pinned to 0 and allow 1 BMS with default address
-        self.device_id = 0
+        self.device_address = int.from_bytes(address, byteorder="big") if address is not None else 0
         self.last_error_time = time.time()
         self.error_active = False
 
@@ -225,7 +225,7 @@ class Jkbms_Pb_Can(Battery):
                 # print("message received")
                 messages_to_read -= 1
                 # print(messages_to_read)
-                normalized_arbitration_id = msg.arbitration_id - self.device_id
+                normalized_arbitration_id = msg.arbitration_id - self.device_address
                 if normalized_arbitration_id in self.CAN_FRAMES[self.BATT_STAT]:
                     voltage = unpack_from("<H", bytes([msg.data[0], msg.data[1]]))[0]
                     self.voltage = voltage / 10
