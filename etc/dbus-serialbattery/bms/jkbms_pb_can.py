@@ -7,12 +7,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 from battery import Battery, Cell
-from utils import (
-    logger,
-    JKBMS_CAN_CELL_COUNT,
-)
+from utils import logger, JKBMS_CAN_CELL_COUNT, CanReceiverThread
 from struct import unpack_from
-import can
 import sys
 import time
 
@@ -132,6 +128,14 @@ class Jkbms_Pb_Can(Battery):
                 self.cells.append(Cell(False))
 
         self.hardware_version = "JKBMS PB CAN " + str(self.cell_count) + "S"
+
+        # Starte den Singleton-Thread
+        try:
+            self.can_thread = CanReceiverThread.get_instance(bustype=self.CAN_BUS_TYPE, channel=self.port, bitrate=self.baud_rate)
+        except Exception as e:
+            print(f"Error: {e}")
+            return False
+
         return True
 
     def refresh_data(self):
@@ -196,131 +200,105 @@ class Jkbms_Pb_Can(Battery):
         self.protection.internal_failure = 0
 
     def read_jkbms_can(self):
-        if self.can_bus is False:
-            logger.debug("Can bus init")
-            # init the can interface
-            try:
-                self.can_bus = can.interface.Bus(bustype=self.CAN_BUS_TYPE, channel=self.port, bitrate=self.baud_rate)
-            except can.CanError as e:
-                logger.error(e)
-
-            if self.can_bus is None:
-                return False
-
-            logger.debug("Can bus init done")
-
         # reset errors after timeout
         if ((time.time() - self.last_error_time) > 120.0) and self.error_active is True:
             self.error_active = False
             self.reset_protection_bits()
 
-        # read msgs until we get one we want
-        messages_to_read = self.MESSAGES_TO_READ
-        while messages_to_read > 0:
-            msg = self.can_bus.recv(1)
-            if msg is None:
-                logger.info("No CAN Message received")
-                return False
+        for frame_id, data in self.can_thread.get_message_cache().items():
+            normalized_arbitration_id = frame_id - self.device_address
+            if normalized_arbitration_id in self.CAN_FRAMES[self.BATT_STAT]:
+                voltage = unpack_from("<H", bytes([data[0], data[1]]))[0]
+                self.voltage = voltage / 10
 
-            if msg is not None:
-                # print("message received")
-                messages_to_read -= 1
-                # print(messages_to_read)
-                normalized_arbitration_id = msg.arbitration_id - self.device_address
-                if normalized_arbitration_id in self.CAN_FRAMES[self.BATT_STAT]:
-                    voltage = unpack_from("<H", bytes([msg.data[0], msg.data[1]]))[0]
-                    self.voltage = voltage / 10
+                current = unpack_from("<H", bytes([data[2], data[3]]))[0]
+                self.current = (current / 10) - 400
 
-                    current = unpack_from("<H", bytes([msg.data[2], msg.data[3]]))[0]
-                    self.current = (current / 10) - 400
+                self.soc = unpack_from("<B", bytes([data[4]]))[0]
 
-                    self.soc = unpack_from("<B", bytes([msg.data[4]]))[0]
+            elif normalized_arbitration_id in self.CAN_FRAMES[self.ALM_INFO]:
+                alarms = unpack_from(
+                    "<L",
+                    bytes([data[0], data[1], data[2], data[3]]),
+                )[0]
+                print("alarms %d" % (alarms))
+                self.last_error_time = time.time()
+                self.error_active = True
+                self.to_protection_bits(alarms)
 
-                elif normalized_arbitration_id in self.CAN_FRAMES[self.ALM_INFO]:
-                    alarms = unpack_from(
-                        "<L",
-                        bytes([msg.data[0], msg.data[1], msg.data[2], msg.data[3]]),
-                    )[0]
-                    print("alarms %d" % (alarms))
-                    self.last_error_time = time.time()
-                    self.error_active = True
-                    self.to_protection_bits(alarms)
+            elif normalized_arbitration_id in self.CAN_FRAMES[self.BATT_STAT_EXT]:
+                self.capacity_remain = unpack_from("<H", bytes([data[0], data[1]]))[0] / 10
+                self.capacity = unpack_from("<H", bytes([data[2], data[3]]))[0] / 10
+                self.history.total_ah_drawn = unpack_from("<H", bytes([data[4], data[5]]))[0] / 10
+                self.history.charge_cycles = unpack_from("<H", bytes([data[6], data[7]]))[0]
 
-                elif normalized_arbitration_id in self.CAN_FRAMES[self.BATT_STAT_EXT]:
-                    self.capacity_remain = unpack_from("<H", bytes([msg.data[0], msg.data[1]]))[0] / 10
-                    self.capacity = unpack_from("<H", bytes([msg.data[2], msg.data[3]]))[0] / 10
-                    self.history.total_ah_drawn = unpack_from("<H", bytes([msg.data[4], msg.data[5]]))[0] / 10
-                    self.history.charge_cycles = unpack_from("<H", bytes([msg.data[6], msg.data[7]]))[0]
+            elif normalized_arbitration_id in self.CAN_FRAMES[self.ALL_TEMP]:
+                # temp_sensor_cnt = unpack_from("<B", bytes([data[0]]))[0]
+                temp1 = unpack_from("<B", bytes([data[1]]))[0] - 50
+                temp2 = unpack_from("<B", bytes([data[2]]))[0] - 50
+                temp_mosfet = unpack_from("<B", bytes([data[3]]))[0] - 50
+                temp4 = unpack_from("<B", bytes([data[4]]))[0] - 50
+                temp5 = unpack_from("<B", bytes([data[5]]))[0] - 50
+                # temp3 equals mosfet temp
+                self.to_temp(0, temp_mosfet)
+                self.to_temp(1, temp1)
+                self.to_temp(2, temp2)
+                self.to_temp(3, temp4)
+                self.to_temp(4, temp5)
 
-                elif normalized_arbitration_id in self.CAN_FRAMES[self.ALL_TEMP]:
-                    # temp_sensor_cnt = unpack_from("<B", bytes([msg.data[0]]))[0]
-                    temp1 = unpack_from("<B", bytes([msg.data[1]]))[0] - 50
-                    temp2 = unpack_from("<B", bytes([msg.data[2]]))[0] - 50
-                    temp_mosfet = unpack_from("<B", bytes([msg.data[3]]))[0] - 50
-                    temp4 = unpack_from("<B", bytes([msg.data[4]]))[0] - 50
-                    temp5 = unpack_from("<B", bytes([msg.data[5]]))[0] - 50
-                    # temp3 equals mosfet temp
-                    self.to_temp(0, temp_mosfet)
-                    self.to_temp(1, temp1)
-                    self.to_temp(2, temp2)
-                    self.to_temp(3, temp4)
-                    self.to_temp(4, temp5)
+            # elif normalized_arbitration_id in self.CAN_FRAMES[self.BMSERR_INFO]:
 
-                # elif normalized_arbitration_id in self.CAN_FRAMES[self.BMSERR_INFO]:
+            # elif normalized_arbitration_id in self.CAN_FRAMES[self.BMS_INFO]:
 
-                # elif normalized_arbitration_id in self.CAN_FRAMES[self.BMS_INFO]:
+            elif normalized_arbitration_id in self.CAN_FRAMES[self.BMS_SWITCH_STATE]:
+                switch_state_bytes = unpack_from("<B", bytes([data[0]]))[0]
+                # logger.info(switch_state_bytes)
+                self.charge_fet = bool((switch_state_bytes >> 0) & 0x01)
+                self.discharge_fet = bool((switch_state_bytes >> 1) & 0x01)
+                # set balance status, if only a common balance status is available (bool)
+                # not needed, if balance status is available for each cell
+                self.balancing = bool((switch_state_bytes >> 2) & 0x01)
+                if self.get_min_cell() is not None and self.get_max_cell() is not None:
+                    for c in range(self.cell_count):
+                        if self.balancing and (self.get_min_cell() == c or self.get_max_cell() == c):
+                            self.cells[c].balance = True
+                        else:
+                            self.cells[c].balance = False
 
-                elif normalized_arbitration_id in self.CAN_FRAMES[self.BMS_SWITCH_STATE]:
-                    switch_state_bytes = unpack_from("<B", bytes([msg.data[0]]))[0]
-                    # logger.info(switch_state_bytes)
-                    self.charge_fet = bool((switch_state_bytes >> 0) & 0x01)
-                    self.discharge_fet = bool((switch_state_bytes >> 1) & 0x01)
-                    # set balance status, if only a common balance status is available (bool)
-                    # not needed, if balance status is available for each cell
-                    self.balancing = bool((switch_state_bytes >> 2) & 0x01)
-                    if self.get_min_cell() is not None and self.get_max_cell() is not None:
-                        for c in range(self.cell_count):
-                            if self.balancing and (self.get_min_cell() == c or self.get_max_cell() == c):
-                                self.cells[c].balance = True
-                            else:
-                                self.cells[c].balance = False
+            elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT1]:
+                self.cells[0].voltage = unpack_from("<H", bytes([data[0], data[1]]))[0] / 1000
+                self.cells[1].voltage = unpack_from("<H", bytes([data[2], data[3]]))[0] / 1000
+                self.cells[2].voltage = unpack_from("<H", bytes([data[4], data[5]]))[0] / 1000
+                self.cells[3].voltage = unpack_from("<H", bytes([data[6], data[7]]))[0] / 1000
 
-                elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT1]:
-                    self.cells[0].voltage = unpack_from("<H", bytes([msg.data[0], msg.data[1]]))[0] / 1000
-                    self.cells[1].voltage = unpack_from("<H", bytes([msg.data[2], msg.data[3]]))[0] / 1000
-                    self.cells[2].voltage = unpack_from("<H", bytes([msg.data[4], msg.data[5]]))[0] / 1000
-                    self.cells[3].voltage = unpack_from("<H", bytes([msg.data[6], msg.data[7]]))[0] / 1000
+            elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT2]:
+                self.cells[4].voltage = unpack_from("<H", bytes([data[0], data[1]]))[0] / 1000
+                self.cells[5].voltage = unpack_from("<H", bytes([data[2], data[3]]))[0] / 1000
+                self.cells[6].voltage = unpack_from("<H", bytes([data[4], data[5]]))[0] / 1000
+                self.cells[7].voltage = unpack_from("<H", bytes([data[6], data[7]]))[0] / 1000
 
-                elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT2]:
-                    self.cells[4].voltage = unpack_from("<H", bytes([msg.data[0], msg.data[1]]))[0] / 1000
-                    self.cells[5].voltage = unpack_from("<H", bytes([msg.data[2], msg.data[3]]))[0] / 1000
-                    self.cells[6].voltage = unpack_from("<H", bytes([msg.data[4], msg.data[5]]))[0] / 1000
-                    self.cells[7].voltage = unpack_from("<H", bytes([msg.data[6], msg.data[7]]))[0] / 1000
+            elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT3]:
+                self.cells[8].voltage = unpack_from("<H", bytes([data[0], data[1]]))[0] / 1000
+                self.cells[9].voltage = unpack_from("<H", bytes([data[2], data[3]]))[0] / 1000
+                self.cells[10].voltage = unpack_from("<H", bytes([data[4], data[5]]))[0] / 1000
+                self.cells[11].voltage = unpack_from("<H", bytes([data[6], data[7]]))[0] / 1000
 
-                elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT3]:
-                    self.cells[8].voltage = unpack_from("<H", bytes([msg.data[0], msg.data[1]]))[0] / 1000
-                    self.cells[9].voltage = unpack_from("<H", bytes([msg.data[2], msg.data[3]]))[0] / 1000
-                    self.cells[10].voltage = unpack_from("<H", bytes([msg.data[4], msg.data[5]]))[0] / 1000
-                    self.cells[11].voltage = unpack_from("<H", bytes([msg.data[6], msg.data[7]]))[0] / 1000
+            elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT4]:
+                self.cells[12].voltage = unpack_from("<H", bytes([data[0], data[1]]))[0] / 1000
+                self.cells[13].voltage = unpack_from("<H", bytes([data[2], data[3]]))[0] / 1000
+                self.cells[14].voltage = unpack_from("<H", bytes([data[4], data[5]]))[0] / 1000
+                self.cells[15].voltage = unpack_from("<H", bytes([data[6], data[7]]))[0] / 1000
 
-                elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT4]:
-                    self.cells[12].voltage = unpack_from("<H", bytes([msg.data[0], msg.data[1]]))[0] / 1000
-                    self.cells[13].voltage = unpack_from("<H", bytes([msg.data[2], msg.data[3]]))[0] / 1000
-                    self.cells[14].voltage = unpack_from("<H", bytes([msg.data[4], msg.data[5]]))[0] / 1000
-                    self.cells[15].voltage = unpack_from("<H", bytes([msg.data[6], msg.data[7]]))[0] / 1000
+            elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT5]:
+                self.cells[16].voltage = unpack_from("<H", bytes([data[0], data[1]]))[0] / 1000
+                self.cells[17].voltage = unpack_from("<H", bytes([data[2], data[3]]))[0] / 1000
+                self.cells[18].voltage = unpack_from("<H", bytes([data[4], data[5]]))[0] / 1000
+                self.cells[19].voltage = unpack_from("<H", bytes([data[6], data[7]]))[0] / 1000
 
-                elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT5]:
-                    self.cells[16].voltage = unpack_from("<H", bytes([msg.data[0], msg.data[1]]))[0] / 1000
-                    self.cells[17].voltage = unpack_from("<H", bytes([msg.data[2], msg.data[3]]))[0] / 1000
-                    self.cells[18].voltage = unpack_from("<H", bytes([msg.data[4], msg.data[5]]))[0] / 1000
-                    self.cells[19].voltage = unpack_from("<H", bytes([msg.data[6], msg.data[7]]))[0] / 1000
-
-                elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT6]:
-                    self.cells[20].voltage = unpack_from("<H", bytes([msg.data[0], msg.data[1]]))[0] / 1000
-                    self.cells[21].voltage = unpack_from("<H", bytes([msg.data[2], msg.data[3]]))[0] / 1000
-                    self.cells[22].voltage = unpack_from("<H", bytes([msg.data[4], msg.data[5]]))[0] / 1000
-                    self.cells[23].voltage = unpack_from("<H", bytes([msg.data[6], msg.data[7]]))[0] / 1000
-
-                # elif normalized_arbitration_id in self.CAN_FRAMES[self.BMS_CHG_INFO]:
+            elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT6]:
+                self.cells[20].voltage = unpack_from("<H", bytes([data[0], data[1]]))[0] / 1000
+                self.cells[21].voltage = unpack_from("<H", bytes([data[2], data[3]]))[0] / 1000
+                self.cells[22].voltage = unpack_from("<H", bytes([data[4], data[5]]))[0] / 1000
+                self.cells[23].voltage = unpack_from("<H", bytes([data[6], data[7]]))[0] / 1000
 
         return True
