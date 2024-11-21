@@ -7,10 +7,10 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 from battery import Battery, Cell
-from utils import logger, JKBMS_CAN_CELL_COUNT, CanReceiverThread
+from utils import logger, CanReceiverThread
 from struct import unpack_from
 import sys
-import time
+from time import sleep, time
 
 
 class Jkbms_Pb_Can(Battery):
@@ -18,13 +18,13 @@ class Jkbms_Pb_Can(Battery):
         super(Jkbms_Pb_Can, self).__init__(port, baud, address)
         self.can_bus = False
         self.cell_count = 1
-        self.poll_interval = 1500
+        # self.poll_interval = 1500
         self.type = self.BATTERYTYPE
         # If multiple BMS are used simultaneously, the device address can be set via the Jikong BMS APP
         # (default address is 0) to change the CAN frame ID sent by the BMS
         # currently pinned to 0 and allow 1 BMS with default address
         self.device_address = int.from_bytes(address, byteorder="big") if address is not None else 0
-        self.last_error_time = time.time()
+        self.last_error_time = time()
         self.error_active = False
 
     def __del__(self):
@@ -97,6 +97,12 @@ class Jkbms_Pb_Can(Battery):
         try:
             # get settings to check if the data is valid and the connection is working
             result = self.get_settings()
+
+            if result:
+                logger.debug("Wait shortly to make sure that all needed data is in the cache")
+                # Slowest message cycle trasmission is every 1 second, wait a bit more for the fist time to fetch all needed data
+                sleep(1.2)
+
             # get the rest of the data to be sure, that all data is valid and the correct battery type is recognized
             # only read next data if the first one was successful, this saves time when checking multiple battery types
             result = result and self.refresh_data()
@@ -117,17 +123,15 @@ class Jkbms_Pb_Can(Battery):
         # After successful connection get_settings() will be called to set up the battery
         # Set the current limits, populate cell count, etc
         # Return True if success, False for failure
-        self.cell_count = JKBMS_CAN_CELL_COUNT
+        # self.cell_count = JKBMS_CAN_CELL_COUNT
         # Balancing feature should be enabled in the BMS
         self.balance_fet = True
 
         # init the cell array add only missing Cell instances
-        missing_instances = self.cell_count - len(self.cells)
-        if missing_instances > 0:
-            for c in range(missing_instances):
-                self.cells.append(Cell(False))
-
-        self.hardware_version = "JKBMS PB CAN " + str(self.cell_count) + "S"
+        # missing_instances = self.cell_count - len(self.cells)
+        # if missing_instances > 0:
+        #     for c in range(missing_instances):
+        #         self.cells.append(Cell(False))
 
         # Starte den Singleton-Thread
         try:
@@ -199,9 +203,17 @@ class Jkbms_Pb_Can(Battery):
         self.protection.internal_failure = 0
         self.protection.internal_failure = 0
 
+    def update_cell_voltages(self, start_index, end_index, data):
+        for i in range(start_index, end_index + 1):
+            cell_voltage = unpack_from("<H", data[2 * (i - start_index) : 2 * (i - start_index) + 2])[0] / 1000
+            if cell_voltage > 0:
+                if len(self.cells) <= i:
+                    self.cells.insert(i, Cell(False))
+                self.cells[i].voltage = cell_voltage
+
     def read_jkbms_can(self):
         # reset errors after timeout
-        if ((time.time() - self.last_error_time) > 120.0) and self.error_active is True:
+        if ((time() - self.last_error_time) > 120.0) and self.error_active is True:
             self.error_active = False
             self.reset_protection_bits()
 
@@ -222,7 +234,7 @@ class Jkbms_Pb_Can(Battery):
                     bytes([data[0], data[1], data[2], data[3]]),
                 )[0]
                 print("alarms %d" % (alarms))
-                self.last_error_time = time.time()
+                self.last_error_time = time()
                 self.error_active = True
                 self.to_protection_bits(alarms)
 
@@ -258,7 +270,7 @@ class Jkbms_Pb_Can(Battery):
                 # set balance status, if only a common balance status is available (bool)
                 # not needed, if balance status is available for each cell
                 self.balancing = bool((switch_state_bytes >> 2) & 0x01)
-                if self.get_min_cell() is not None and self.get_max_cell() is not None:
+                if self.get_min_cell() is not None and self.get_max_cell() is not None and self.cell_count > 1:
                     for c in range(self.cell_count):
                         if self.balancing and (self.get_min_cell() == c or self.get_max_cell() == c):
                             self.cells[c].balance = True
@@ -266,10 +278,29 @@ class Jkbms_Pb_Can(Battery):
                             self.cells[c].balance = False
 
             elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT1]:
-                self.cells[0].voltage = unpack_from("<H", bytes([data[0], data[1]]))[0] / 1000
-                self.cells[1].voltage = unpack_from("<H", bytes([data[2], data[3]]))[0] / 1000
-                self.cells[2].voltage = unpack_from("<H", bytes([data[4], data[5]]))[0] / 1000
-                self.cells[3].voltage = unpack_from("<H", bytes([data[6], data[7]]))[0] / 1000
+                self.update_cell_voltages(0, 3, data)
+            elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT2]:
+                self.update_cell_voltages(4, 7, data)
+            elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT3]:
+                self.update_cell_voltages(8, 11, data)
+            elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT4]:
+                self.update_cell_voltages(12, 15, data)
+            elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT5]:
+                self.update_cell_voltages(16, 19, data)
+            elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT6]:
+                self.update_cell_voltages(20, 23, data)
+
+            """
+            elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT1]:
+
+                for i in range(0, 3):
+                    cell_voltage = unpack_from("<H", bytes([data[2 * i], data[2 * i + 1]]))[0] / 1000
+                    if cell_voltage > 0:
+                        if len(self.cells) > i:
+                            self.cells[i].voltage = cell_voltage
+                        else:
+                            self.cells.insert(i, Cell(False))
+                            self.cells[i].voltage = cell_voltage
 
             elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT2]:
                 self.cells[4].voltage = unpack_from("<H", bytes([data[0], data[1]]))[0] / 1000
@@ -300,5 +331,9 @@ class Jkbms_Pb_Can(Battery):
                 self.cells[21].voltage = unpack_from("<H", bytes([data[2], data[3]]))[0] / 1000
                 self.cells[22].voltage = unpack_from("<H", bytes([data[4], data[5]]))[0] / 1000
                 self.cells[23].voltage = unpack_from("<H", bytes([data[6], data[7]]))[0] / 1000
+            """
+
+        if self.hardware_version is None:
+            self.hardware_version = "JKBMS PB CAN " + str(self.cell_count) + "S"
 
         return True
