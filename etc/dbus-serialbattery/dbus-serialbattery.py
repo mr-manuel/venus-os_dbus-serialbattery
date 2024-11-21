@@ -207,10 +207,6 @@ def main():
     port = get_port()
     battery = {}
 
-    # wait some seconds to be sure that the serial connection is ready
-    # else the error throw a lot of timeouts
-    sleep(16)
-
     if port.endswith("_Ble"):
         """
         Import ble classes only, if it's a ble port, else the driver won't start due to missing python modules
@@ -274,6 +270,10 @@ def main():
             battery[0] = get_battery(port)
 
     else:
+        # wait some seconds to be sure that the serial connection is ready
+        # else the error throw a lot of timeouts
+        sleep(16)
+
         # check if MODBUS_ADDRESSES is not empty
         if utils.MODBUS_ADDRESSES:
             for address in utils.MODBUS_ADDRESSES:
