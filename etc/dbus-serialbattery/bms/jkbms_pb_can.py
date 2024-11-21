@@ -24,7 +24,6 @@ class Jkbms_Pb_Can(Battery):
         self.cell_count = 1
         self.poll_interval = 1500
         self.type = self.BATTERYTYPE
-
         # If multiple BMS are used simultaneously, the device address can be set via the Jikong BMS APP
         # (default address is 0) to change the CAN frame ID sent by the BMS
         # currently pinned to 0 and allow 1 BMS with default address
@@ -123,6 +122,8 @@ class Jkbms_Pb_Can(Battery):
         # Set the current limits, populate cell count, etc
         # Return True if success, False for failure
         self.cell_count = JKBMS_CAN_CELL_COUNT
+        # Balancing feature should be enabled in the BMS
+        self.balance_fet = True
 
         # init the cell array add only missing Cell instances
         missing_instances = self.cell_count - len(self.cells)
