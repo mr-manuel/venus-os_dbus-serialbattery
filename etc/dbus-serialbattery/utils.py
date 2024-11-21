@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 # Standard library imports
 import bisect
-import can
 import configparser
 import logging
+
+# import os
 import sys
-import threading
 from pathlib import Path
 from struct import unpack_from
 from time import sleep
@@ -739,10 +739,20 @@ def publish_config_variables(dbusservice) -> None:
             dbusservice.add_path(f"/Info/Config/{variable}", value)
 
 
+# import modules only if CAN_PORT is set
+if CAN_PORT:
+    logger.info("Importing CAN bus modules...")
+    # sys.path.insert(1, os.path.join(os.path.dirname(__file__), "ext"))
+    import can
+    import threading
+
+
 class CanReceiverThread(threading.Thread):
+
     _instances = {}
 
     def __init__(self, channel, bustype, bitrate):
+
         # singleton for tupel
         if (channel, bustype, bitrate) in CanReceiverThread._instances:
             raise Exception("Instance already exists for this configuration!")
