@@ -430,7 +430,6 @@ INVERT_CURRENT_MEASUREMENT: int = get_int_from_config("DEFAULT", "INVERT_CURRENT
 
 # -- JK BMS settings
 JKBMS_CAN_CELL_COUNT: int = get_int_from_config("DEFAULT", "JKBMS_CAN_CELL_COUNT")
-JKBMS_PB_CAN_DEVICE_ADDRESSES: list = get_list_from_config("DEFAULT", "JKBMS_PB_CAN_DEVICE_ADDRESSES", str)
 
 # -- ESC GreenMeter and Lipro device settings
 GREENMETER_ADDRESS: int = get_int_from_config("DEFAULT", "GREENMETER_ADDRESS")
