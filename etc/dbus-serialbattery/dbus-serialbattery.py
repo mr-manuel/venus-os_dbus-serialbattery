@@ -1,6 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 from typing import Union
+from typing import Callable, Dict
 
 from time import sleep
 from datetime import datetime
@@ -119,7 +120,7 @@ def main():
 
         return True
 
-    def get_battery(_port: str, _modbus_address: hex = None) -> Union[Battery, None]:
+    def get_battery(_port: str, _modbus_address: hex = None, _can_message_cache_callback: callable = None) -> Union[Battery, None]:
         # all the different batteries the driver support and need to test for
         # try to establish communications with the battery 3 times, else exit
         retry = 1
@@ -145,7 +146,7 @@ def main():
                     )
                     batteryClass = test["bms"]
                     baud = test["baud"]
-                    battery: Battery = batteryClass(port=_port, baud=baud, address=_bms_address)
+                    battery: Battery = batteryClass(port=_port, baud=baud, address=_bms_address, can_message_cache_callback=_can_message_cache_callback)
                     if battery.test_connection() and battery.validate_data():
                         logger.info("-- Connection established to " + battery.__class__.__name__)
                         return battery
@@ -277,11 +278,19 @@ def main():
             battery_type for battery_type in supported_bms_types if battery_type["bms"].__name__ in utils.BMS_TYPE or len(utils.BMS_TYPE) == 0
         ]
 
+        # start the corresponding CanReceiverThread if BMS for this type found
+        from utils_can import CanReceiverThread
+
+        try:
+            can_thread = CanReceiverThread.get_instance(bustype="socketcan", channel=port, bitrate=utils.CAN_SPEED)
+        except Exception as e:
+            print(f"Error: {e}")
+
         # check if MODBUS_ADDRESSES is not empty and expected_bms_types contains Jkbms_Pb_Can
         if utils.MODBUS_ADDRESSES and any(entry["bms"] == Jkbms_Pb_Can for entry in expected_bms_types):
             logger.info(">>> Jkbms_Pb_Can multi device mode")
             for address in utils.MODBUS_ADDRESSES:
-                checkbatt = get_battery(port, address)
+                checkbatt = get_battery(port, address, can_thread.get_message_cache)
                 if checkbatt is not None:
                     battery[address] = checkbatt
                     logger.info("Successful battery connection at " + port + " and this device address " + str(address))
@@ -289,7 +298,7 @@ def main():
                     logger.warning("No battery connection at " + port + " and this device address " + str(address))
         # use default address
         else:
-            battery[0] = get_battery(port)
+            battery[0] = get_battery(port, None, can_thread.get_message_cache)
 
     # SERIAL
     else:

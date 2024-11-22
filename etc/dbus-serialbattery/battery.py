@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from typing import Union, Tuple, List, Callable
+from typing import Union, Tuple, List, Callable, Dict
 
 from utils import logger
 import utils
@@ -155,10 +155,11 @@ class Battery(ABC):
     use the individual implementations as type Battery and work with it.
     """
 
-    def __init__(self, port: str, baud: int, address: str):
+    def __init__(self, port: str, baud: int, address: str, can_message_cache_callback: callable):
         self.port: str = port
         self.baud_rate: int = baud
         self.address: str = address
+        self.can_message_cache_callback: callable = can_message_cache_callback
         self.role: str = "battery"
         self.type: str = "Generic"
         self.poll_interval: int = 1000

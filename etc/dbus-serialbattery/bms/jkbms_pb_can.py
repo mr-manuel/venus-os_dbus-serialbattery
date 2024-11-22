@@ -8,15 +8,14 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 from battery import Battery, Cell
 from utils import logger
-from utils_can import CanReceiverThread
 from struct import unpack_from
 import sys
 from time import sleep, time
 
 
 class Jkbms_Pb_Can(Battery):
-    def __init__(self, port, baud, address):
-        super(Jkbms_Pb_Can, self).__init__(port, baud, address)
+    def __init__(self, port, baud, address, can_message_cache_callback):
+        super(Jkbms_Pb_Can, self).__init__(port, baud, address, can_message_cache_callback)
         self.cell_count = 1
         self.type = self.BATTERYTYPE
 
@@ -96,7 +95,7 @@ class Jkbms_Pb_Can(Battery):
                 sleep(1.2)
 
                 # if there are no messages in the cache after sleeping, something is wrong
-                if not self.can_thread.get_message_cache().items():
+                if not self.can_message_cache_callback().items():
                     logger.error("Error: found no messages on can bus, is it properly configured?")
                     result = False
 
@@ -125,11 +124,11 @@ class Jkbms_Pb_Can(Battery):
         self.balance_fet = True
 
         # Start CanReceiverThread
-        try:
+        """ try:
             self.can_thread = CanReceiverThread.get_instance(bustype=self.CAN_BUS_TYPE, channel=self.port, bitrate=self.baud_rate)
         except Exception as e:
             print(f"Error: {e}")
-            return False
+            return False """
 
         return True
 
@@ -208,7 +207,7 @@ class Jkbms_Pb_Can(Battery):
             self.error_active = False
             self.reset_protection_bits()
 
-        for frame_id, data in self.can_thread.get_message_cache().items():
+        for frame_id, data in self.can_message_cache_callback().items():
             normalized_arbitration_id = frame_id - self.device_address
             if normalized_arbitration_id in self.CAN_FRAMES[self.BATT_STAT]:
                 voltage = unpack_from("<H", bytes([data[0], data[1]]))[0]
