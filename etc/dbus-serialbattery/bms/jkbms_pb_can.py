@@ -17,22 +17,14 @@ from time import sleep, time
 class Jkbms_Pb_Can(Battery):
     def __init__(self, port, baud, address):
         super(Jkbms_Pb_Can, self).__init__(port, baud, address)
-        self.can_bus = False
         self.cell_count = 1
-        # self.poll_interval = 1500
         self.type = self.BATTERYTYPE
-        # If multiple BMS are used simultaneously, the device address can be set via the Jikong BMS APP
-        # (default address is 0) to change the CAN frame ID sent by the BMS
-        # currently pinned to 0 and allow 1 BMS with default address
+
+        # If multiple BMS are used simultaneously, the device address can be set via the dip switches on the BMS
+        # (default address is 0, all switches down) to change the CAN frame ID sent by the BMS
         self.device_address = int.from_bytes(address, byteorder="big") if address is not None else 0
         self.last_error_time = time()
         self.error_active = False
-
-    def __del__(self):
-        if self.can_bus:
-            self.can_bus.shutdown()
-            self.can_bus = False
-            logger.debug("bus shutdown")
 
     BATTERYTYPE = "JKBMS PB CAN"
     CAN_BUS_TYPE = "socketcan"
@@ -128,11 +120,11 @@ class Jkbms_Pb_Can(Battery):
         # After successful connection get_settings() will be called to set up the battery
         # Set the current limits, populate cell count, etc
         # Return True if success, False for failure
-        # self.cell_count = JKBMS_CAN_CELL_COUNT
+
         # Balancing feature should be enabled in the BMS
         self.balance_fet = True
 
-        # Starte den Singleton-Thread
+        # Start CanReceiverThread
         try:
             self.can_thread = CanReceiverThread.get_instance(bustype=self.CAN_BUS_TYPE, channel=self.port, bitrate=self.baud_rate)
         except Exception as e:
