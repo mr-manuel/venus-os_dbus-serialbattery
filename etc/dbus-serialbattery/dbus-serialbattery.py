@@ -1,7 +1,6 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 from typing import Union
-from typing import Callable, Dict
 
 from time import sleep
 from datetime import datetime
