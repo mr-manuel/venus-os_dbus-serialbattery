@@ -26,7 +26,6 @@ class Jkbms_Pb_Can(Battery):
         self.error_active = False
 
     BATTERYTYPE = "JKBMS PB CAN"
-    CAN_BUS_TYPE = "socketcan"
 
     BATT_STAT = "BATT_STAT"
     CELL_VOLT = "CELL_VOLT"
@@ -122,13 +121,6 @@ class Jkbms_Pb_Can(Battery):
 
         # Balancing feature should be enabled in the BMS
         self.balance_fet = True
-
-        # Start CanReceiverThread
-        """ try:
-            self.can_thread = CanReceiverThread.get_instance(bustype=self.CAN_BUS_TYPE, channel=self.port, bitrate=self.baud_rate)
-        except Exception as e:
-            print(f"Error: {e}")
-            return False """
 
         return True
 
