@@ -7,7 +7,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 from battery import Battery, Cell
-from utils import logger, CanReceiverThread
+from utils import logger
+from utils_can import CanReceiverThread
 from struct import unpack_from
 import sys
 from time import sleep, time
@@ -54,8 +55,6 @@ class Jkbms_Pb_Can(Battery):
     CELL_VOLT_EXT6 = "CELL_VOLT_EXT6"
     BMS_CHG_INFO = "BMS_CHG_INFO"
 
-    MESSAGES_TO_READ = 100
-
     CAN_FRAMES = {
         BATT_STAT: [0x02F4],
         CELL_VOLT: [0x04F4],
@@ -100,8 +99,14 @@ class Jkbms_Pb_Can(Battery):
 
             if result:
                 logger.debug("Wait shortly to make sure that all needed data is in the cache")
+
                 # Slowest message cycle trasmission is every 1 second, wait a bit more for the fist time to fetch all needed data
                 sleep(1.2)
+
+                # if there are no messages in the cache after sleeping, something is wrong
+                if not self.can_thread.get_message_cache().items():
+                    logger.error("Error: found no messages on can bus, is it properly configured?")
+                    result = False
 
             # get the rest of the data to be sure, that all data is valid and the correct battery type is recognized
             # only read next data if the first one was successful, this saves time when checking multiple battery types
@@ -126,12 +131,6 @@ class Jkbms_Pb_Can(Battery):
         # self.cell_count = JKBMS_CAN_CELL_COUNT
         # Balancing feature should be enabled in the BMS
         self.balance_fet = True
-
-        # init the cell array add only missing Cell instances
-        # missing_instances = self.cell_count - len(self.cells)
-        # if missing_instances > 0:
-        #     for c in range(missing_instances):
-        #         self.cells.append(Cell(False))
 
         # Starte den Singleton-Thread
         try:
@@ -289,49 +288,6 @@ class Jkbms_Pb_Can(Battery):
                 self.update_cell_voltages(16, 19, data)
             elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT6]:
                 self.update_cell_voltages(20, 23, data)
-
-            """
-            elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT1]:
-
-                for i in range(0, 3):
-                    cell_voltage = unpack_from("<H", bytes([data[2 * i], data[2 * i + 1]]))[0] / 1000
-                    if cell_voltage > 0:
-                        if len(self.cells) > i:
-                            self.cells[i].voltage = cell_voltage
-                        else:
-                            self.cells.insert(i, Cell(False))
-                            self.cells[i].voltage = cell_voltage
-
-            elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT2]:
-                self.cells[4].voltage = unpack_from("<H", bytes([data[0], data[1]]))[0] / 1000
-                self.cells[5].voltage = unpack_from("<H", bytes([data[2], data[3]]))[0] / 1000
-                self.cells[6].voltage = unpack_from("<H", bytes([data[4], data[5]]))[0] / 1000
-                self.cells[7].voltage = unpack_from("<H", bytes([data[6], data[7]]))[0] / 1000
-
-            elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT3]:
-                self.cells[8].voltage = unpack_from("<H", bytes([data[0], data[1]]))[0] / 1000
-                self.cells[9].voltage = unpack_from("<H", bytes([data[2], data[3]]))[0] / 1000
-                self.cells[10].voltage = unpack_from("<H", bytes([data[4], data[5]]))[0] / 1000
-                self.cells[11].voltage = unpack_from("<H", bytes([data[6], data[7]]))[0] / 1000
-
-            elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT4]:
-                self.cells[12].voltage = unpack_from("<H", bytes([data[0], data[1]]))[0] / 1000
-                self.cells[13].voltage = unpack_from("<H", bytes([data[2], data[3]]))[0] / 1000
-                self.cells[14].voltage = unpack_from("<H", bytes([data[4], data[5]]))[0] / 1000
-                self.cells[15].voltage = unpack_from("<H", bytes([data[6], data[7]]))[0] / 1000
-
-            elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT5]:
-                self.cells[16].voltage = unpack_from("<H", bytes([data[0], data[1]]))[0] / 1000
-                self.cells[17].voltage = unpack_from("<H", bytes([data[2], data[3]]))[0] / 1000
-                self.cells[18].voltage = unpack_from("<H", bytes([data[4], data[5]]))[0] / 1000
-                self.cells[19].voltage = unpack_from("<H", bytes([data[6], data[7]]))[0] / 1000
-
-            elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT6]:
-                self.cells[20].voltage = unpack_from("<H", bytes([data[0], data[1]]))[0] / 1000
-                self.cells[21].voltage = unpack_from("<H", bytes([data[2], data[3]]))[0] / 1000
-                self.cells[22].voltage = unpack_from("<H", bytes([data[4], data[5]]))[0] / 1000
-                self.cells[23].voltage = unpack_from("<H", bytes([data[6], data[7]]))[0] / 1000
-            """
 
         if self.hardware_version is None:
             self.hardware_version = "JKBMS PB CAN " + str(self.cell_count) + "S"
