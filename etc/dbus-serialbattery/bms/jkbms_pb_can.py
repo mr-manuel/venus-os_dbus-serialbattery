@@ -14,8 +14,8 @@ from time import sleep, time
 
 
 class Jkbms_Pb_Can(Battery):
-    def __init__(self, port, baud, address, can_message_cache_callback):
-        super(Jkbms_Pb_Can, self).__init__(port, baud, address, can_message_cache_callback)
+    def __init__(self, port, baud, address):
+        super(Jkbms_Pb_Can, self).__init__(port, baud, address)
         self.cell_count = 1
         self.type = self.BATTERYTYPE
 

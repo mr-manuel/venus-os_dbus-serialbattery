@@ -145,7 +145,8 @@ def main():
                     )
                     batteryClass = test["bms"]
                     baud = test["baud"]
-                    battery: Battery = batteryClass(port=_port, baud=baud, address=_bms_address, can_message_cache_callback=_can_message_cache_callback)
+                    battery: Battery = batteryClass(port=_port, baud=baud, address=_bms_address)
+                    battery.set_message_cache_callback(_can_message_cache_callback)
                     if battery.test_connection() and battery.validate_data():
                         logger.info("-- Connection established to " + battery.__class__.__name__)
                         return battery

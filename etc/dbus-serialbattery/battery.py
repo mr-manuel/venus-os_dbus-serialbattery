@@ -155,11 +155,11 @@ class Battery(ABC):
     use the individual implementations as type Battery and work with it.
     """
 
-    def __init__(self, port: str, baud: int, address: str, can_message_cache_callback: callable):
+    def __init__(self, port: str, baud: int, address: str):
         self.port: str = port
         self.baud_rate: int = baud
         self.address: str = address
-        self.can_message_cache_callback: callable = can_message_cache_callback
+        self.can_message_cache_callback: callable = None
         self.role: str = "battery"
         self.type: str = "Generic"
         self.poll_interval: int = 1000
@@ -343,6 +343,19 @@ class Battery(ABC):
             True if callable should be used for updates as they arrive from the battery
         """
         return False
+
+    def set_message_cache_callback(self, callback: callable) -> None:
+        """
+        Each driver may override this function to indicate whether it is able to provide value
+        updates on its own.
+
+        :return:
+            False when the battery cannot provide updates by itself, then it will be polled
+            every `poll_interval` milliseconds for new values
+
+            True if callable should be used for updates as they arrive from the battery
+        """
+        self.can_message_cache_callback: callable = callback
 
     @abstractmethod
     def get_settings(self) -> bool:
