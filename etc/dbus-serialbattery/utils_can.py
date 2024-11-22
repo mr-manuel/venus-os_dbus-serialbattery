@@ -1,6 +1,5 @@
 import threading
 import can
-from typing import Dict
 
 
 class CanReceiverThread(threading.Thread):
