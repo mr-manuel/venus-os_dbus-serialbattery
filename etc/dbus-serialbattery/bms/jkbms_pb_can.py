@@ -191,6 +191,7 @@ class Jkbms_Pb_Can(Battery):
             if cell_voltage > 0:
                 if len(self.cells) <= i:
                     self.cells.insert(i, Cell(False))
+                    self.cell_count = len(self.cells)
                 self.cells[i].voltage = cell_voltage
 
     def read_jkbms_can(self):
