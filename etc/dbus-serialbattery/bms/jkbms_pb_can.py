@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 
 # NOTES
-# copied some lines from jkbms_can.py
-# extended for JK Inverter BMS CAN from https://github.com/Hooorny/venus-os_dbus-serialbattery
+# Added by https://github.com/Hooorny and https://github.com/mr-manuel
+# https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/108
 
 
 from __future__ import absolute_import, division, print_function, unicode_literals

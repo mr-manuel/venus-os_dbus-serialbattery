@@ -1,37 +1,42 @@
 import threading
 import can
+import subprocess
+from utils import logger
 
 
 class CanReceiverThread(threading.Thread):
 
     _instances = {}
 
-    def __init__(self, channel, bustype, bitrate):
+    def __init__(self, channel, bustype):
 
         # singleton for tupel
-        if (channel, bustype, bitrate) in CanReceiverThread._instances:
+        if (channel, bustype) in CanReceiverThread._instances:
             raise Exception("Instance already exists for this configuration!")
 
         super().__init__()
         self.channel = channel
         self.bustype = bustype
-        self.bitrate = bitrate
         self.message_cache = {}  # cache can frames here
         self.cache_lock = threading.Lock()  # lock for thread safety
-        CanReceiverThread._instances[(channel, bustype, bitrate)] = self
+        CanReceiverThread._instances[(channel, bustype)] = self
         self.daemon = True
 
     @classmethod
-    def get_instance(cls, channel, bustype, bitrate):
+    def get_instance(cls, channel, bustype):
         # check for instance
-        if (channel, bustype, bitrate) not in cls._instances:
+        if (channel, bustype) not in cls._instances:
             # create new one
-            instance = cls(channel, bustype, bitrate)
+            instance = cls(channel, bustype)
             instance.start()
-        return cls._instances[(channel, bustype, bitrate)]
+        return cls._instances[(channel, bustype)]
 
     def run(self):
-        bus = can.interface.Bus(channel=self.channel, bustype=self.bustype, bitrate=self.bitrate)
+        bus = can.interface.Bus(channel=self.channel, bustype=self.bustype)
+
+        # fetch the bitrate from the current port, for logging only
+        bitrate = self.get_bitrate(self.channel)
+        logger.info(f"Detected CAN Bus bitrate: {bitrate/1000:.0f} kbps")
 
         while True:
             message = bus.recv(timeout=1.0)  # timeout 1 sec
@@ -47,3 +52,14 @@ class CanReceiverThread(threading.Thread):
         with self.cache_lock:
             # return a copy of the current cache
             return dict(self.message_cache)
+
+    @staticmethod
+    def get_bitrate(channel):
+        try:
+            result = subprocess.run(["ip", "-details", "link", "show", channel], capture_output=True, text=True, check=True)
+            for line in result.stdout.split("\n"):
+                if "bitrate" in line:
+                    return int(line.split("bitrate")[1].split()[0])
+        except Exception as e:
+            logger.error(f"Error fetching bitrate: {e}")
+            raise

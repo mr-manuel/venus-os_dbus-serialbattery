@@ -143,7 +143,7 @@ def main():
                         + (' at address "' + utils.bytearray_to_string(_bms_address) + '"' if _bms_address is not None else "")
                     )
                     batteryClass = test["bms"]
-                    baud = test["baud"]
+                    baud = test["baud"] if "baud" in test else None
                     battery: Battery = batteryClass(port=_port, baud=baud, address=_bms_address)
                     battery.set_message_cache_callback(_can_message_cache_callback)
                     if battery.test_connection() and battery.validate_data():
@@ -274,9 +274,9 @@ def main():
 
         # only try CAN BMS on CAN port
         supported_bms_types = [
-            {"bms": Daly_Can, "baud": utils.CAN_SPEED},
-            {"bms": Jkbms_Can, "baud": utils.CAN_SPEED},
-            {"bms": Jkbms_Pb_Can, "baud": utils.CAN_SPEED},
+            {"bms": Daly_Can},
+            {"bms": Jkbms_Pb_Can},  # try JKBMS CAN V2 first
+            {"bms": Jkbms_Can},  # fallback to JKBMS CAN V1
         ]
 
         # check if utils.BMS_TYPE is not empty and all BMS types in the list are supported
@@ -290,7 +290,7 @@ def main():
         from utils_can import CanReceiverThread
 
         try:
-            can_thread = CanReceiverThread.get_instance(bustype="socketcan", channel=port, bitrate=utils.CAN_SPEED)
+            can_thread = CanReceiverThread.get_instance(bustype="socketcan", channel=port)
         except Exception as e:
             print(f"Error: {e}")
 

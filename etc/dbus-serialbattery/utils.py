@@ -196,13 +196,6 @@ SOC_CALC_CURRENT_MEASURED_BY_USER: list = get_list_from_config("DEFAULT", "SOC_C
 SOC_CALC_CURRENT: bool = SOC_CALC_CURRENT_REPORTED_BY_BMS != SOC_CALC_CURRENT_MEASURED_BY_USER
 
 
-# --------- CAN BMS ---------
-CAN_SPEED: int = get_int_from_config("DEFAULT", "CAN_SPEED") * 1000
-"""
-Speed of the CAN bus in bps
-"""
-
-
 # --------- Modbus (multiple BMS on one serial adapter) ---------
 MODBUS_ADDRESSES: list = get_list_from_config("DEFAULT", "MODBUS_ADDRESSES", str)
 
