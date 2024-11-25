@@ -294,6 +294,10 @@ def main():
         except Exception as e:
             print(f"Error: {e}")
 
+        logger.debug("Wait shortly to make sure that all needed data is in the cache")
+        # Slowest message cycle trasmission is every 1 second, wait a bit more for the fist time to fetch all needed data
+        sleep(2)
+
         # check if MODBUS_ADDRESSES is not empty and expected_bms_types contains Jkbms_Pb_Can
         if utils.MODBUS_ADDRESSES and any(entry["bms"] == Jkbms_Pb_Can for entry in expected_bms_types):
             logger.info(">>> Jkbms_Pb_Can multi device mode")

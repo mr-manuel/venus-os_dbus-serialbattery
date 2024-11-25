@@ -10,7 +10,7 @@ from battery import Battery, Cell
 from utils import logger
 from struct import unpack_from
 import sys
-from time import sleep, time
+from time import time
 
 
 class Jkbms_Pb_Can(Battery):
@@ -87,16 +87,10 @@ class Jkbms_Pb_Can(Battery):
             # get settings to check if the data is valid and the connection is working
             result = self.get_settings()
 
-            if result:
-                logger.debug("Wait shortly to make sure that all needed data is in the cache")
-
-                # Slowest message cycle trasmission is every 1 second, wait a bit more for the fist time to fetch all needed data
-                sleep(1.2)
-
-                # if there are no messages in the cache after sleeping, something is wrong
-                if not self.can_message_cache_callback().items():
-                    logger.error("Error: found no messages on can bus, is it properly configured?")
-                    result = False
+            # if there are no messages in the cache after sleeping, something is wrong
+            if not self.can_message_cache_callback().items():
+                logger.error("Error: found no messages on can bus, is it properly configured?")
+                result = False
 
             # get the rest of the data to be sure, that all data is valid and the correct battery type is recognized
             # only read next data if the first one was successful, this saves time when checking multiple battery types
