@@ -285,12 +285,12 @@ def main():
         """
         from bms.daly_can import Daly_Can
         from bms.jkbms_can import Jkbms_Can
-        from bms.jkbms_pb_can import Jkbms_Pb_Can
+        from bms.jkbms_can_v2 import Jkbms_V2_Can
 
         # only try CAN BMS on CAN port
         supported_bms_types = [
             {"bms": Daly_Can},
-            {"bms": Jkbms_Pb_Can},  # try JKBMS CAN V2 first
+            {"bms": Jkbms_V2_Can},  # try JKBMS CAN V2 first
             {"bms": Jkbms_Can},  # fallback to JKBMS CAN V1
         ]
 
@@ -313,9 +313,9 @@ def main():
         # Slowest message cycle trasmission is every 1 second, wait a bit more for the fist time to fetch all needed data
         sleep(2)
 
-        # check if MODBUS_ADDRESSES is not empty and expected_bms_types contains Jkbms_Pb_Can
-        if utils.MODBUS_ADDRESSES and any(entry["bms"] == Jkbms_Pb_Can for entry in expected_bms_types):
-            logger.info(">>> Jkbms_Pb_Can multi device mode")
+        # check if MODBUS_ADDRESSES is not empty
+        if utils.MODBUS_ADDRESSES:
+            logger.info(">>> CAN multi device mode")
             for address in utils.MODBUS_ADDRESSES:
                 checkbatt = get_battery(port, address, can_thread.get_message_cache)
                 if checkbatt is not None:

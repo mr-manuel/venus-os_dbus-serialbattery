@@ -17,9 +17,9 @@ import sys
 from time import time
 
 
-class Jkbms_Pb_Can(Battery):
+class Jkbms_V2_Can(Battery):
     def __init__(self, port, baud, address):
-        super(Jkbms_Pb_Can, self).__init__(port, baud, address)
+        super(Jkbms_V2_Can, self).__init__(port, baud, address)
         self.cell_count = 1
         self.type = self.BATTERYTYPE
 
@@ -29,7 +29,7 @@ class Jkbms_Pb_Can(Battery):
         self.last_error_time = time()
         self.error_active = False
 
-    BATTERYTYPE = "JKBMS PB CAN"
+    BATTERYTYPE = "JKBMS CAN V2"
 
     BATT_STAT = "BATT_STAT"
     CELL_VOLT = "CELL_VOLT"
