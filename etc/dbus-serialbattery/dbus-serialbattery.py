@@ -77,7 +77,6 @@ delayed_loop_count = 0
 
 
 def main():
-    # NameError: free variable 'expected_bms_types' referenced before assignment in enclosing scope
     global expected_bms_types, supported_bms_types
 
     def poll_battery(loop) -> bool:
@@ -216,8 +215,17 @@ def main():
     # read the version of Venus OS
     with open("/opt/victronenergy/version", "r") as f:
         venus_version = f.readline().strip()
-    # show Venus OS version
-    logger.info("Venus OS " + venus_version)
+
+    # read the version of Venus OS
+    with open("/opt/victronenergy/version", "r") as f:
+        venus_version = f.readline().strip()
+
+    # read the GX device type
+    with open("/sys/firmware/devicetree/base/model", "r") as f:
+        gx_device_type = f.readline().strip()
+
+    # show Venus OS version and device type
+    logger.info("Venus OS " + venus_version + " running on " + gx_device_type)
 
     # show the version of the driver
     logger.info("dbus-serialbattery v" + str(utils.DRIVER_VERSION))

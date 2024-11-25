@@ -3,8 +3,6 @@
 import bisect
 import configparser
 import logging
-
-# import os
 import sys
 from pathlib import Path
 from struct import unpack_from
@@ -16,7 +14,7 @@ import serial
 
 
 # CONSTANTS
-DRIVER_VERSION: str = "1.5.20241119dev"
+DRIVER_VERSION: str = "1.5.20241125dev"
 """
 current version of the driver
 """
@@ -203,7 +201,7 @@ CAN_SPEED: int = get_int_from_config("DEFAULT", "CAN_SPEED") * 1000
 """
 Speed of the CAN bus in bps
 """
-CAN_PORT: list = get_list_from_config("DEFAULT", "CAN_PORT", str)
+
 
 # --------- Modbus (multiple BMS on one serial adapter) ---------
 MODBUS_ADDRESSES: list = get_list_from_config("DEFAULT", "MODBUS_ADDRESSES", str)
