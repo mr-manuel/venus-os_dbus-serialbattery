@@ -81,7 +81,11 @@ def main():
 
     def poll_battery(loop) -> bool:
         """
-        Polls the battery for data and updates it on the dbus
+        Polls the battery for data and updates it on the dbus.
+        Calls `publish_battery` from DbusHelper for each battery instance.
+
+        :param loop: The main event loop
+        :return: Always returns True
         """
         global count_for_loops, delayed_loop_count
 
@@ -119,18 +123,24 @@ def main():
         return True
 
     def get_battery(_port: str, _modbus_address: hex = None, _can_message_cache_callback: callable = None) -> Union[Battery, None]:
-        # all the different batteries the driver support and need to test for
-        # try to establish communications with the battery 3 times, else exit
+        """
+        Attempts to establish a connection to the battery and returns the battery object if successful.
+
+        :param _port: The port to connect to.
+        :param _modbus_address: The Modbus address to connect to (optional).
+        :return: The battery object if a connection is established, otherwise None.
+        """
+        # Try to establish communications with the battery 3 times, else exit
         retry = 1
         retries = 3
         while retry <= retries:
             logger.info("-- Testing BMS: " + str(retry) + " of " + str(retries) + " rounds")
-            # create a new battery object that can read the battery and run connection test
+            # Create a new battery object that can read the battery and run connection test
             for test in expected_bms_types:
                 # noinspection PyBroadException
                 try:
                     if _modbus_address is not None:
-                        # convert hex string to bytes
+                        # Convert hex string to bytes
                         _bms_address = bytes.fromhex(_modbus_address.replace("0x", ""))
                     elif "address" in test:
                         _bms_address = test["address"]
@@ -168,37 +178,46 @@ def main():
         return None
 
     def get_port() -> str:
-        # Get the port we need to use from the argument
+        """
+        Retrieves the port to connect to from the command line arguments.
+
+        :return: The port to connect to.
+        """
         if len(sys.argv) > 1:
             port = sys.argv[1]
             if port not in utils.EXCLUDED_DEVICES:
                 return port
             else:
-                logger.debug("Stopping dbus-serialbattery: " + str(port) + " is excluded trough the config file")
+                logger.debug("Stopping dbus-serialbattery: " + str(port) + " is excluded through the config file")
                 sleep(60)
-                # exit with error in order that the serialstarter goes on
+                # Exit with error so that the serialstarter continues
                 sys.exit(1)
-        else:
-            # just for MNB-SPI
+        elif "MNB" in utils.BMS_TYPE:
+            # Special case for MNB-SPI
             logger.info("No Port needed")
             return "/dev/ttyUSB9"
+        else:
+            logger.error("ERROR >>> No port specified in the command line arguments")
+            sleep(60)
+            sys.exit(1)
 
     def check_bms_types(supported_bms_types, type) -> None:
         """
-        Check if utils.BMS_TYPE is not empty and all BMS types in the list are supported.
+        Checks if utils.BMS_TYPE is not empty and all specified BMS types are supported.
 
-        :param supported_bms_types: list of supported BMS types
+        :param supported_bms_types: List of supported BMS types.
+        :param type: The type of BMS connection (ble, can, or serial).
         :return: None
         """
-        # get only BMS_TYPE that end with "_Ble"
+        # Get only BMS_TYPE that end with "_Ble"
         if type == "ble":
             bms_types = [type for type in utils.BMS_TYPE if type.endswith("_Ble")]
 
-        # get only BMS_TYPE that end with "_Can"
+        # Get only BMS_TYPE that end with "_Can"
         if type == "can":
             bms_types = [type for type in utils.BMS_TYPE if type.endswith("_Can")]
 
-        # get only BMS_TYPE that does not end with "_Ble" or "_Can"
+        # Get only BMS_TYPE that do not end with "_Ble" or "_Can"
         if type == "serial":
             bms_types = [type for type in utils.BMS_TYPE if not type.endswith("_Ble") and not type.endswith("_Can")]
 
@@ -211,10 +230,6 @@ def main():
                         + "; Disabled by default: ANT, MNB, Sinowealth"
                     )
                     sys.exit(1)
-
-    # read the version of Venus OS
-    with open("/opt/victronenergy/version", "r") as f:
-        venus_version = f.readline().strip()
 
     # read the version of Venus OS
     with open("/opt/victronenergy/version", "r") as f:
@@ -236,8 +251,8 @@ def main():
     # BLUETOOTH
     if port.endswith("_Ble"):
         """
-        Import ble classes only, if it's a ble port, else the driver won't start due to missing python modules
-        This prevent problems when using the driver only with a serial connection
+        Import BLE classes only if it's a BLE port; otherwise, the driver won't start due to missing Python modules.
+        This prevents issues when using the driver exclusively with a serial connection.
         """
 
         if len(sys.argv) <= 2:
@@ -265,8 +280,8 @@ def main():
     # CAN
     elif port.startswith("can") or port.startswith("vecan"):
         """
-        Import CAN classes only, if it's a can port, else the driver won't start due to missing python modules
-        This prevent problems when using the driver only with a serial connection
+        Import CAN classes only if it's a CAN port; otherwise, the driver won't start due to missing Python modules.
+        This prevents issues when using the driver exclusively with a serial connection.
         """
         from bms.daly_can import Daly_Can
         from bms.jkbms_can import Jkbms_Can

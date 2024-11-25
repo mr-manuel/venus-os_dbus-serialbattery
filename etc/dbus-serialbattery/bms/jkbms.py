@@ -64,8 +64,8 @@ class Jkbms(Battery):
             self.cells.append(Cell(False))
 
         self.hardware_version = (
-            "JKBMS"
-            + (" " + self.version + " " if self.version != "" else " ")
+            "JKBMS "
+            + (sub(r"\s+", " ", self.version) + " " if self.version != "" else "")
             + str(self.cell_count)
             + "S"
             + (" (" + self.production + ")" if self.production else "")

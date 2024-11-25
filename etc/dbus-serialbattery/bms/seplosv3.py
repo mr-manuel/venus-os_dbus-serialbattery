@@ -30,13 +30,12 @@ class Seplosv3(Battery):
             self.slaveaddresses = list(range(16))
 
     @staticmethod
-    def to_signed_int(value):
+    def to_signed_int(value: int) -> int:
         """
         Converts an unsigned value to a signed value.
-        Args:
-            value (int): The unsigned value to be converted.
-        Returns:
-            int: The signed value.
+
+        :param value: The unsigned value to be converted.
+        :return: The signed value.
         """
         packval = struct.pack("<H", value)
         return struct.unpack("<h", packval)[0]
@@ -118,7 +117,6 @@ class Seplosv3(Battery):
                     continue
                 break
             if found:
-                self.type = f"{self.hardware_version}"
                 break
 
         # give the user a feedback that no BMS was found
