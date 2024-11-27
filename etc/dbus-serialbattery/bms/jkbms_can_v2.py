@@ -198,6 +198,9 @@ class Jkbms_V2_Can(Battery):
             self.error_active = False
             self.reset_protection_bits()
 
+        # check if all needed data is available
+        data_check = 0
+
         for frame_id, data in self.can_message_cache_callback().items():
             normalized_arbitration_id = frame_id - self.device_address
             if normalized_arbitration_id in self.CAN_FRAMES[self.BATT_STAT]:
@@ -209,6 +212,9 @@ class Jkbms_V2_Can(Battery):
 
                 self.soc = unpack_from("<B", bytes([data[4]]))[0]
 
+                # check if all needed data is available
+                data_check += 1
+
             elif normalized_arbitration_id in self.CAN_FRAMES[self.ALM_INFO]:
                 alarms = unpack_from(
                     "<L",
@@ -219,11 +225,17 @@ class Jkbms_V2_Can(Battery):
                 self.error_active = True
                 self.to_protection_bits(alarms)
 
+                # check if all needed data is available
+                data_check += 2
+
             elif normalized_arbitration_id in self.CAN_FRAMES[self.BATT_STAT_EXT]:
                 self.capacity_remain = unpack_from("<H", bytes([data[0], data[1]]))[0] / 10
                 self.capacity = unpack_from("<H", bytes([data[2], data[3]]))[0] / 10
                 self.history.total_ah_drawn = unpack_from("<H", bytes([data[4], data[5]]))[0] / 10
                 self.history.charge_cycles = unpack_from("<H", bytes([data[6], data[7]]))[0]
+
+                # check if all needed data is available
+                data_check += 4
 
             elif normalized_arbitration_id in self.CAN_FRAMES[self.ALL_TEMP]:
                 # temp_sensor_cnt = unpack_from("<B", bytes([data[0]]))[0]
@@ -248,6 +260,9 @@ class Jkbms_V2_Can(Battery):
                     temp5 = unpack_from("<B", bytes([data[5]]))[0] - 50
                     self.to_temp(4, temp5)
 
+                # check if all needed data is available
+                data_check += 8
+
             # elif normalized_arbitration_id in self.CAN_FRAMES[self.BMSERR_INFO]:
 
             # elif normalized_arbitration_id in self.CAN_FRAMES[self.BMS_INFO]:
@@ -267,8 +282,14 @@ class Jkbms_V2_Can(Battery):
                         else:
                             self.cells[c].balance = False
 
+                # check if all needed data is available
+                data_check += 16
+
             elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT1]:
                 self.update_cell_voltages(0, 3, data)
+                # check if all needed data is available
+                # this is important to differentiate between the JKBMS CAN V1 and V2
+                data_check += 32
             elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT2]:
                 self.update_cell_voltages(4, 7, data)
             elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT3]:
@@ -282,5 +303,11 @@ class Jkbms_V2_Can(Battery):
 
         if self.hardware_version is None:
             self.hardware_version = "JKBMS PB CAN " + str(self.cell_count) + "S"
+
+        # check if all needed data is available
+        logger.debug("Data check: %d" % (data_check))
+        if data_check < 61:
+            logger.error(">>> ERROR: No reply - returning")
+            return False
 
         return True
