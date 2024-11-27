@@ -227,17 +227,26 @@ class Jkbms_V2_Can(Battery):
 
             elif normalized_arbitration_id in self.CAN_FRAMES[self.ALL_TEMP]:
                 # temp_sensor_cnt = unpack_from("<B", bytes([data[0]]))[0]
-                temp1 = unpack_from("<B", bytes([data[1]]))[0] - 50
-                temp2 = unpack_from("<B", bytes([data[2]]))[0] - 50
-                temp_mosfet = unpack_from("<B", bytes([data[3]]))[0] - 50
-                temp4 = unpack_from("<B", bytes([data[4]]))[0] - 50
-                temp5 = unpack_from("<B", bytes([data[5]]))[0] - 50
+                # temp1
+                if data[1] != 0x00:
+                    temp1 = unpack_from("<B", bytes([data[1]]))[0] - 50
+                    self.to_temp(1, temp1)
+                # temp2
+                if data[2] != 0x00:
+                    temp2 = unpack_from("<B", bytes([data[2]]))[0] - 50
+                    self.to_temp(2, temp2)
                 # temp3 equals mosfet temp
-                self.to_temp(0, temp_mosfet)
-                self.to_temp(1, temp1)
-                self.to_temp(2, temp2)
-                self.to_temp(3, temp4)
-                self.to_temp(4, temp5)
+                if data[3] != 0x00:
+                    temp_mosfet = unpack_from("<B", bytes([data[3]]))[0] - 50
+                    self.to_temp(0, temp_mosfet)
+                # temp4 (currently only JKBMS PB Model)
+                if data[4] != 0x00:
+                    temp4 = unpack_from("<B", bytes([data[4]]))[0] - 50
+                    self.to_temp(3, temp4)
+                # temp5 (currently only JKBMS PB Model)
+                if data[5] != 0x00:
+                    temp5 = unpack_from("<B", bytes([data[5]]))[0] - 50
+                    self.to_temp(4, temp5)
 
             # elif normalized_arbitration_id in self.CAN_FRAMES[self.BMSERR_INFO]:
 
