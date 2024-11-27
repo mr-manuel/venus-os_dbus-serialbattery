@@ -11,7 +11,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 from battery import Battery, Cell
-from utils import logger
+from utils import bytearray_to_string, logger
 from struct import unpack_from
 import sys
 from time import time
@@ -69,7 +69,7 @@ class Jkbms_V2_Can(Battery):
     }
 
     def connection_name(self) -> str:
-        return "CAN " + self.port + " Device address " + str(self.device_address)
+        return f"CAN socketcan:{self.port}" + (f"__{self.device_address}" if self.device_address != 0 else "")
 
     def unique_identifier(self) -> str:
         """
@@ -78,7 +78,7 @@ class Jkbms_V2_Can(Battery):
         e.g. the serial number
         If there is no such value, please remove this function
         """
-        return "JK Inverter BMS " + self.port + " addr " + str(self.device_address)
+        return self.port + ("__" + bytearray_to_string(self.address).replace("\\", "0") if self.address is not None else "")
 
     def test_connection(self):
         """
