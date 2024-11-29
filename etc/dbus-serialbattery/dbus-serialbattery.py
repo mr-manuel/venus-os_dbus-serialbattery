@@ -27,6 +27,7 @@ from bms.hlpdatabms4s import HLPdataBMS4S
 from bms.jkbms import Jkbms
 from bms.jkbms_pb import Jkbms_pb
 from bms.lltjbd import LltJbd
+from bms.pace import pace
 from bms.renogy import Renogy
 from bms.seplos import Seplos
 from bms.seplosv3 import Seplosv3
@@ -51,6 +52,7 @@ supported_bms_types = [
     {"bms": Jkbms, "baud": 115200},
     {"bms": Jkbms_pb, "baud": 115200, "address": b"\x01"},
     {"bms": LltJbd, "baud": 9600, "address": b"\x00"},
+    {"bms": pace, "baud": 9600, "address": b"\x00"},
     {"bms": Renogy, "baud": 9600, "address": b"\x30"},
     {"bms": Renogy, "baud": 9600, "address": b"\xF7"},
     {"bms": Seplos, "baud": 19200, "address": b"\x00"},
