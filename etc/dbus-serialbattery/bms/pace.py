@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-
 # Notes
 # Added by https://github.com/KoljaWindeler
 
