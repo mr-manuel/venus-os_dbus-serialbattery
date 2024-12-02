@@ -16,6 +16,7 @@ from utils import (
     MIN_CELL_VOLTAGE,
 )
 from struct import unpack_from
+from time import time
 import can
 import sys
 
@@ -33,29 +34,54 @@ class Daly_Can(Battery):
         self.poll_step = 0
         self.type = self.BATTERYTYPE
         self.can_bus = None
+        self.device_address = int.from_bytes(address, byteorder="big") if address is not None else 0
+        self.error_active = False
+
+    COMMAND_BASE = "COMMAND_BASE"
+    COMMAND_SOC = "COMMAND_SOC"
+    COMMAND_MINMAX_CELL_VOLTS = "COMMAND_MINMAX_CELL_VOLTS"
+    COMMAND_MINMAX_TEMP = "COMMAND_MINMAX_TEMP"
+    COMMAND_FET = "COMMAND_FET"
+    COMMAND_STATUS = "COMMAND_STATUS"
+    COMMAND_CELL_VOLTS = "COMMAND_CELL_VOLTS"
+    COMMAND_TEMP = "COMMAND_TEMP"
+    COMMAND_CELL_BALANCE = "COMMAND_CELL_BALANCE"
+    COMMAND_ALARM = "COMMAND_ALARM"
+
+    RESPONSE_BASE = "RESPONSE_BASE"
+    RESPONSE_SOC = "RESPONSE_SOC"
+    RESPONSE_MINMAX_CELL_VOLTS = "RESPONSE_MINMAX_CELL_VOLTS"
+    RESPONSE_MINMAX_TEMP = "RESPONSE_MINMAX_TEMP"
+    RESPONSE_FET = "RESPONSE_FET"
+    RESPONSE_STATUS = "RESPONSE_STATUS"
+    RESPONSE_CELL_VOLTS = "RESPONSE_CELL_VOLTS"
+    RESPONSE_TEMP = "RESPONSE_TEMP"
+    RESPONSE_CELL_BALANCE = "RESPONSE_CELL_BALANCE"
+    RESPONSE_ALARM = "RESPONSE_ALARM"
 
     # command bytes [Priority=18][Command=94][BMS ID=01][Uplink ID=40]
-    command_base = 0x18940140
-    command_soc = 0x18900140
-    command_minmax_cell_volts = 0x18910140
-    command_minmax_temp = 0x18920140
-    command_fet = 0x18930140
-    command_status = 0x18940140
-    command_cell_volts = 0x18950140
-    command_temp = 0x18960140
-    command_cell_balance = 0x18970140
-    command_alarm = 0x18980140
-
-    response_base = 0x18944001
-    response_soc = 0x18904001
-    response_minmax_cell_volts = 0x18914001
-    response_minmax_temp = 0x18924001
-    response_fet = 0x18934001
-    response_status = 0x18944001
-    response_cell_volts = 0x18954001
-    response_temp = 0x18964001
-    response_cell_balance = 0x18974001
-    response_alarm = 0x18984001
+    CAN_FRAMES = {
+        COMMAND_BASE: [0x18940140],
+        COMMAND_SOC: [0x18900140],
+        COMMAND_MINMAX_CELL_VOLTS: [0x18910140],
+        COMMAND_MINMAX_TEMP: [0x18920140],
+        COMMAND_FET: [0x18930140],
+        COMMAND_STATUS: [0x18940140],
+        COMMAND_CELL_VOLTS: [0x18950140],
+        COMMAND_TEMP: [0x18960140],
+        COMMAND_CELL_BALANCE: [0x18970140],
+        COMMAND_ALARM: [0x18980140],
+        RESPONSE_BASE: [0x18944001],
+        RESPONSE_SOC: [0x18904001],
+        RESPONSE_MINMAX_CELL_VOLTS: [0x18914001],
+        RESPONSE_MINMAX_TEMP: [0x18924001],
+        RESPONSE_FET: [0x18934001],
+        RESPONSE_STATUS: [0x18944001],
+        RESPONSE_CELL_VOLTS: [0x18954001],
+        RESPONSE_TEMP: [0x18964001],
+        RESPONSE_CELL_BALANCE: [0x18974001],
+        RESPONSE_ALARM: [0x18984001],
+    }
 
     BATTERYTYPE = "Daly CAN"
     LENGTH_CHECK = 4
@@ -71,7 +97,11 @@ class Daly_Can(Battery):
         """
         result = False
         try:
+            # get settings to check if the data is valid and the connection is working
+            result = self.get_settings()
+
             # TODO handle errors?
+            """
             can_filters = [
                 {"can_id": self.response_base, "can_mask": 0xFFFFFFF},
                 {"can_id": self.response_soc, "can_mask": 0xFFFFFFF},
@@ -84,19 +114,19 @@ class Daly_Can(Battery):
                 {"can_id": self.response_cell_balance, "can_mask": 0xFFFFFFF},
                 {"can_id": self.response_alarm, "can_mask": 0xFFFFFFF},
             ]
-            self.can_bus = can.Bus(
-                interface="socketcan",
-                channel=self.port,
-                receive_own_messages=False,
-                can_filters=can_filters,
-            )
-            # get settings to check if the data is valid and the connection is working
-            result = self.get_settings()
+            self.can_bus = can.Bus(interface="socketcan", channel=self.port, receive_own_messages=False, can_filters=can_filters)
+            """
+
+            # if there are no messages in the cache after sleeping, something is wrong
+            if not self.can_message_cache_callback().items():
+                logger.error("Error: found no messages on can bus, is it properly configured?")
+                result = False
+
             # get the rest of the data to be sure, that all data is valid and the correct battery type is recognized
             # only read next data if the first one was successful, this saves time when checking multiple battery types
-            result = result and self.read_status_data(self.can_bus)
+            result = result and self.read_daly_can()
 
-            result = result and self.read_soc_data(self.can_bus)
+            # result = result and self.read_soc_data(self.can_bus)
         except Exception:
             (
                 exception_type,
@@ -396,3 +426,42 @@ class Daly_Can(Battery):
             if count == expectedMessageCount:
                 break
         return response
+
+    def read_daly_can(self):
+        # reset errors after timeout
+        if ((time() - self.last_error_time) > 120.0) and self.error_active is True:
+            self.error_active = False
+            # self.reset_protection_bits()
+
+        # check if all needed data is available
+        data_check = 0
+
+        for frame_id, data in self.can_message_cache_callback().items():
+            # normalized_arbitration_id = frame_id - self.device_address
+            normalized_arbitration_id = frame_id
+
+            # Frame is send every 20ms
+            if normalized_arbitration_id in self.CAN_FRAMES[self.COMMAND_STATUS]:
+                (
+                    self.cell_count,
+                    self.temp_sensors,
+                    self.charger_connected,
+                    self.load_connected,
+                    state,
+                    self.history.charge_cycles,
+                ) = unpack_from(">BB??BHX", data)
+
+                if self.cell_count != 0:
+                    # check if all needed data is available
+                    data_check += 1
+
+                self.hardware_version = "Daly CAN " + str(self.cell_count) + "S"
+
+        # check if all needed data is available to make sure it's a JKBMS CAN V2
+        # sum of all data checks except for alarms
+        logger.debug("Data check: %d" % (data_check))
+        if data_check > 0:
+            logger.error(">>> ERROR: No reply - returning")
+            return False
+
+        return True
