@@ -129,7 +129,7 @@ class Jkbms_V2_Can(Battery):
         return self.read_status_data()
 
     def read_status_data(self):
-        status_data = self.read_jkbms_can()
+        status_data = self.read_jkbms_can_v2()
         # check if connection success
         if status_data is False:
             return False
@@ -192,7 +192,7 @@ class Jkbms_V2_Can(Battery):
                     self.cell_count = len(self.cells)
                 self.cells[i].voltage = cell_voltage
 
-    def read_jkbms_can(self):
+    def read_jkbms_can_v2(self):
         # reset errors after timeout
         if ((time() - self.last_error_time) > 120.0) and self.error_active is True:
             self.error_active = False
@@ -203,6 +203,8 @@ class Jkbms_V2_Can(Battery):
 
         for frame_id, data in self.can_message_cache_callback().items():
             normalized_arbitration_id = frame_id - self.device_address
+
+            # Frame is send every 20ms
             if normalized_arbitration_id in self.CAN_FRAMES[self.BATT_STAT]:
                 voltage = unpack_from("<H", bytes([data[0], data[1]]))[0]
                 self.voltage = voltage / 10
@@ -215,6 +217,17 @@ class Jkbms_V2_Can(Battery):
                 # check if all needed data is available
                 data_check += 1
 
+            # Frame is send every 100ms
+            elif normalized_arbitration_id in self.CAN_FRAMES[self.BATT_STAT_EXT]:
+                self.capacity_remain = unpack_from("<H", bytes([data[0], data[1]]))[0] / 10
+                self.capacity = unpack_from("<H", bytes([data[2], data[3]]))[0] / 10
+                self.history.total_ah_drawn = unpack_from("<H", bytes([data[4], data[5]]))[0] / 10
+                self.history.charge_cycles = unpack_from("<H", bytes([data[6], data[7]]))[0]
+
+                # check if all needed data is available
+                data_check += 4
+
+            # Frame is send every 100ms
             elif normalized_arbitration_id in self.CAN_FRAMES[self.ALM_INFO]:
                 alarms = unpack_from(
                     "<L",
@@ -228,15 +241,19 @@ class Jkbms_V2_Can(Battery):
                 # check if all needed data is available
                 data_check += 2
 
-            elif normalized_arbitration_id in self.CAN_FRAMES[self.BATT_STAT_EXT]:
-                self.capacity_remain = unpack_from("<H", bytes([data[0], data[1]]))[0] / 10
-                self.capacity = unpack_from("<H", bytes([data[2], data[3]]))[0] / 10
-                self.history.total_ah_drawn = unpack_from("<H", bytes([data[4], data[5]]))[0] / 10
-                self.history.charge_cycles = unpack_from("<H", bytes([data[6], data[7]]))[0]
+            # Frame is send every 100ms
+            # elif normalized_arbitration_id in self.CAN_FRAMES[self.BMSERR_INFO]:
+            #    pass
 
-                # check if all needed data is available
-                data_check += 4
+            # Frame is send every 100ms
+            # elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT]:
+            #    pass
 
+            # Frame is send every 500ms
+            # elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_TEMP]:
+            #    pass
+
+            # Frame is send every 500ms
             elif normalized_arbitration_id in self.CAN_FRAMES[self.ALL_TEMP]:
                 # temp_sensor_cnt = unpack_from("<B", bytes([data[0]]))[0]
                 # temp1
@@ -263,10 +280,11 @@ class Jkbms_V2_Can(Battery):
                 # check if all needed data is available
                 data_check += 8
 
-            # elif normalized_arbitration_id in self.CAN_FRAMES[self.BMSERR_INFO]:
-
+            # Frame is send every 500ms
             # elif normalized_arbitration_id in self.CAN_FRAMES[self.BMS_INFO]:
+            #    pass
 
+            # Frame is send every 500ms
             elif normalized_arbitration_id in self.CAN_FRAMES[self.BMS_SWITCH_STATE]:
                 switch_state_bytes = unpack_from("<B", bytes([data[0]]))[0]
                 # logger.info(switch_state_bytes)
@@ -285,26 +303,33 @@ class Jkbms_V2_Can(Battery):
                 # check if all needed data is available
                 data_check += 16
 
+            # Frame is send every 1000ms
             elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT1]:
                 self.update_cell_voltages(0, 3, data)
                 # check if all needed data is available
                 # this is important to differentiate between the JKBMS CAN V1 and V2
                 data_check += 32
+            # Frame is send every 1000ms, if the BMS has more than 4 cells
             elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT2]:
                 self.update_cell_voltages(4, 7, data)
+            # Frame is send every 1000ms, if the BMS has more than 8 cells
             elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT3]:
                 self.update_cell_voltages(8, 11, data)
+            # Frame is send every 1000ms, if the BMS has more than 12 cells
             elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT4]:
                 self.update_cell_voltages(12, 15, data)
+            # Frame is send every 1000ms, if the BMS has more than 16 cells
             elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT5]:
                 self.update_cell_voltages(16, 19, data)
+            # Frame is send every 1000ms, if the BMS has more than 20 cells
             elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT6]:
                 self.update_cell_voltages(20, 23, data)
 
         if self.hardware_version is None:
-            self.hardware_version = "JKBMS PB CAN " + str(self.cell_count) + "S"
+            self.hardware_version = "JKBMS CAN V2 " + str(self.cell_count) + "S"
 
-        # check if all needed data is available
+        # check if all needed data is available to make sure it's a JKBMS CAN V2
+        # sum of all data checks except for alarms
         logger.debug("Data check: %d" % (data_check))
         if data_check < 61:
             logger.error(">>> ERROR: No reply - returning")
