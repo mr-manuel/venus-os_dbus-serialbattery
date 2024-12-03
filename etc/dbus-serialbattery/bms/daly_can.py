@@ -3,6 +3,7 @@
 # NOTES
 # Added by https://github.com/SamuelBrucksch
 # https://github.com/Louisvdw/dbus-serialbattery/pull/169
+# Reworked by https://github.com/mr-manuel
 
 
 from __future__ import absolute_import, division, print_function, unicode_literals
@@ -36,6 +37,7 @@ class Daly_Can(Battery):
         self.can_bus = None
         self.device_address = int.from_bytes(address, byteorder="big") if address is not None else 0
         self.error_active = False
+        self.last_error_time = 0
 
     COMMAND_BASE = "COMMAND_BASE"
     COMMAND_SOC = "COMMAND_SOC"
@@ -437,8 +439,7 @@ class Daly_Can(Battery):
         data_check = 0
 
         for frame_id, data in self.can_message_cache_callback().items():
-            # normalized_arbitration_id = frame_id - self.device_address
-            normalized_arbitration_id = frame_id
+            normalized_arbitration_id = frame_id + self.device_address
 
             # Frame is send every 20ms
             if normalized_arbitration_id in self.CAN_FRAMES[self.COMMAND_STATUS]:
@@ -460,7 +461,7 @@ class Daly_Can(Battery):
         # check if all needed data is available to make sure it's a JKBMS CAN V2
         # sum of all data checks except for alarms
         logger.debug("Data check: %d" % (data_check))
-        if data_check > 0:
+        if data_check == 0:
             logger.error(">>> ERROR: No reply - returning")
             return False
 

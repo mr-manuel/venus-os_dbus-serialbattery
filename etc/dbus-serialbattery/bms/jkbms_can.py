@@ -203,7 +203,7 @@ class Jkbms_Can(Battery):
         data_check = 0
 
         for frame_id, data in self.can_message_cache_callback().items():
-            normalized_arbitration_id = frame_id - self.device_address
+            normalized_arbitration_id = frame_id + self.device_address
 
             # Frame is send every 20ms
             if normalized_arbitration_id in self.CAN_FRAMES[self.BATT_STAT]:
