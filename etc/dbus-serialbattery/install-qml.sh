@@ -121,13 +121,13 @@ if [ -d /opt/victronenergy/gui ]; then
         fileList+=" $qmlDir/PageBatteryCellVoltages.qml"
         fileList+=" $qmlDir/PageBatteryParameters.qml"
         fileList+=" $qmlDir/PageBatterySettings.qml"
-        fileList+=" $qmlDir/PageBatterySetup.qml"
         fileList+=" $qmlDir/PageLynxIonIo.qml"
         for file in $fileList ; do
             sed -i -e 's/VisibleItemModel/VisualItemModel/' "$file"
         done
-        echo "done."
     fi
+
+    echo "done."
 
 fi
 
@@ -200,67 +200,119 @@ if [ -d /opt/victronenergy/gui-v2 ]; then
         ((filesChanged++))
     fi
 
-fi
 
+    # get current Venus OS version
+    versionStringToNumber $(head -n 1 /opt/victronenergy/version)
+    ((venusVersionNumber = $versionNumber))
 
-# DOWNLOAD AND INSTALL WASM BUILD
-if [ -f "/var/www/venus/gui-v2/commit-sha" ]; then
-    # check if latest version is already installed
-    hash_local=$(cat /var/www/venus/gui-v2/commit-sha)
-    hash_online=$(curl -s https://api.github.com/repos/mr-manuel/venus-os_dbus-serialbattery_gui-v2/commits?path=venus-webassembly.zip | grep "sha" | head -n 1 | cut -d : -f 2,3 | tr -d "\ " | tr -d \" | tr -d \,)
+    # Some class names changed with this Venus OS version
+    versionStringToNumber "v3.60~8"
 
-    if [ "$hash_local" != "$hash_online" ]; then
-        install_wasm=1
-    else
-        install_wasm=0
+    # change files in the destination folder, else the files are "broken" if upgrading to a the newer Venus OS version
+    qmlDir="$pathGuiV2/Victron/VenusOS/pages/settings/devicelist/battery"
+
+    if (( $venusVersionNumber < $versionNumber )); then
+        echo -n "Venus OS $(head -n 1 /opt/victronenergy/version) is older than v3.60~8. Fixing class names... "
+        fileList="$qmlDir/PageBattery.qml"
+        fileList+=" $qmlDir/PageBatteryCellVoltages.qml"
+        fileList+=" $qmlDir/PageBatteryParameters.qml"
+        fileList+=" $qmlDir/PageBatterySettings.qml"
+        fileList+=" $qmlDir/PageLynxIonIo.qml"
+        for file in $fileList ; do
+            sed -i -e 's/ListText {/ListTextItem {/' "$file"
+            sed -i -e 's/ListQuantity {/ListQuantityItem {/' "$file"
+            sed -i -e 's/ListTemperature {/ListTemperatureItem {/' "$file"
+            sed -i -e 's/ListNavigation {/ListNavigationItem {/' "$file"
+            sed -i -e 's/PrimaryListLabel {/ListLabel {/' "$file"
+            sed -i -e 's/ListText {/ListTextItem {/' "$file"
+        done
     fi
-else
-    install_wasm=1
+
+    echo "done."
+
 fi
 
-if [ $install_wasm -eq 1 ]; then
+
+# INSTALL WASM BUILD
+
+hash_installed=$(cat /var/www/venus/gui-v2/venus-gui-v2.wasm.sha256)
+hash_online=$(curl -s https://raw.githubusercontent.com/mr-manuel/venus-os_dbus-serialbattery_gui-v2/refs/heads/master/venus-gui-v2.wasm.sha256)
+
+# Check if hash_online contains "venus-gui-v2.wasm", if not the online request failed
+if [[ "$hash_online" == *"venus-gui-v2.wasm"* ]]; then
+
+    # Check if latest version is already available offline
+    if [ "$hash_installed" != "$hash_online" ]; then
+
+        # Download new version
+        echo "New version of GUIv2 web version available. Downloading..."
+        if [ ! -d "/data/etc/dbus-serialbattery/ext/venus-os_dbus-serialbattery_gui-v2" ]; then
+            mkdir -p /data/etc/dbus-serialbattery/ext/venus-os_dbus-serialbattery_gui-v2
+        fi
+
+        wget -q -O /data/etc/dbus-serialbattery/ext/venus-os_dbus-serialbattery_gui-v2/venus-webassembly.zip https://raw.githubusercontent.com/mr-manuel/venus-os_dbus-serialbattery_gui-v2/refs/heads/master/venus-webassembly.zip
+
+        # check if download was successful
+        if [ $? -ne 0 ]; then
+            echo "ERROR: Download of GUIv2 web version failed."
+        else
+            wget -q -O /data/etc/dbus-serialbattery/ext/venus-os_dbus-serialbattery_gui-v2/venus-gui-v2.wasm.sha256 https://raw.githubusercontent.com/mr-manuel/venus-os_dbus-serialbattery_gui-v2/refs/heads/master/venus-gui-v2.wasm.sha256
+
+            # check if download was successful
+            if [ $? -ne 0 ]; then
+                echo "ERROR: Download of hash file for GUIv2 web version failed."
+            fi
+        fi
+
+    fi
+
+fi
+
+# Check if offline version is already installed
+hash_available=$(cat /data/etc/dbus-serialbattery/ext/venus-os_dbus-serialbattery_gui-v2/venus-gui-v2.wasm.sha256)
+if [ "$hash_installed" != "$hash_available" ]; then
 
     echo ""
-    echo "Installing GUIv2 WASM build..."
+    echo "Installing GUIv2 web version..."
 
-    wget -q -O /tmp/venus-webassembly.zip https://raw.githubusercontent.com/mr-manuel/venus-os_dbus-serialbattery_gui-v2/master/venus-webassembly.zip
-
-    # check if download was successful
-    if [ ! -f "/tmp/venus-webassembly.zip" ]; then
-        echo "** Download of GUIv2 failed! Skip installation. **"
-        echo "For offline installing see https://github.com/mr-manuel/venus-os_dbus-serialbattery_gui-v2"
+    # Check if file is available
+    if [ ! -f "/data/etc/dbus-serialbattery/ext/venus-os_dbus-serialbattery_gui-v2/venus-webassembly.zip" ]; then
+        echo "ERROR: GUIv2 web version not found."
     else
 
-        unzip -o /tmp/venus-webassembly.zip -d /tmp > /dev/null
+        unzip -o /data/etc/dbus-serialbattery/ext/venus-os_dbus-serialbattery_gui-v2/venus-webassembly.zip -d /tmp > /dev/null
 
         # remove unneeded files
         if [ -f "/tmp/wasm/Makefile" ]; then
             rm -f /tmp/wasm/Makefile
         fi
 
-        # add commit-sha file
-        echo $hash_online > /tmp/wasm/commit-sha
-
-        # move original wasm build, if it's a folder
         if [ -d "/var/www/venus/gui-v2" ] && [ ! -L "/var/www/venus/gui-v2" ]; then
-            mv /var/www/venus/gui-v2 /var/www/venus/gui-v2.bak
-        # remove if it's a symlink
-        elif [ -L "/var/www/venus/gui-v2" ]; then
-            rm -f /var/www/venus/gui-v2
+            pathGuiWww="/var/www/venus/gui-v2"
+        elif [ -d "/var/www/venus/gui-beta" ] && [ ! -L "/var/www/venus/gui-beta" ]; then
+            pathGuiWww="/var/www/venus/gui-beta"
         fi
-        mv /tmp/wasm /var/www/venus/gui-v2
 
-        cd /var/www/venus/gui-v2
+        # "remove" old files
+        if [ -d "$pathGuiWww" ]; then
+            rm -rf "$pathGuiWww"
+        fi
+        mv /tmp/wasm "$pathGuiWww"
+
+        cd "$pathGuiWww"
 
         # create missing files for VRM portal check
         if [ ! -f "venus-gui-v2.wasm.gz" ]; then
             echo "GZip WASM build..."
             gzip -k venus-gui-v2.wasm
-            echo "Create SHA256 checksum..."
-            sha256sum /var/www/venus/gui-v2/venus-gui-v2.wasm > /var/www/venus/gui-v2/venus-gui-v2.wasm.sha256
+            # echo "Create SHA256 checksum..."
+            # sha256sum venus-gui-v2.wasm > venus-gui-v2.wasm.sha256
+            rm -f venus-gui-v2.wasm
         fi
 
         rm -f /tmp/venus-webassembly.zip
+
+        echo "done."
 
     fi
 

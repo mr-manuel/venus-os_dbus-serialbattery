@@ -29,7 +29,7 @@ Page {
 				]
 			}
 
-			ListTextItem {
+			ListText {
 				text: CommonWords.state
 				dataItem.uid: root.battery.serviceUid + "/State"
 				allowed: defaultAllowed && dataItem.isValid
@@ -77,14 +77,14 @@ Page {
 				}
 			}
 
-			ListTextItem {
+			ListText {
 				text: CommonWords.error
 				dataItem.uid: root.battery.serviceUid + "/ErrorCode"
 				allowed: defaultAllowed && dataItem.isValid
 				secondaryText: BmsError.description(dataItem.value)
 			}
 
-			ListTextItem {
+			ListText {
 				//% "Battery bank error"
 				text: qsTrId("battery_bank_error")
 				dataItem.uid: root.battery.serviceUid + "/ErrorCode"
@@ -122,14 +122,14 @@ Page {
 				]
 			}
 
-			ListQuantityItem {
+			ListQuantity {
 				text: "Current (last 5 minutes avg.)"
 				dataItem.uid: root.battery.serviceUid + "/CurrentAvg"
 				allowed: defaultAllowed && dataItem.isValid
 				unit: VenusOS.Units_Amp
 			}
 
-			ListQuantityItem {
+			ListQuantity {
 				//% "Total Capacity"
 				text: qsTrId("devicelist_battery_total_capacity")
 				dataItem.uid: root.battery.serviceUid + "/Capacity"
@@ -137,7 +137,7 @@ Page {
 				unit: VenusOS.Units_AmpHour
 			}
 
-			ListQuantityItem {
+			ListQuantity {
 				readonly property VeQuickItem _n2kDeviceInstance: VeQuickItem {
 					uid: battery.serviceUid + "/N2kDeviceInstance"
 				}
@@ -149,7 +149,7 @@ Page {
 				unit: VenusOS.Units_Volt_DC
 			}
 
-			ListTextItem {
+			ListText {
 				id: nrOfBmses
 				//% "Number of BMSes"
 				text: qsTrId("devicelist_battery_number_of_bmses")
@@ -157,13 +157,13 @@ Page {
 				allowed: defaultAllowed && root.isParallelBms
 			}
 
-			ListQuantityItem {
+			ListQuantity {
 				text: CommonWords.state_of_charge
 				value: root.battery.stateOfCharge
 				unit: VenusOS.Units_Percentage
 			}
 
-			ListQuantityItem {
+			ListQuantity {
 				//% "State of health"
 				text: qsTrId("battery_state_of_health")
 				dataItem.uid: root.battery.serviceUid + "/Soh"
@@ -171,28 +171,28 @@ Page {
 				unit: VenusOS.Units_Percentage
 			}
 
-			ListTemperatureItem {
+			ListTemperature {
 				text: CommonWords.battery_temperature
 				dataItem.uid: root.battery.serviceUid + "/Dc/0/Temperature"
 				allowed: defaultAllowed && dataItem.isValid
 				unit: Global.systemSettings.temperatureUnit
 			}
 
-			ListTemperatureItem {
+			ListTemperature {
 				text: "MOSFET Temperature"
 				dataItem.uid: root.battery.serviceUid + "/System/MOSTemperature"
 				allowed: defaultAllowed && dataItem.isValid
 				unit: Global.systemSettings.temperatureUnit
 			}
 
-			ListTemperatureItem {
+			ListTemperature {
 				//% "Air temperature"
 				text: qsTrId("battery_air_temp")
 				dataItem.uid: root.battery.serviceUid + "/AirTemperature"
 				allowed: defaultAllowed && dataItem.isValid
 			}
 
-			ListQuantityItem {
+			ListQuantity {
 				//% "Starter voltage"
 				text: qsTrId("battery_starter_voltage")
 				dataItem.uid: root.battery.serviceUid + "/Dc/1/Voltage"
@@ -200,7 +200,7 @@ Page {
 				unit: VenusOS.Units_Volt_DC
 			}
 
-			ListQuantityItem {
+			ListQuantity {
 				//% "Bus voltage"
 				text: qsTrId("battery_bus_voltage")
 				dataItem.uid: root.battery.serviceUid + "/BusVoltage"
@@ -208,7 +208,7 @@ Page {
 				unit: VenusOS.Units_Volt_DC
 			}
 
-			ListQuantityItem {
+			ListQuantity {
 				//% "Top section voltage"
 				text: qsTrId("battery_top_section_voltage")
 				allowed: midVoltage.isValid
@@ -216,7 +216,7 @@ Page {
 				unit: VenusOS.Units_Volt_DC
 			}
 
-			ListQuantityItem {
+			ListQuantity {
 				//% "Bottom section voltage"
 				text: qsTrId("battery_bottom_section_voltage")
 				value: midVoltage.value === undefined ? NaN : midVoltage.value
@@ -224,7 +224,7 @@ Page {
 				unit: VenusOS.Units_Volt_DC
 			}
 
-			ListQuantityItem {
+			ListQuantity {
 				//% "Mid-point deviation"
 				text: qsTrId("battery_mid_point_deviation")
 				dataItem.uid: root.battery.serviceUid + "/Dc/0/MidVoltageDeviation"
@@ -232,7 +232,7 @@ Page {
 				unit: VenusOS.Units_Percentage
 			}
 
-			ListQuantityItem {
+			ListQuantity {
 				//% "Consumed AmpHours"
 				text: qsTrId("battery_consumed_amphours")
 				dataItem.uid: root.battery.serviceUid + "/ConsumedAmphours"
@@ -240,7 +240,7 @@ Page {
 				unit: VenusOS.Units_AmpHour
 			}
 
-			ListQuantityItem {
+			ListQuantity {
 				//% "Bus voltage"
 				text: qsTrId("battery_buss_voltage")
 				dataItem.uid: root.battery.serviceUid + "/BussVoltage"
@@ -248,7 +248,7 @@ Page {
 				unit: VenusOS.Units_Volt_DC
 			}
 
-			ListTextItem {
+			ListText {
 				//% "Time-to-go"
 				text: qsTrId("battery_time_to_go")
 				dataItem.uid: root.battery.serviceUid + "/TimeToGo"
@@ -256,7 +256,7 @@ Page {
 				secondaryText: Utils.secondsToString(root.battery.timeToGo)
 			}
 
-			ListTextItem {
+			ListText {
 				//% "Time-to-SoC 0%"
 				text: "Time-to-SoC 0%"
 				allowed: defaultAllowed && dataItem.seen
@@ -264,7 +264,7 @@ Page {
 				secondaryText: dataItem.isValid && dataItem.value != "" > 0 ? dataItem.value : "--"
 			}
 
-			ListTextItem {
+			ListText {
 				//% "Time-to-SoC 10%"
 				text: "Time-to-SoC 10%"
 				allowed: defaultAllowed && dataItem.seen
@@ -272,7 +272,7 @@ Page {
 				secondaryText: dataItem.isValid && dataItem.value != "" > 0 ? dataItem.value : "--"
 			}
 
-			ListTextItem {
+			ListText {
 				//% "Time-to-SoC 20%"
 				text: "Time-to-SoC 20%"
 				allowed: defaultAllowed && dataItem.seen
@@ -280,7 +280,7 @@ Page {
 				secondaryText: dataItem.isValid && dataItem.value != "" > 0 ? dataItem.value : "--"
 			}
 
-			ListTextItem {
+			ListText {
 				//% "Time-to-SoC 80%"
 				text: "Time-to-SoC 80%"
 				allowed: defaultAllowed && dataItem.seen
@@ -288,7 +288,7 @@ Page {
 				secondaryText: dataItem.isValid && dataItem.value != "" > 0 ? dataItem.value : "--"
 			}
 
-			ListTextItem {
+			ListText {
 				//% "Time-to-SoC 90%"
 				text: "Time-to-SoC 90%"
 				allowed: defaultAllowed && dataItem.seen
@@ -296,7 +296,7 @@ Page {
 				secondaryText: dataItem.isValid && dataItem.value != "" > 0 ? dataItem.value : "--"
 			}
 
-			ListTextItem {
+			ListText {
 				//% "Time-to-SoC 100%"
 				text: "Time-to-SoC 100%"
 				allowed: defaultAllowed && dataItem.seen
@@ -312,7 +312,7 @@ Page {
 				dataItem.uid: root.battery.serviceUid + "/Alarms/Alarm"
 			}
 
-			ListNavigationItem {
+			ListNavigation {
 				//% "Details"
 				text: qsTrId("battery_details")
 				allowed: defaultAllowed && batteryDetails.hasAllowedItem
@@ -327,7 +327,7 @@ Page {
 				}
 			}
 
-			ListNavigationItem {
+			ListNavigation {
 				text: "Cell Voltages"
 				onClicked: {
 					Global.pageManager.pushPage("/pages/settings/devicelist/battery/PageBatteryCellVoltages.qml",
@@ -335,7 +335,7 @@ Page {
 				}
 			}
 
-			ListNavigationItem {
+			ListNavigation {
 				text: CommonWords.alarms
 				allowed: !root.isParallelBms
 				onClicked: {
@@ -344,7 +344,7 @@ Page {
 				}
 			}
 
-			ListNavigationItem {
+			ListNavigation {
 				//% "Module level alarms"
 				text: qsTrId("battery_module_level_alarms")
 				allowed: moduleAlarmModel.rowCount > 0
@@ -354,7 +354,7 @@ Page {
 				}
 			}
 
-			ListNavigationItem {
+			ListNavigation {
 				text: CommonWords.history
 				allowed: !isFiamm48TL && batteryHistory.hasAllowedItem
 				onClicked: {
@@ -368,7 +368,7 @@ Page {
 				}
 			}
 
-			ListNavigationItem {
+			ListNavigation {
 				text: CommonWords.settings
 				allowed: hasSettings.value === 1
 				onClicked: {
@@ -377,7 +377,7 @@ Page {
 				}
 			}
 
-			ListNavigationItem {
+			ListNavigation {
 				id: lynxIonDiagnostics
 
 				//% "Diagnostics"
@@ -394,7 +394,7 @@ Page {
 				}
 			}
 
-			ListNavigationItem {
+			ListNavigation {
 				text: lynxIonDiagnostics.text
 				allowed: isFiamm48TL
 
@@ -404,7 +404,7 @@ Page {
 				}
 			}
 
-			ListNavigationItem {
+			ListNavigation {
 				//% "Fuses"
 				text: qsTrId("battery_settings_fuses")
 				allowed: nrOfDistributors.isValid && nrOfDistributors.value > 0
@@ -420,7 +420,7 @@ Page {
 				}
 			}
 
-			ListNavigationItem {
+			ListNavigation {
 				//% "IO"
 				text: qsTrId("battery_settings_io")
 				allowed: allowToCharge.isValid
@@ -435,7 +435,7 @@ Page {
 				}
 			}
 
-			ListNavigationItem {
+			ListNavigation {
 				//% "System"
 				text: qsTrId("battery_settings_system")
 				allowed: nrOfBatteries.isValid
@@ -450,7 +450,7 @@ Page {
 				}
 			}
 
-			ListNavigationItem {
+			ListNavigation {
 				text: CommonWords.device_info_title
 				onClicked: {
 					Global.pageManager.pushPage("/pages/settings/PageDeviceInfo.qml",
@@ -458,7 +458,7 @@ Page {
 				}
 			}
 
-			ListNavigationItem {
+			ListNavigation {
 				//% "Parameters"
 				text: qsTrId("battery_settings_parameters")
 				allowed: cvl.isValid || ccl.isValid || dcl.isValid

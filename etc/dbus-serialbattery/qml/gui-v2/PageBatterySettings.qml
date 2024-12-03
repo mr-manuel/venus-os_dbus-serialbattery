@@ -33,7 +33,7 @@ Page {
 
 	GradientListView {
 		model: ObjectModel {
-			ListNavigationItem {
+			ListNavigation {
 				//% "Battery bank"
 				text: qsTrId("batterysettings_battery_bank")
 				onClicked: {
@@ -42,7 +42,7 @@ Page {
 				}
 			}
 
-			ListNavigationItem {
+			ListNavigation {
 				text: CommonWords.alarms
 				allowed: alarmSettingsMonitor.hasVisibleItem
 				onClicked: {
@@ -51,7 +51,7 @@ Page {
 				}
 			}
 
-			ListNavigationItem {
+			ListNavigation {
 				//% "Relay (on battery monitor)"
 				text: qsTrId("batterysettings_relay_on_battery_monitor")
 				allowed: relaySettingsMonitor.hasVisibleItem

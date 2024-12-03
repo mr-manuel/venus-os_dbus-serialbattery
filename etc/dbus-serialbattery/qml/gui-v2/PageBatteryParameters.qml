@@ -14,46 +14,46 @@ Page {
 	GradientListView {
 		model: ObjectModel {
 
-			ListTextItem {
+			ListText {
 				text: "Charge Mode"
 				dataItem.uid: root.bindPrefix + "/Info/ChargeMode"
 				allowed: defaultAllowed && dataItem.isValid
 			}
 
-			ListQuantityItem {
+			ListQuantity {
 				//% "Charge Voltage Limit (CVL)"
 				text: qsTrId("batteryparameters_charge_voltage_limit_cvl")
 				dataItem.uid: root.bindPrefix + "/Info/MaxChargeVoltage"
 				unit: VenusOS.Units_Volt_DC
 			}
 
-			ListTextItem {
+			ListText {
 				text: "Charge Limitation"
 				dataItem.uid: root.bindPrefix + "/Info/ChargeLimitation"
 				allowed: defaultAllowed && dataItem.isValid
 			}
 
-			ListQuantityItem {
+			ListQuantity {
 				//% "Charge Current Limit (CCL)"
 				text: qsTrId("batteryparameters_charge_current_limit_ccl")
 				dataItem.uid: root.bindPrefix + "/Info/MaxChargeCurrent"
 				unit: VenusOS.Units_Amp
 			}
 
-			ListTextItem {
+			ListText {
 				text: "Discharge Limitation"
 				dataItem.uid: root.bindPrefix + "/Info/DischargeLimitation"
 				allowed: defaultAllowed && dataItem.isValid
 			}
 
-			ListQuantityItem {
+			ListQuantity {
 				//% "Discharge Current Limit (DCL)"
 				text: qsTrId("batteryparameters_discharge_current_limit_dcl")
 				dataItem.uid: root.bindPrefix + "/Info/MaxDischargeCurrent"
 				unit: VenusOS.Units_Amp
 			}
 
-			ListQuantityItem {
+			ListQuantity {
 				//% "Low Voltage Disconnect (always ignored)"
 				text: qsTrId("batteryparameters_low_voltage_disconnect_always_ignored")
 				dataItem.uid: root.bindPrefix + "/Info/BatteryLowVoltage"
@@ -70,7 +70,7 @@ Page {
 				}
 
 				bottomContentChildren: [
-					ListLabel {
+					PrimaryListLabel {
 						topPadding: 0
 						bottomPadding: 0
 						color: Theme.color_font_secondary
@@ -91,7 +91,7 @@ Page {
 				}
 
 				bottomContentChildren: [
-					ListLabel {
+					PrimaryListLabel {
 						topPadding: 0
 						bottomPadding: 0
 						color: Theme.color_font_secondary
@@ -112,7 +112,7 @@ Page {
 				}
 
 				bottomContentChildren: [
-					ListLabel {
+					PrimaryListLabel {
 						topPadding: 0
 						bottomPadding: 0
 						color: Theme.color_font_secondary
