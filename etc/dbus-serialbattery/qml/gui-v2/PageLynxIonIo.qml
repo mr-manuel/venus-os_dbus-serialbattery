@@ -13,7 +13,7 @@ Page {
 
 	GradientListView {
 		model: ObjectModel {
-			ListTextItem {
+			ListText {
 				//% "System Switch"
 				text: qsTrId("lynxionio_system_switch")
 				dataItem.uid: root.bindPrefix + "/SystemSwitch"
@@ -21,21 +21,21 @@ Page {
 				secondaryText: CommonWords.enabledOrDisabled(dataItem.value)
 			}
 
-			ListTextItem {
+			ListText {
 				text: CommonWords.allow_to_charge
 				dataItem.uid: root.bindPrefix + "/Io/AllowToCharge"
 				allowed: defaultAllowed && dataItem.isValid
 				secondaryText: CommonWords.yesOrNo(dataItem.value)
 			}
 
-			ListTextItem {
+			ListText {
 				text: CommonWords.allow_to_discharge
 				dataItem.uid: root.bindPrefix + "/Io/AllowToDischarge"
 				allowed: defaultAllowed && dataItem.isValid
 				secondaryText: CommonWords.yesOrNo(dataItem.value)
 			}
 
-			ListTextItem {
+			ListText {
 				text: "Allow to balance"
 				dataItem.uid: root.bindPrefix + "/Io/AllowToBalance"
 				allowed: defaultAllowed && dataItem.isValid
@@ -60,7 +60,7 @@ Page {
 				allowed: defaultAllowed && dataItem.isValid
 			}
 
-			ListTextItem {
+			ListText {
 				//% "External relay"
 				text: qsTrId("lynxionio_external_relay")
 				dataItem.uid: root.bindPrefix + "/Io/ExternalRelay"
@@ -68,7 +68,7 @@ Page {
 				secondaryText: CommonWords.activeOrInactive(dataItem.value)
 			}
 
-			ListTextItem {
+			ListText {
 				//% "Programmable Contact"
 				text: qsTrId("lynxionio_programmable_contact")
 				dataItem.uid: root.bindPrefix + "/Io/ProgrammableContact"

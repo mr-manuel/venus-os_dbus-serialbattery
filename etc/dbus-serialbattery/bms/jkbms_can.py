@@ -49,10 +49,10 @@ class Jkbms_Can(Battery):
     # B2A... Silver is using 0x0XF5
     # See https://github.com/Louisvdw/dbus-serialbattery/issues/950
     CAN_FRAMES = {
-        BATT_STAT: [0x02F4, 0x02F5],
-        CELL_VOLT: [0x04F4, 0x04F5],
-        CELL_TEMP: [0x05F4, 0x05F5],
-        ALM_INFO: [0x07F4, 0x07F5],
+        BATT_STAT: [0x02F4, 0x02F5, 0x02F9],
+        CELL_VOLT: [0x04F4, 0x04F5, 0x04F9],
+        CELL_TEMP: [0x05F4, 0x05F5, 0x05F9],
+        ALM_INFO: [0x07F4, 0x07F5, 0x07F9],
     }
 
     def connection_name(self) -> str:
@@ -170,85 +170,102 @@ class Jkbms_Can(Battery):
             logger.debug("Can bus init")
             # intit the can interface
             try:
-                self.can_bus = can.interface.Bus(bustype=self.CAN_BUS_TYPE, channel=self.port, bitrate=self.baud_rate)
+                self.can_bus = can.interface.Bus(bustype=self.CAN_BUS_TYPE, channel=self.port)
+                logger.debug(f"bustype: {self.CAN_BUS_TYPE}, channel: {self.port}, bitrate: {self.baud_rate}")
             except can.CanError as e:
                 logger.error(e)
 
             if self.can_bus is None:
+                logger.error("Can bus init failed")
                 return False
 
             logger.debug("Can bus init done")
 
-        # reset errors after timeout
-        if ((time.time() - self.last_error_time) > 120.0) and self.error_active is True:
-            self.error_active = False
-            self.reset_protection_bits()
+        try:
 
-        # read msgs until we get one we want
-        messages_to_read = self.MESSAGES_TO_READ
-        while messages_to_read > 0:
-            msg = self.can_bus.recv(1)
-            if msg is None:
-                logger.info("No CAN Message received")
-                return False
+            # reset errors after timeout
+            if ((time.time() - self.last_error_time) > 120.0) and self.error_active is True:
+                self.error_active = False
+                self.reset_protection_bits()
 
-            if msg is not None:
-                # print("message received")
-                messages_to_read -= 1
-                # print(messages_to_read)
-                if msg.arbitration_id in self.CAN_FRAMES[self.BATT_STAT]:
-                    voltage = unpack_from("<H", bytes([msg.data[0], msg.data[1]]))[0]
-                    self.voltage = voltage / 10
+            # read msgs until we get one we want
+            messages_to_read = self.MESSAGES_TO_READ
+            while messages_to_read > 0:
+                msg = self.can_bus.recv(1)
+                if msg is None:
+                    logger.info("No CAN Message received")
+                    return False
 
-                    current = unpack_from("<H", bytes([msg.data[2], msg.data[3]]))[0]
-                    self.current = (current / 10) - 400
+                if msg is not None:
+                    # print("message received")
+                    messages_to_read -= 1
+                    # print(messages_to_read)
+                    if msg.arbitration_id in self.CAN_FRAMES[self.BATT_STAT]:
+                        voltage = unpack_from("<H", bytes([msg.data[0], msg.data[1]]))[0]
+                        self.voltage = voltage / 10
 
-                    self.soc = unpack_from("<B", bytes([msg.data[4]]))[0]
+                        current = unpack_from("<H", bytes([msg.data[2], msg.data[3]]))[0]
+                        self.current = (current / 10) - 400
 
-                    self.time_to_go = unpack_from("<H", bytes([msg.data[6], msg.data[7]]))[0] * 36
+                        self.soc = unpack_from("<B", bytes([msg.data[4]]))[0]
 
-                    # print(self.voltage)
-                    # print(self.current)
-                    # print(self.soc)
-                    # print(self.time_to_go)
+                        self.time_to_go = unpack_from("<H", bytes([msg.data[6], msg.data[7]]))[0] * 36
 
-                elif msg.arbitration_id in self.CAN_FRAMES[self.CELL_VOLT]:
-                    max_cell_volt = unpack_from("<H", bytes([msg.data[0], msg.data[1]]))[0] / 1000
-                    max_cell_nr = unpack_from("<B", bytes([msg.data[2]]))[0]
-                    max_cell_cnt = max(max_cell_nr, self.cell_count)
+                        # print(self.voltage)
+                        # print(self.current)
+                        # print(self.soc)
+                        # print(self.time_to_go)
 
-                    min_cell_volt = unpack_from("<H", bytes([msg.data[3], msg.data[4]]))[0] / 1000
-                    min_cell_nr = unpack_from("<B", bytes([msg.data[5]]))[0]
-                    max_cell_cnt = max(min_cell_nr, max_cell_cnt)
+                    elif msg.arbitration_id in self.CAN_FRAMES[self.CELL_VOLT]:
+                        max_cell_volt = unpack_from("<H", bytes([msg.data[0], msg.data[1]]))[0] / 1000
+                        max_cell_nr = unpack_from("<B", bytes([msg.data[2]]))[0]
+                        max_cell_cnt = max(max_cell_nr, self.cell_count)
 
-                    if max_cell_cnt > self.cell_count:
-                        self.cell_count = max_cell_cnt
-                        self.get_settings()
+                        min_cell_volt = unpack_from("<H", bytes([msg.data[3], msg.data[4]]))[0] / 1000
+                        min_cell_nr = unpack_from("<B", bytes([msg.data[5]]))[0]
+                        max_cell_cnt = max(min_cell_nr, max_cell_cnt)
 
-                    for c_nr in range(len(self.cells)):
-                        self.cells[c_nr].balance = False
+                        if max_cell_cnt > self.cell_count:
+                            self.cell_count = max_cell_cnt
+                            self.get_settings()
 
-                    if self.cell_count == len(self.cells):
-                        self.cells[max_cell_nr - 1].voltage = max_cell_volt
-                        self.cells[max_cell_nr - 1].balance = True
+                        for c_nr in range(len(self.cells)):
+                            self.cells[c_nr].balance = False
 
-                        self.cells[min_cell_nr - 1].voltage = min_cell_volt
-                        self.cells[min_cell_nr - 1].balance = True
+                        if self.cell_count == len(self.cells):
+                            self.cells[max_cell_nr - 1].voltage = max_cell_volt
+                            self.cells[max_cell_nr - 1].balance = True
 
-                elif msg.arbitration_id in self.CAN_FRAMES[self.CELL_TEMP]:
-                    max_temp = unpack_from("<B", bytes([msg.data[0]]))[0] - 50
-                    min_temp = unpack_from("<B", bytes([msg.data[2]]))[0] - 50
-                    self.to_temp(1, max_temp if max_temp <= 100 else 100)
-                    self.to_temp(2, min_temp if min_temp <= 100 else 100)
-                    # print(max_temp)
-                    # print(min_temp)
-                elif msg.arbitration_id in self.CAN_FRAMES[self.ALM_INFO]:
-                    alarms = unpack_from(
-                        "<L",
-                        bytes([msg.data[0], msg.data[1], msg.data[2], msg.data[3]]),
-                    )[0]
-                    print("alarms %d" % (alarms))
-                    self.last_error_time = time.time()
-                    self.error_active = True
-                    self.to_protection_bits(alarms)
-        return True
+                            self.cells[min_cell_nr - 1].voltage = min_cell_volt
+                            self.cells[min_cell_nr - 1].balance = True
+
+                    elif msg.arbitration_id in self.CAN_FRAMES[self.CELL_TEMP]:
+                        max_temp = unpack_from("<B", bytes([msg.data[0]]))[0] - 50
+                        # max_nr = unpack_from("<B", bytes([msg.data[1]]))[0]
+                        min_temp = unpack_from("<B", bytes([msg.data[2]]))[0] - 50
+                        # min_nr = unpack_from("<B", bytes([msg.data[3]]))[0]
+                        self.to_temp(1, max_temp if max_temp <= 100 else 100)
+                        self.to_temp(2, min_temp if min_temp <= 100 else 100)
+                        # print(max_temp)
+                        # print(min_temp)
+                    elif msg.arbitration_id in self.CAN_FRAMES[self.ALM_INFO]:
+                        alarms = unpack_from(
+                            "<L",
+                            bytes([msg.data[0], msg.data[1], msg.data[2], msg.data[3]]),
+                        )[0]
+                        print("alarms %d" % (alarms))
+                        self.last_error_time = time.time()
+                        self.error_active = True
+                        self.to_protection_bits(alarms)
+            return True
+
+        except Exception:
+            (
+                exception_type,
+                exception_object,
+                exception_traceback,
+            ) = sys.exc_info()
+            file = exception_traceback.tb_frame.f_code.co_filename
+            line = exception_traceback.tb_lineno
+            logger.error(f"Exception occurred: {repr(exception_object)} of type {exception_type} in {file} line #{line}")
+            return False
