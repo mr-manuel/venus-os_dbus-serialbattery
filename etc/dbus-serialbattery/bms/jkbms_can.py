@@ -1,35 +1,39 @@
 # -*- coding: utf-8 -*-
 
 # NOTES
-# Added by https://github.com/Hooorny and https://github.com/mr-manuel
+# Added by https://github.com/IrisCrimson
+# Reworked by https://github.com/Hooorny and https://github.com/mr-manuel
 # https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/108
 
 # TODO
 # - Implement controlling of BMS, see protocol documentation 7.1 (Ctrl_INFO)
-# - Compare can frames with Jkbms_Can class
 
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 from battery import Battery, Cell
 from utils import bytearray_to_string, logger
 from struct import unpack_from
-import sys
+from typing import Union
 from time import time
+import sys
 
 
-class Jkbms_V2_Can(Battery):
+class Jkbms_Can(Battery):
     def __init__(self, port, baud, address):
-        super(Jkbms_V2_Can, self).__init__(port, baud, address)
-        self.cell_count = 1
+        super(Jkbms_Can, self).__init__(port, baud, address)
+        self.cell_count = 0
         self.type = self.BATTERYTYPE
 
         # If multiple BMS are used simultaneously, the device address can be set via the dip switches on the BMS
         # (default address is 0, all switches down) to change the CAN frame ID sent by the BMS
         self.device_address = int.from_bytes(address, byteorder="big") if address is not None else 0
-        self.last_error_time = time()
+        self.last_error_time = 0
         self.error_active = False
+        self.protocol_version = None
+        self.v1_max_cell_nr = None
+        self.v1_min_cell_nr = None
 
-    BATTERYTYPE = "JKBMS CAN V2"
+    BATTERYTYPE = "JKBMS CAN"
 
     BATT_STAT = "BATT_STAT"
     CELL_VOLT = "CELL_VOLT"
@@ -116,9 +120,6 @@ class Jkbms_V2_Can(Battery):
         # After successful connection get_settings() will be called to set up the battery
         # Set the current limits, populate cell count, etc
         # Return True if success, False for failure
-
-        # Balancing feature should be enabled in the BMS
-        self.balance_fet = True
 
         return True
 
@@ -214,6 +215,8 @@ class Jkbms_V2_Can(Battery):
 
                 self.soc = unpack_from("<B", bytes([data[4]]))[0]
 
+                # self.time_to_go = unpack_from("<H", bytes([data[6], data[7]]))[0] * 36
+
                 # check if all needed data is available
                 data_check += 1
 
@@ -225,7 +228,7 @@ class Jkbms_V2_Can(Battery):
                 self.history.charge_cycles = unpack_from("<H", bytes([data[6], data[7]]))[0]
 
                 # check if all needed data is available
-                data_check += 4
+                data_check += 2
 
             # Frame is send every 100ms
             elif normalized_arbitration_id in self.CAN_FRAMES[self.ALM_INFO]:
@@ -239,19 +242,37 @@ class Jkbms_V2_Can(Battery):
                 self.to_protection_bits(alarms)
 
                 # check if all needed data is available
-                data_check += 2
+                data_check += 4
 
             # Frame is send every 100ms
             # elif normalized_arbitration_id in self.CAN_FRAMES[self.BMSERR_INFO]:
             #    pass
 
             # Frame is send every 100ms
-            # elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT]:
-            #    pass
+            elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT]:
+                v1_max_cell_volt = unpack_from("<H", bytes([data[0], data[1]]))[0] / 1000
+                self.v1_max_cell_nr = unpack_from("<B", bytes([data[2]]))[0]
+
+                v1_min_cell_volt = unpack_from("<H", bytes([data[3], data[4]]))[0] / 1000
+                self.v1_min_cell_nr = unpack_from("<B", bytes([data[5]]))[0]
+
+                # logger.info(f"Min cell: {self.min_cell_nr} {min_cell_volt} - Max cell: {self.max_cell_nr} {max_cell_volt}")
+
+                # check if all needed data is available
+                data_check += 8
 
             # Frame is send every 500ms
-            # elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_TEMP]:
-            #    pass
+            elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_TEMP]:
+                v1_max_temp = unpack_from("<B", bytes([data[0]]))[0] - 50
+                v1_max_nr = unpack_from("<B", bytes([data[1]]))[0]
+                v1_min_temp = unpack_from("<B", bytes([data[2]]))[0] - 50
+                v1_min_nr = unpack_from("<B", bytes([data[3]]))[0]
+
+                # store temperatures in a dict to assign the temperature to the correct sensor
+                v1_temperatures = {v1_min_nr: v1_min_temp, v1_max_nr: v1_max_temp}
+
+                # check if all needed data is available
+                data_check += 16
 
             # Frame is send every 500ms
             elif normalized_arbitration_id in self.CAN_FRAMES[self.ALL_TEMP]:
@@ -278,7 +299,7 @@ class Jkbms_V2_Can(Battery):
                     self.to_temp(4, temp5)
 
                 # check if all needed data is available
-                data_check += 8
+                data_check += 32
 
             # Frame is send every 500ms
             # elif normalized_arbitration_id in self.CAN_FRAMES[self.BMS_INFO]:
@@ -301,14 +322,15 @@ class Jkbms_V2_Can(Battery):
                             self.cells[c].balance = False
 
                 # check if all needed data is available
-                data_check += 16
+                data_check += 64
 
             # Frame is send every 1000ms
             elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT1]:
                 self.update_cell_voltages(0, 3, data)
                 # check if all needed data is available
                 # this is important to differentiate between the JKBMS CAN V1 and V2
-                data_check += 32
+                data_check += 128
+
             # Frame is send every 1000ms, if the BMS has more than 4 cells
             elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT2]:
                 self.update_cell_voltages(4, 7, data)
@@ -325,14 +347,62 @@ class Jkbms_V2_Can(Battery):
             elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT6]:
                 self.update_cell_voltages(20, 23, data)
 
+        # fetch data from min/max values if protocol is JKBMS CAN V1 (extra frames missing)
+        if data_check < 128:
+
+            if self.cell_count == 0:
+                self.cell_count = 2
+                self.cells = [Cell(False) for _ in range(self.cell_count)]
+
+            if self.cell_count == len(self.cells):
+                self.cells[1].voltage = v1_max_cell_volt
+                # self.cells[1].balance = True
+
+                self.cells[0].voltage = v1_min_cell_volt
+                # self.cells[0].balance = True
+
+                self.to_temp(1, v1_temperatures[0] if v1_temperatures[0] <= 100 else 100)
+                self.to_temp(2, v1_temperatures[1] if v1_temperatures[1] <= 100 else 100)
+
+            self.protocol_version = 1
+            self.type = "JKBMS CAN"
+
+        else:
+            self.protocol_version = 2
+            self.type = "JKBMS CAN V2"
+
         if self.hardware_version is None:
-            self.hardware_version = "JKBMS CAN V2 " + str(self.cell_count) + "S"
+            self.hardware_version = "JKBMS CAN" + (" V2" + str(self.cell_count) + "S" if self.protocol_version == 2 else "")
 
         # check if all needed data is available to make sure it's a JKBMS CAN V2
         # sum of all data checks except for alarms
         logger.debug("Data check: %d" % (data_check))
-        if data_check < 61:
+        if data_check == 0:
             logger.error(">>> ERROR: No reply - returning")
             return False
 
         return True
+
+    def get_min_cell_desc(self) -> Union[str, None]:
+        """
+        Get the description of the cell with the lowest voltage.
+
+        :return: The description of the cell with the lowest voltage
+        """
+        if self.protocol_version == 1:
+            return f"C{self.v1_min_cell_nr}" if self.v1_min_cell_nr is not None else ""
+
+        cell_no = self.get_min_cell()
+        return cell_no if cell_no is None else "C" + str(cell_no + 1)
+
+    def get_max_cell_desc(self) -> Union[str, None]:
+        """
+        Get the description of the cell with the highest voltage.
+
+        :return: The description of the cell with the highest voltage
+        """
+        if self.protocol_version == 1:
+            return f"C{self.v1_max_cell_nr}" if self.v1_max_cell_nr is not None else ""
+
+        cell_no = self.get_max_cell()
+        return cell_no if cell_no is None else "C" + str(cell_no + 1)
