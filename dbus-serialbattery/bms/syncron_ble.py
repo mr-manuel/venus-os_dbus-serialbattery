@@ -1,10 +1,10 @@
 from utils import logger
 import threading
 import asyncio
-import time
 from bleak import BleakClient
 
 
+# Class that enables synchronous writing and reading to a bluetooh device
 class Syncron_Ble:
 
     ble_async_thread_ready = threading.Event()
@@ -20,19 +20,29 @@ class Syncron_Ble:
     read_characteristic = None
 
     def __init__(self, address, read_characteristic, write_characteristic):
+        """
+            address: the address of the bluetooth device to read and write to
+            read_characteristic: the id of bluetooth LE characteristic that will send a
+            notification when there is new data to read.
+            write_characteristic: the id of the bluetooth LE characteristic that the class writes messages to
+        """
+
         self.write_characteristic = write_characteristic
         self.read_characteristic = read_characteristic
         self.address = address
 
+        # Start a new thread that will run bleak the async bluetooth LE library 
         self.main_thread = threading.current_thread()
         ble_async_thread = threading.Thread(name="BMS_bluetooth_async_thread", target=self.initiate_ble_thread_main, daemon=True)
         ble_async_thread.start()
+
+        
         thread_start_ok = self.ble_async_thread_ready.wait(2)
         connected_ok = self.ble_connection_ready.wait(10)
         if not thread_start_ok:
-            logger.error("thread took to long to start")
+            logger.error("bluetooh LE thread took to long to start")
         if not connected_ok:
-            logger.error("BLE connection to BMS took to long to inititate")
+            logger.error(f"bluetooh LE connection to address: {self.address} took to long to inititate")
 
     def initiate_ble_thread_main(self):
         asyncio.run(self.async_main(self.address))
@@ -47,14 +57,14 @@ class Syncron_Ble:
             await asyncio.sleep(1)  # sleep one second before trying to reconnecting
 
     def client_disconnected(self, client):
-        logger.error("BMS disconnected")
+        logger.error(f"bluetooh device with address: {self.address} disconnected")
 
     async def connect_to_bms(self, address):
         self.client = BleakClient(address, disconnected_callback=self.client_disconnected)
         try:
-            logger.info("initiate BLE connection to: " + address)
+            logger.info("initiating BLE connection to: " + address)
             await self.client.connect()
-            logger.info("connected")
+            logger.info("connected to bluetooh device" + address)
             await self.client.start_notify(self.read_characteristic, self.notify_read_callback)
 
         except Exception as e:
