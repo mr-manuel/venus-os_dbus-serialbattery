@@ -317,6 +317,10 @@ def main():
                 # noqa: F401 --> ignore flake "imported but unused" error
                 from bms.lltjbd_ble import LltJbd_Ble  # noqa: F401
 
+            if port == "LiTime_Ble":
+                # noqa: F401 --> ignore flake "imported but unused" error
+                from bms.litime import LiTime_Ble  # noqa: F401
+
             class_ = eval(port)
 
             # do not remove ble_ prefix, since the dbus service cannot be only numbers
