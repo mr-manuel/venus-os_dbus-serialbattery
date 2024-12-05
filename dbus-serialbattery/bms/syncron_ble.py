@@ -4,6 +4,7 @@ import asyncio
 import time
 from bleak import BleakClient
 
+
 class Syncron_Ble:
 
     ble_async_thread_ready = threading.Event()
@@ -40,10 +41,10 @@ class Syncron_Ble:
         self.ble_async_thread_event_loop = asyncio.get_event_loop()
         self.ble_async_thread_ready.set()
 
-        #try to connect over and over if the connection fails
+        # try to connect over and over if the connection fails
         while self.main_thread.is_alive():
             await self.connect_to_bms(self.address)
-            await asyncio.sleep(1)#sleep one second before trying to reconnecting
+            await asyncio.sleep(1)  # sleep one second before trying to reconnecting
 
     def client_disconnected(self, client):
         logger.error("BMS disconnected")
@@ -51,7 +52,7 @@ class Syncron_Ble:
     async def connect_to_bms(self, address):
         self.client = BleakClient(address, disconnected_callback=self.client_disconnected)
         try:
-            logger.info("initiate BLE connection to: "+address)
+            logger.info("initiate BLE connection to: " + address)
             await self.client.connect()
             logger.info("connected")
             await self.client.start_notify(self.read_characteristic, self.notify_read_callback)
@@ -65,7 +66,7 @@ class Syncron_Ble:
                 await asyncio.sleep(0.1)
             await self.client.disconnect()
 
-    #saves response and tells the command sender that the response has arived
+    # saves response and tells the command sender that the response has arived
     def notify_read_callback(self, sender, data: bytearray):
         self.response_data = data
         self.response_event.set()
@@ -74,7 +75,7 @@ class Syncron_Ble:
         self.response_event = asyncio.Event()
         self.response_data = False
         await self.client.write_gatt_char(self.write_characteristic, command, True)
-        await asyncio.wait_for(self.response_event.wait(), timeout=1)#Wait for the response notification
+        await asyncio.wait_for(self.response_event.wait(), timeout=1)  # Wait for the response notification
         self.response_event = False
         return self.response_data
 
