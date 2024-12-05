@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 from battery import Battery, Cell
-from utils import logger
 import utils
 from bms.syncron_ble import Syncron_Ble
 from struct import unpack_from
