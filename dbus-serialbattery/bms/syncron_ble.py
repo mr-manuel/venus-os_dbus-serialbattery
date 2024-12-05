@@ -35,7 +35,7 @@ class Syncron_Ble:
         self.main_thread = threading.current_thread()
         ble_async_thread = threading.Thread(name="BMS_bluetooth_async_thread", target=self.initiate_ble_thread_main, daemon=True)
         ble_async_thread.start()
-        
+
         thread_start_ok = self.ble_async_thread_ready.wait(2)
         connected_ok = self.ble_connection_ready.wait(10)
         if not thread_start_ok:
