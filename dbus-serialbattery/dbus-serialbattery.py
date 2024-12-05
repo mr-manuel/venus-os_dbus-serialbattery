@@ -33,6 +33,7 @@ from bms.daren_485 import Daren485
 from bms.ecs import Ecs
 from bms.eg4_lifepower import EG4_Lifepower
 from bms.eg4_ll import EG4_LL
+from bms.felicity import Felicity
 from bms.heltecmodbus import HeltecModbus
 from bms.hlpdatabms4s import HLPdataBMS4S
 from bms.jkbms import Jkbms
@@ -60,6 +61,7 @@ supported_bms_types = [
     {"bms": Ecs, "baud": 19200},
     {"bms": EG4_Lifepower, "baud": 9600, "address": b"\x01"},
     {"bms": EG4_LL, "baud": 9600, "address": b"\x01"},
+    {"bms": Felicity, "baud": 9600, "address": b"\x01"},
     {"bms": HeltecModbus, "baud": 9600, "address": b"\x01"},
     {"bms": HLPdataBMS4S, "baud": 9600},
     {"bms": Jkbms, "baud": 115200},
