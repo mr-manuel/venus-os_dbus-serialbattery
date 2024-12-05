@@ -21,21 +21,20 @@ class Syncron_Ble:
 
     def __init__(self, address, read_characteristic, write_characteristic):
         """
-            address: the address of the bluetooth device to read and write to
-            read_characteristic: the id of bluetooth LE characteristic that will send a
-            notification when there is new data to read.
-            write_characteristic: the id of the bluetooth LE characteristic that the class writes messages to
+        address: the address of the bluetooth device to read and write to
+        read_characteristic: the id of bluetooth LE characteristic that will send a
+        notification when there is new data to read.
+        write_characteristic: the id of the bluetooth LE characteristic that the class writes messages to
         """
 
         self.write_characteristic = write_characteristic
         self.read_characteristic = read_characteristic
         self.address = address
 
-        # Start a new thread that will run bleak the async bluetooth LE library 
+        # Start a new thread that will run bleak the async bluetooth LE library
         self.main_thread = threading.current_thread()
         ble_async_thread = threading.Thread(name="BMS_bluetooth_async_thread", target=self.initiate_ble_thread_main, daemon=True)
         ble_async_thread.start()
-
         
         thread_start_ok = self.ble_async_thread_ready.wait(2)
         connected_ok = self.ble_connection_ready.wait(10)
