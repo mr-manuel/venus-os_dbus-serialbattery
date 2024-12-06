@@ -37,23 +37,28 @@
 #
 # Version history
 # macGH 20.08.2024  Version 0.1.0
+# macGH 06.12.2024  Version 0.2.0: Update to newest serialbattery code
 
 ######################################################################################
 # Explanations (see also uni_bms_text.py for an example)
 ######################################################################################
 
 ######################################################################################
-# def __init__(self, devpath, driverOption, loglevel):
+# def __init__(self, devpath, driverOption, devadr, loglevel):
 #
 # devpath
 # Add the /dev/tty device here, mostly .../dev/ttyUSB0, if empty default path /dev/ttyUSB0 is used
 #
 # driverOption
 # Id for bluetooth and can devices
-# 0: autotetect for all non BT / CAN devices
-# 1: JKBMS bluettooth - Jkbms_Ble
-# 2: JDB bluetooth    - LltJbd_Ble
-# 3: CAN devices for JKBAMS and DALY
+# 0 : autotetect for all non BT / CAN devices
+# 1 : JKBMS bluettooth - Jkbms_Ble
+# 2 : JDB bluetooth    - LltJbd_Ble
+# 3 : LiTime bluetooth - LiTime_Ble
+# 10: CAN devices for JKBAMS and DALY
+#
+# devadr
+# bluetooth address as string or "" empty
 #
 # loglevel
 # Enter Loglevel 0,10,20,30,40,50 
@@ -75,18 +80,32 @@ import struct
 from typing import Union
 from time import sleep
 
-from bmshelper import DbusHelper
+from uni_bmshelper import DbusHelper
 from utils import logger
 import utils
 from battery import Battery
-sys.path.insert(1, os.path.join(os.path.dirname(__file__), "ext"))
+
+from utils import (
+    BMS_TYPE,
+    bytearray_to_string,
+    DRIVER_VERSION,
+    EXCLUDED_DEVICES,
+    EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE,
+    EXTERNAL_CURRENT_SENSOR_DBUS_PATH,
+    logger,
+    BATTERY_ADDRESSES,
+    POLL_INTERVAL,
+    validate_config_values,
+)
 
 # import battery classes
+# TODO: import only the classes that are needed
 from bms.daly import Daly
 from bms.daren_485 import Daren485
 from bms.ecs import Ecs
 from bms.eg4_lifepower import EG4_Lifepower
 from bms.eg4_ll import EG4_LL
+from bms.felicity import Felicity
 from bms.heltecmodbus import HeltecModbus
 from bms.hlpdatabms4s import HLPdataBMS4S
 from bms.jkbms import Jkbms
@@ -97,56 +116,56 @@ from bms.seplos import Seplos
 from bms.seplosv3 import Seplosv3
 
 # enabled only if explicitly set in config under "BMS_TYPE"
-if "ANT" in utils.BMS_TYPE:
+if "ANT" in BMS_TYPE:
     from bms.ant import ANT
-if "MNB" in utils.BMS_TYPE:
+if "MNB" in BMS_TYPE:
     from bms.mnb import MNB
-if "Sinowealth" in utils.BMS_TYPE:
+if "Sinowealth" in BMS_TYPE:
     from bms.sinowealth import Sinowealth
+
+supported_bms_types = [
+    {"bms": Daly, "baud": 9600, "address": b"\x40"},
+    {"bms": Daly, "baud": 9600, "address": b"\x80"},
+    {"bms": Daren485, "baud": 19200, "address": b"\x01"},
+    {"bms": Ecs, "baud": 19200},
+    {"bms": EG4_Lifepower, "baud": 9600, "address": b"\x01"},
+    {"bms": EG4_LL, "baud": 9600, "address": b"\x01"},
+    {"bms": Felicity, "baud": 9600, "address": b"\x01"},
+    {"bms": HeltecModbus, "baud": 9600, "address": b"\x01"},
+    {"bms": HLPdataBMS4S, "baud": 9600},
+    {"bms": Jkbms, "baud": 115200},
+    {"bms": Jkbms_pb, "baud": 115200, "address": b"\x01"},
+    {"bms": LltJbd, "baud": 9600, "address": b"\x00"},
+    {"bms": Renogy, "baud": 9600, "address": b"\x30"},
+    {"bms": Renogy, "baud": 9600, "address": b"\xF7"},
+    {"bms": Seplos, "baud": 19200, "address": b"\x00"},
+    {"bms": Seplosv3, "baud": 19200},
+]
 
 #########################################
 ##class
 class uni_bms:
 
     def init_bms_types(self):
-        self.supported_bms_types = [
-        {"bms": Daly, "baud": 9600, "address": b"\x40"},
-        {"bms": Daly, "baud": 9600, "address": b"\x80"},
-        {"bms": Daren485, "baud": 19200, "address": b"\x01"},
-        {"bms": Ecs, "baud": 19200},
-        {"bms": EG4_Lifepower, "baud": 9600, "address": b"\x01"},
-        {"bms": EG4_LL, "baud": 9600, "address": b"\x01"},
-        {"bms": HeltecModbus, "baud": 9600, "address": b"\x01"},
-        {"bms": HLPdataBMS4S, "baud": 9600},
-        {"bms": Jkbms, "baud": 115200},
-        {"bms": Jkbms_pb, "baud": 115200, "address": b"\x01"},
-        {"bms": LltJbd, "baud": 9600},
-        {"bms": Renogy, "baud": 9600, "address": b"\x30"},
-        {"bms": Renogy, "baud": 9600, "address": b"\xF7"},
-        {"bms": Seplos, "baud": 19200, "address": b"\x00"},
-        {"bms": Seplosv3, "baud": 19200},
-        ]
+        self.supported_bms_types = supported_bms_types
 
         # enabled only if explicitly set in config under "BMS_TYPE"
-        if "ANT" in utils.BMS_TYPE:
+        if "ANT" in BMS_TYPE:
             self.supported_bms_types.append({"bms": ANT, "baud": 19200})
-        if "MNB" in utils.BMS_TYPE:
+        if "MNB" in BMS_TYPE:
             self.supported_bms_types.append({"bms": MNB, "baud": 9600})
-        if "Sinowealth" in utils.BMS_TYPE:
+        if "Sinowealth" in BMS_TYPE:
             self.supported_bms_types.append({"bms": Sinowealth, "baud": 9600})
 
-        self.expected_bms_types = [
-            battery_type
-            for battery_type in self.supported_bms_types
-            if battery_type["bms"].__name__ in utils.BMS_TYPE or len(utils.BMS_TYPE) == 0
-        ]
+        self.expected_bms_types = [battery_type for battery_type in self.supported_bms_types if battery_type["bms"].__name__ in BMS_TYPE or len(BMS_TYPE) == 0]
 
-    def __init__(self, devpath, driverOption, loglevel):
+    def __init__(self, devpath, driverOption, devadr, loglevel):
         #init with default
         self.init_bms_types()
         self.devpath  = "/dev/ttyUSB0" #just try if is is the common devpath
         self.loglevel = 20             #just use info as default
         self.driveroption = driverOption
+        self.devadr = devadr
         
         if devpath  != "": self.devpath    = devpath
         if loglevel != "": self.loglevel   = loglevel
@@ -159,9 +178,9 @@ class uni_bms:
 
     def bms_open(self):
         logging.info("open serial interface")
-		# check if utils.BMS_TYPE is not empty and all BMS types in the list are supported
-        if len(utils.BMS_TYPE) > 0:
-            for bms_type in utils.BMS_TYPE:
+		# check if BMS_TYPE is not empty and all BMS types in the list are supported
+        if len(BMS_TYPE) > 0:
+            for bms_type in BMS_TYPE:
                 if bms_type not in [bms["bms"].__name__ for bms in self.supported_bms_types]:
                     logging.error(
                         f'ERROR >>> BMS type "{bms_type}" is not supported. Supported BMS types are: '
@@ -171,26 +190,33 @@ class uni_bms:
                     raise Exception("BMS DEVICE NOT IN SUPPORTED LIST")
 
 
-        if(self.driveroption != 0):
+        if(self.driveroption != 0): #no autodetect for Bluetooth, CAN and serial
             """
             Import ble classes only, if it's a ble port, else the driver won't start due to missing python modules
             This prevent problems when using the driver only with a serial connection
             """
-            if self.driveroption == 1: #"Jkbms_Ble":
-                # noqa: F401 --> ignore flake "imported but unused" error
-                from bms.jkbms_ble import Jkbms_Ble  # noqa: F401
+            if self.driveroption <= 3: #bluetooth
 
-            if self.driveroption == 2: #"LltJbd_Ble":
-                # noqa: F401 --> ignore flake "imported but unused" error
-                from bms.lltjbd_ble import LltJbd_Ble  # noqa: F401
+                if self.driveroption == 1: #"Jkbms_Ble":
+                    # noqa: F401 --> ignore flake "imported but unused" error
+                    from bms.jkbms_ble import Jkbms_Ble  # noqa: F401
 
-            class_ = eval(self.devpath)
-            testbms = class_("", 9600, "define 2nd arg")
-            if testbms.test_connection():
-                logging.info("Connection established to " + testbms.__class__.__name__)
-                self.battery[0] = testbms
+                if self.driveroption == 2: #"LltJbd_Ble":
+                    # noqa: F401 --> ignore flake "imported but unused" error
+                    from bms.lltjbd_ble import LltJbd_Ble  # noqa: F401
 
-            if self.driveroption == 3: #can interface:
+                if self.driveroption == 3: #"LiTime_Ble":
+                    # noqa: F401 --> ignore flake "imported but unused" error
+                    from bms.litime_ble import LiTime_Ble  # noqa: F401
+
+                class_ = eval(self.devpath)
+                testbms = class_("ble_" + self.devadr.replace(":", "").lower(), 9600, self.devadr)
+
+                if testbms.test_connection():
+                    logging.info("Connection established to " + testbms.__class__.__name__)
+                    self.battery[0] = testbms
+
+            if self.driveroption == 10: #can interface
                 """
                 Import CAN classes only, if it's a can port, else the driver won't start due to missing python modules
                 This prevent problems when using the driver only with a serial connection
@@ -200,23 +226,50 @@ class uni_bms:
 
                 # only try CAN BMS on CAN port
                 self.supported_bms_types = [
-                    {"bms": Daly_Can, "baud": utils.CAN_SPEED},
-                    {"bms": Jkbms_Can, "baud": utils.CAN_SPEED},
+                    {"bms": Daly_Can},
+                    {"bms": Jkbms_Can},
                 ]
 
-            self.expected_bms_types = [
-                battery_type
-                for battery_type in self.supported_bms_types
-                if battery_type["bms"].__name__ in utils.BMS_TYPE
-                or len(utils.BMS_TYPE) == 0
-            ]
+                self.expected_bms_types = [battery_type for battery_type in self.supported_bms_types if battery_type["bms"].__name__ in BMS_TYPE or len(BMS_TYPE) == 0]
 
-            self.battery[0] = self.get_battery(self.devpath)
+                # start the corresponding CanReceiverThread if BMS for this type found
+                from utils_can import CanReceiverThread
 
-        else:
-            # check if MODBUS_ADDRESSES is not empty
-            if utils.MODBUS_ADDRESSES:
-                for address in utils.MODBUS_ADDRESSES:
+                try:
+                    can_thread = CanReceiverThread.get_instance(bustype="socketcan", channel=self.devpath)
+                except Exception as e:
+                    print(f"Error: {e}")
+
+                logging.debug("Wait shortly to make sure that all needed data is in the cache")
+                # Slowest message cycle trasmission is every 1 second, wait a bit more for the fist time to fetch all needed data
+                sleep(2)
+
+                # check if BATTERY_ADDRESSES is not empty
+                if BATTERY_ADDRESSES:
+                    logging.info(">>> CAN multi device mode")
+                    for address in BATTERY_ADDRESSES:
+                        checkbatt = self.get_battery(self.devpath, address, can_thread.get_message_cache)
+                        if checkbatt is not None:
+                            self.battery[address] = checkbatt
+                            logging.info("Successful battery connection at " + self.devpath + " and this device address " + str(address))
+                        else:
+                            logging.warning("No battery connection at " + self.devpath + " and this device address " + str(address))
+                # use default address
+                else:
+                    self.battery[0] = self.get_battery(self.devpath, None, can_thread.get_message_cache)
+
+
+        else: #Serial, modbus, ...
+            # check if BMS_TYPE is not empty and all BMS types in the list are supported
+            #self.check_bms_types(supported_bms_types, "serial")
+
+            # wait some seconds to be sure that the serial connection is ready
+            # else the error throw a lot of timeouts
+            sleep(1)
+
+            # check if BATTERY_ADDRESSES is not empty
+            if BATTERY_ADDRESSES:
+                for address in BATTERY_ADDRESSES:
                     checkbatt = self.get_battery(self.devpath, address)
                     if checkbatt is not None:
                         self.battery[address] = checkbatt
@@ -236,16 +289,9 @@ class uni_bms:
 
         if not battery_found:
             logging.error(
-                "ERROR >>> No battery connection at "
-                + self.devpath
-                + (
-                    " and this Modbus addresses: " + ", ".join(utils.MODBUS_ADDRESSES)
-                    if utils.MODBUS_ADDRESSES
-                    else ""
-                )
+                "ERROR >>> No battery connection at " + self.devpath + (" and this Modbus addresses: " + ", ".join(utils.MODBUS_ADDRESSES) if utils.MODBUS_ADDRESSES else "")
             )
             raise Exception("BMS DEVICE NOT FOUND")
-
 
         for key_address in self.battery:
             self.helper[key_address] = DbusHelper(self.battery[key_address], key_address)
@@ -255,8 +301,37 @@ class uni_bms:
         # self.battery.log_settings()
         return self.BatIds
 
+    def check_bms_types(self, supported_bms_types, type) -> None:
+        """
+        Checks if BMS_TYPE is not empty and all specified BMS types are supported.
 
-    def get_battery(self, _port: str, _modbus_address: hex = None) -> Union[Battery, None]:
+        :param supported_bms_types: List of supported BMS types.
+        :param type: The type of BMS connection (ble, can, or serial).
+        :return: None
+        """
+        # Get only BMS_TYPE that end with "_Ble"
+        if type == "ble":
+            bms_types = [type for type in BMS_TYPE if type.endswith("_Ble")]
+
+        # Get only BMS_TYPE that end with "_Can"
+        if type == "can":
+            bms_types = [type for type in BMS_TYPE if type.endswith("_Can")]
+
+        # Get only BMS_TYPE that do not end with "_Ble" or "_Can"
+        if type == "serial":
+            bms_types = [type for type in BMS_TYPE if not type.endswith("_Ble") and not type.endswith("_Can")]
+
+        if len(bms_types) > 0:
+            for bms_type in bms_types:
+                if bms_type not in [bms["bms"].__name__ for bms in supported_bms_types]:
+                    logger.error(
+                        f'ERROR >>> BMS type "{bms_type}" is not supported. Supported BMS types are: '
+                        + f"{', '.join([bms['bms'].__name__ for bms in supported_bms_types])}"
+                        + "; Disabled by default: ANT, MNB, Sinowealth"
+                    )
+                    raise(None, None, 1)
+
+    def get_battery(self, _port: str, _modbus_address: hex = None, _can_message_cache_callback: callable = None) -> Union[Battery, None]:
         # all the different batteries the driver support and need to test for
         # try to establish communications with the battery 3 times, else exit
         retry = 1
@@ -276,15 +351,13 @@ class uni_bms:
                         _bms_address = None
 
                     logging.info(
-                        "Testing "
-                        + test["bms"].__name__
-                        + (' at address "' + utils.bytearray_to_string(_bms_address) + '"' if _bms_address is not None else "")
+                        "Testing " + test["bms"].__name__ + (' at address "' + utils.bytearray_to_string(_bms_address) + '"' if _bms_address is not None else "")
                     )
                     batteryClass = test["bms"]
-                    baud = test["baud"]
+                    baud = test["baud"] if "baud" in test else None
                     battery: Battery = batteryClass(port=_port, baud=baud, address=_bms_address)
                     if battery.test_connection() and battery.validate_data():
-                        logging.info("Connection established to " + battery.__class__.__name__)
+                        logging.info("-- Connection established to " + battery.__class__.__name__)
                         return battery
                 except KeyboardInterrupt:
                     return None

@@ -27,9 +27,7 @@ class DbusHelper:
             "allow_max_voltage": self.battery.allow_max_voltage,
             "max_voltage_start_time": self.battery.max_voltage_start_time,
             "soc_reset_last_reached": self.battery.soc_reset_last_reached,
-            "soc_calc": (
-                self.battery.soc_calc if self.battery.soc_calc is not None else ""
-            ),
+            "soc_calc": (self.battery.soc_calc if self.battery.soc_calc is not None else ""),
         }
 
     def publish_battery(self, loop):
@@ -61,41 +59,6 @@ class DbusHelper:
 
                 time_since_first_error = self.error["timestamp_last"] - self.error["timestamp_first"]
 
-            '''
-                # if the battery did not update in 10 second, it's assumed to be offline
-                if time_since_first_error >= 10 and self.battery.online:
-                    self.battery.online = False
-
-                # check if the cell voltages are good to go for some minutes
-                if self.cell_voltages_good is None:
-                    self.cell_voltages_good = (
-                        True
-                        if self.battery.get_min_cell_voltage() > utils.BLOCK_ON_DISCONNECT_VOLTAGE_MIN
-                        and self.battery.get_max_cell_voltage() < utils.BLOCK_ON_DISCONNECT_VOLTAGE_MAX
-                        else False
-                    )
-                    logger.info(
-                        f"cell_voltages_good: {self.cell_voltages_good} - "
-                        + f"min: {self.battery.get_min_cell_voltage()} > {utils.BLOCK_ON_DISCONNECT_VOLTAGE_MIN} - "
-                        + f"max: {self.battery.get_max_cell_voltage()} < {utils.BLOCK_ON_DISCONNECT_VOLTAGE_MAX}"
-                    )
-
-                    # reset the battery values
-                    self.battery.init_values()
-
-                    # block charge/discharge
-                    if utils.BLOCK_ON_DISCONNECT:
-                        self.battery.block_because_disconnect = True
-
-            # This is to mannage CVCL
-#            self.battery.manage_charge_voltage()
-
-            # This is to mannage CCL\DCL
-#            self.battery.manage_charge_current()
-
-            # publish all the data from the battery object to dbus
-            # self.publish_dbus()
-            '''
         except Exception:
             traceback.print_exc()
 
@@ -165,10 +128,7 @@ class DbusHelper:
                 exception_type, exception_object, exception_traceback = sys.exc_info()
                 file = exception_traceback.tb_frame.f_code.co_filename
                 line = exception_traceback.tb_lineno
-                logger.error(
-                    "Non blocking exception occurred: "
-                    + f"{repr(exception_object)} of type {exception_type} in {file} line #{line}"
-                )
+                logger.error("Non blocking exception occurred: " + f"{repr(exception_object)} of type {exception_type} in {file} line #{line}")
                 pass
 
                 logger.debug(str(self.battery.current_avg))

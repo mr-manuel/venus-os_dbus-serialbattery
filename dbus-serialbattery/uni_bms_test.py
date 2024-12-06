@@ -66,7 +66,7 @@ if logtoconsole == 1:
     mylogs.addHandler(stream)
 
 
-Ubms = uni_bms(DEVPATH,0,LOGLEVEL)
+Ubms = uni_bms(DEVPATH,0,"",LOGLEVEL)
 Ubms.bms_open()
 sleep(0.5)
 time1 = datetime.datetime.now()
