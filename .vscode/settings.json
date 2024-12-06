@@ -2,9 +2,11 @@
     "[python]": { "editor.formatOnSave": true },
 
     "python.autoComplete.extraPaths": [
-        "etc/dbus-serialbattery/ext/velib_python",
+        "dbus-serialbattery/ext",
+        "dbus-serialbattery/ext/velib_python",
     ],
     "python.analysis.extraPaths": [
-        "etc/dbus-serialbattery/ext/velib_python",
+        "dbus-serialbattery/ext",
+        "dbus-serialbattery/ext/velib_python",
     ]
 }

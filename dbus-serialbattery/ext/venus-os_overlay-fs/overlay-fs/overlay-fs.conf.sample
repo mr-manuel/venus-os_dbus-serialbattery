@@ -1,0 +1,10 @@
+; Specify the absolute path of the directory to be overlayed.
+; NOTE: You can only overlay an entire directory, not individual files.
+; However, you can modify individual files within an overlayed directory.
+;
+; Add a space followed by a comma-separated list of applications that use the specific directory.
+; This prevents the overlay directory from being removed when an application is uninstalled.
+; Example for one app using the path:
+;     /var/www/venus custom-web-app
+; Example for two apps using the same path:
+;     /var/www/venus custom-web-app,custom-css-app

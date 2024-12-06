@@ -2,13 +2,19 @@ name: "CodeChecks"
 
 on:
   push:
+    # Run on all branches
     branches:
-      # include
       - '**'
-
-    # Run on changes in the etc folder
+    # Run on any file change
     paths:
-      - etc/**
+      - '**/*.py'
+  pull_request:
+    # Run on all branches
+    branches:
+      - '**'
+    # Run on any file change
+    paths:
+      - '**/*.py'
 
 jobs:
   analyse:

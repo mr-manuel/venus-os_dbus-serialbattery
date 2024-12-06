@@ -1,0 +1,7 @@
+# AGPLv3 Compliance
+
+We have designed dbus-serialbattery as an Open Source software for the Open Source software community. This requires applications to consider whether their usage of dbus-serialbattery is in compliance with the GNU AGPLv3 [license](https://github.com/mr-manuel/venus-os_dbus-serialbattery/blob/master/LICENSE).
+
+dbus-serialbattery cannot make the determination as to whether your application's usage of dbus-serialbattery is in compliance with the AGPLv3 license requirements. You should instead rely on your own legal counsel or licensing specialists to audit and ensure your application is in compliance with the licenses of dbus-serialbattery and all other open-source projects with which your application integrates or interacts. We understand that AGPLv3 licensing is complex and nuanced. It is for that reason we strongly encourage using experts in licensing to make any such determinations around compliance instead of relying on apocryphal or anecdotal advice.
+
+Commercial licensing is available for applications that cannot comply with AGPLv3 obligations (e.g., open sourcing your application). If you require a commercial license, please contact me by opening an issue on [GitHub](https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues) or via Discord. The Discord link is available on my [GitHub profile](https://github.com/mr-manuel). Applications using dbus-serialbattery or any other OSS-licensed code without validating their usage do so at their own risk.
