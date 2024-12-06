@@ -1,12 +1,8 @@
 ############################################################################
 #    Copyright (C) 2024 by macGH                                           #
 #                                                                          #
-#    This lib is free software; you can redistribute it and/or modify      #
-#    it under the terms of the LGPL                                        #
-#    This program is distributed in the hope that it will be useful,       #
-#    but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
-#    GNU General Public License for more details.                          #
+#    For LICENSE see LICENSE file of                                      #
+#    https://github.com/mr-manuel/venus-os_dbus-serialbattery              #
 #                                                                          #
 ############################################################################
 
