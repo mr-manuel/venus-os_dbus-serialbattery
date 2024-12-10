@@ -1111,7 +1111,7 @@ class DbusHelper:
                         logger.debug(f"Time-to-Go: Use utils.SOC_LOW_WARNING: {time_to_go_soc}")
 
                     # Update TimeToGo item, has to be a positive int since it's used from dbus-systemcalc-py
-                    time_to_go = self.battery.get_timeToSoc(
+                    time_to_go = self.battery.get_time_to_soc(
                         # switch value depending on charging/discharging
                         (time_to_go_soc if self.battery.current_avg < 0 else 100),
                         percent_per_seconds,
@@ -1124,7 +1124,9 @@ class DbusHelper:
                 # Update TimeToSoc items
                 if len(utils.TIME_TO_SOC_POINTS) > 0:
                     for num in utils.TIME_TO_SOC_POINTS:
-                        self._dbusservice["/TimeToSoC/" + str(num)] = self.battery.get_timeToSoc(num, percent_per_seconds) if self.battery.current_avg else None
+                        self._dbusservice["/TimeToSoC/" + str(num)] = (
+                            self.battery.get_time_to_soc(num, percent_per_seconds) if self.battery.current_avg else None
+                        )
 
         except Exception:
             # set error code, to show in the GUI that something is wrong

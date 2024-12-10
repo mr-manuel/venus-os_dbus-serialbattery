@@ -307,7 +307,7 @@ class Battery(ABC):
         # else the BMS turns off the inverter on disconnect
         self.soc_calc_capacity_remain: float = None
         self.soc_calc_capacity_remain_last_time: float = None
-        self.soc_calc_reset_starttime: int = None
+        self.soc_calc_reset_start_time: int = None
         self.soc_calc: float = None  # save soc_calc to preserve on restart
         self.soc: float = None
         self.charge_fet: bool = None
@@ -623,32 +623,32 @@ class Battery(ABC):
                 # check if battery is fully charged
                 if (
                     self.current_calc < utils.SOC_RESET_CURRENT
-                    and self.soc_calc_reset_starttime
+                    and self.soc_calc_reset_start_time
                     # ### only needed, if the SOC should be reset to 100% after the battery was balanced
                     # ### in off grid situations and winter time, this will not always be the case
                     # and (self.max_battery_voltage - utils.VOLTAGE_DROP <= voltage_sum)
                 ):
                     # set soc to 100%, if SOC_RESET_TIME is reached and soc_calc is not rounded 100% anymore
-                    if (int(current_time) - self.soc_calc_reset_starttime) > utils.SOC_RESET_TIME and round(self.soc_calc, 0) != 100:
+                    if (int(current_time) - self.soc_calc_reset_start_time) > utils.SOC_RESET_TIME and round(self.soc_calc, 0) != 100:
                         logger.info("SOC set to 100%")
                         self.soc_calc_capacity_remain = self.capacity
-                        self.soc_calc_reset_starttime = None
+                        self.soc_calc_reset_start_time = None
                 else:
-                    self.soc_calc_reset_starttime = int(current_time)
+                    self.soc_calc_reset_start_time = int(current_time)
 
             # execute checks only if one cell reaches min voltage
             # use lowest cell voltage, since in this case the battery is empty
             # else a unbalanced battery won't reach 0% and the BMS will shut down
             if self.get_min_cell_voltage() <= utils.MIN_CELL_VOLTAGE:
                 # check if battery is still being discharged
-                if self.current_calc < 0 and self.soc_calc_reset_starttime:
+                if self.current_calc < 0 and self.soc_calc_reset_start_time:
                     # set soc to 0%, if SOC_RESET_TIME is reached and soc_calc is not rounded 0% anymore
-                    if (int(current_time) - self.soc_calc_reset_starttime) > utils.SOC_RESET_TIME and round(self.soc_calc, 0) != 0:
+                    if (int(current_time) - self.soc_calc_reset_start_time) > utils.SOC_RESET_TIME and round(self.soc_calc, 0) != 0:
                         logger.info("SOC set to 0%")
                         self.soc_calc_capacity_remain = 0
-                        self.soc_calc_reset_starttime = None
+                        self.soc_calc_reset_start_time = None
                 else:
-                    self.soc_calc_reset_starttime = int(current_time)
+                    self.soc_calc_reset_start_time = int(current_time)
         else:
             # if soc_calc is not available initialize it from the BMS
             if self.soc_calc is None:
@@ -886,7 +886,7 @@ class Battery(ABC):
                 formatted_time = driver_start_time_dt.strftime("%Y.%m.%d %H:%M:%S")
 
                 self.charge_mode_debug = (
-                    f"driver started: {formatted_time} • running since: {self.get_secondsToString(int(time()) - self.driver_start_time)}\n"
+                    f"driver started: {formatted_time} • running since: {self.get_seconds_to_string(int(time()) - self.driver_start_time)}\n"
                     + f"max_battery_voltage: {(self.max_battery_voltage):.2f} V • "
                     + f"control_voltage: {self.control_voltage:.2f} V\n"
                     + f"voltage: {self.voltage:.2f} V • "
@@ -911,8 +911,8 @@ class Battery(ABC):
                         if self.soc_calc_capacity_remain is not None
                         else ""
                     )
-                    + "soc_calc_reset_starttime: "
-                    + (f"{int(current_time - self.soc_calc_reset_starttime)}/{utils.SOC_RESET_TIME}" if self.soc_calc_reset_starttime is not None else "None")
+                    + "soc_calc_reset_start_time: "
+                    + (f"{int(current_time - self.soc_calc_reset_start_time)}/{utils.SOC_RESET_TIME}" if self.soc_calc_reset_start_time is not None else "None")
                 )
 
                 self.charge_mode_debug_float = (
@@ -1050,7 +1050,7 @@ class Battery(ABC):
                 formatted_time = driver_start_time_dt.strftime("%Y.%m.%d %H:%M:%S")
 
                 self.charge_mode_debug = (
-                    f"driver started: {formatted_time} • running since: {self.get_secondsToString(int(time()) - self.driver_start_time)}\n"
+                    f"driver started: {formatted_time} • running since: {self.get_seconds_to_string(int(time()) - self.driver_start_time)}\n"
                     + f"max_battery_voltage: {(self.max_battery_voltage):.2f} V • "
                     + f"control_voltage: {self.control_voltage:.2f} V\n"
                     + f"voltage: {self.voltage:.2f} V • "
@@ -1075,8 +1075,8 @@ class Battery(ABC):
                         if self.soc_calc_capacity_remain is not None
                         else ""
                     )
-                    + "soc_calc_reset_starttime: "
-                    + (f"{int(current_time - self.soc_calc_reset_starttime)}/{utils.SOC_RESET_TIME}" if self.soc_calc_reset_starttime is not None else "None")
+                    + "soc_calc_reset_start_time: "
+                    + (f"{int(current_time - self.soc_calc_reset_start_time)}/{utils.SOC_RESET_TIME}" if self.soc_calc_reset_start_time is not None else "None")
                 )
 
                 self.charge_mode_debug_float = (
@@ -1663,7 +1663,7 @@ class Battery(ABC):
 
         return None
 
-    def get_timeToSoc(self, soc_target: float, percent_per_second: float, only_number: bool = False) -> str:
+    def get_time_to_soc(self, soc_target: float, percent_per_second: float, only_number: bool = False) -> str:
         """
         Calculate the time to reach a specific SoC target.
 
@@ -1698,14 +1698,14 @@ class Battery(ABC):
                 if not only_number and utils.TIME_TO_SOC_VALUE_TYPE & 2:
                     time_to_go_str += " ["
             if not only_number and utils.TIME_TO_SOC_VALUE_TYPE & 2:
-                time_to_go_str += self.get_secondsToString(seconds_to_go)
+                time_to_go_str += self.get_seconds_to_string(seconds_to_go)
 
                 if utils.TIME_TO_SOC_VALUE_TYPE & 1:
                     time_to_go_str += "]"
 
         return time_to_go_str
 
-    def get_secondsToString(self, seconds: int, precision: int = 3) -> str:
+    def get_seconds_to_string(self, seconds: int, precision: int = 3) -> str:
         """
         Transforms seconds to a string in the format: 1d 1h 1m 1s (Victron Style)
 
