@@ -21,6 +21,7 @@
   * Changes to `config.default.ini`: Changed default values for Cell Voltage Current Limitation and Temperature Current Limitation
 
 ### What's Changed
+* Added: Calculation of history values not provided by the battery by @mr-manuel
 * Added: Felicity BMS by @versager
 * Added: JKBMS CAN - Extended protocol with version V2 by @Hooorny and @mr-manuel
 * Added: LiTime BMS by @calledit

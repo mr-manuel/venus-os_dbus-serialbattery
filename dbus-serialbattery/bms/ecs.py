@@ -149,9 +149,6 @@ class Ecs(Battery):
             # if the SOC value is less than 65535 (65.535%). So 50% comes through as #C350 FFFF instead of #C350 0000
             self.soc = (temp_soc if temp_soc < 4294901760 else temp_soc - 4294901760) / 1000
 
-            # self.history.charge_cycles = None
-            self.history.total_ah_drawn = None
-
             self.protection = Protection()
 
             over_voltage = mbdev.read_register(130, 0, 3, True)

@@ -28,6 +28,7 @@ class Protection(object):
     OK = 0
 
     def __init__(self):
+        # current values
         self.high_voltage: int = None
         self.high_cell_voltage: int = None
         self.low_voltage: int = None
@@ -44,97 +45,211 @@ class Protection(object):
         self.high_internal_temp: int = None
         self.fuse_blown: int = None
 
+        # previous values to check if the value has changed
+        self.previous_high_voltage: int = None
+        self.previous_high_cell_voltage: int = None
+        self.previous_low_voltage: int = None
+        self.previous_low_cell_voltage: int = None
+        self.previous_low_soc: int = None
+        self.previous_high_charge_current: int = None
+        self.previous_high_discharge_current: int = None
+        self.previous_cell_imbalance: int = None
+        self.previous_internal_failure: int = None
+        self.previous_high_charge_temp: int = None
+        self.previous_low_charge_temp: int = None
+        self.previous_high_temperature: int = None
+        self.previous_low_temperature: int = None
+        self.previous_high_internal_temp: int = None
+        self.previous_fuse_blown: int = None
+
+    def set_previous(self) -> None:
+        """
+        Set the previous values to the current values.
+
+        :return: None
+        """
+        self.previous_high_voltage = self.high_voltage
+        self.previous_high_cell_voltage = self.high_cell_voltage
+        self.previous_low_voltage = self.low_voltage
+        self.previous_low_cell_voltage = self.low_cell_voltage
+        self.previous_low_soc = self.low_soc
+        self.previous_high_charge_current = self.high_charge_current
+        self.previous_high_discharge_current = self.high_discharge_current
+        self.previous_cell_imbalance = self.cell_imbalance
+        self.previous_internal_failure = self.internal_failure
+        self.previous_high_charge_temp = self.high_charge_temp
+        self.previous_low_charge_temp = self.low_charge_temp
+        self.previous_high_temperature = self.high_temperature
+        self.previous_low_temperature = self.low_temperature
+        self.previous_high_internal_temp = self.high_internal_temp
+        self.previous_fuse_blown = self.fuse_blown
+
 
 class History:
     """
-    This class holds the history data of the battery
+    This class holds the history data of the battery.
     """
 
     def __init__(self):
+        self.exclude_values_to_calculate: list = []
+        """
+        List of values to exclude from calculation, because they are fetched from the BMS.
+        """
+
+        self.clear: int = 0
+        """
+        Clear the history values, if set to 1. Set to 0 after clearing.
+
+        You can set it manually via `dbus-spy --history` to:
+        - 1 to clear all the history values (default)
+        - 2 to clear only the capacity values
+        - 3 to clear only the voltage values
+        - 4 to clear only the time values
+        - 5 to clear only the alarm values
+        - 6 to clear only the temperature values
+        - 7 to clear only the energy values
+        """
+
+        # Discharge information in Ah
+
         self.deepest_discharge: float = None
         """
-        Deepest discharge in Ampere hours
+        Deepest discharge in Ampere hours (lifetime).
+        Overwritten each time the battery discharges deeper.
+        **Should be negative.**
         """
 
         self.last_discharge: float = None
         """
-        Last discharge in Ampere hours
+        Last discharge in Ampere hours until the battery was charged again.
+        **Should be negative.**
         """
 
         self.average_discharge: float = None
         """
-        Average discharge in Ampere hours
-        """
-
-        self.charge_cycles: int = None
-        """
-        Number of charge cycles
-        """
-
-        self.full_discharges: int = None
-        """
-        Number of full discharges
+        Average discharge in Ampere hours.
+        Cumulative Ah drawn divided by total cycles.
+        **Should be negative.**
         """
 
         self.total_ah_drawn: float = None
         """
-        Total Ah drawn (lifetime)
+        Total Ah drawn (lifetime).
+        Cumulative Amp hours drawn from the battery.
+        **Should be negative.**
         """
 
-        self.minimum_voltage: float = None
-        """
-        Minimum voltage in Volts (lifetime)
-        """
+        # Charge
 
-        self.maximum_voltage: float = None
+        self.charge_cycles: int = None
         """
-        Maximum voltage in Volts (lifetime)
-        """
-
-        self.minimum_cell_voltage: float = None
-        """
-        Minimum cell voltage in Volts (lifetime)
-        """
-
-        self.maximum_cell_voltage: float = None
-        """
-        Maximum cell voltage in Volts (lifetime)
+        Number of charge cycles (lifetime).
+        Total Amp hours drawn from the battery divided by the capacity.
         """
 
         self.time_since_last_full_charge: int = None
         """
-        Time since last full charge in seconds
+        Time since last full charge in seconds.
         """
+
+        self.full_discharges: int = None
+        """
+        Number of full discharges (lifetime).
+        Counted when state of charge reaches 0%.
+        """
+
+        # Battery voltage
+
+        self.minimum_voltage: float = None
+        """
+        Minimum voltage in Volts (lifetime).
+        """
+
+        self.maximum_voltage: float = None
+        """
+        Maximum voltage in Volts (lifetime).
+        """
+
+        self.minimum_cell_voltage: float = None
+        """
+        Minimum cell voltage in Volts (lifetime).
+        """
+
+        self.maximum_cell_voltage: float = None
+        """
+        Maximum cell voltage in Volts (lifetime).
+        """
+
+        # Voltage alarms
 
         self.low_voltage_alarms: int = None
         """
-        Number of low voltage alarms
+        Number of low voltage alarms (lifetime).
         """
 
         self.high_voltage_alarms: int = None
         """
-        Number of high voltage alarms
+        Number of high voltage alarms (lifetime).
         """
+
+        # Battery temperature
 
         self.minimum_temperature: float = None
         """
-        Minimum temperature in Celsius (lifetime)
+        Minimum temperature in Celsius (lifetime).
         """
 
         self.maximum_temperature: float = None
         """
-        Maximum temperature in Celsius (lifetime)
+        Maximum temperature in Celsius (lifetime).
         """
+
+        # Energy in kWh
 
         self.discharged_energy: int = None
         """
-        Discharged energy in kilo Watt hours
+        Total discharged energy in Kilowatt-hour (lifetime).
         """
 
         self.charged_energy: int = None
         """
-        Charged energy in kilo Watt hours
+        Total charged energy in Kilowatt-hour.
         """
+
+    def reset_values(self, attributes: list = []) -> None:
+        """
+        Reset all calculated values that are not excluded.
+
+        :param attributes: list of attributes to reset, if empty all attributes are reset
+        :return: None
+        """
+        attributes = (
+            [
+                "deepest_discharge",
+                "last_discharge",
+                "average_discharge",
+                "total_ah_drawn",
+                "charge_cycles",
+                "time_since_last_full_charge",
+                "full_discharges",
+                "minimum_voltage",
+                "maximum_voltage",
+                "minimum_cell_voltage",
+                "maximum_cell_voltage",
+                "low_voltage_alarms",
+                "high_voltage_alarms",
+                "minimum_temperature",
+                "maximum_temperature",
+                "discharged_energy",
+                "charged_energy",
+            ]
+            if not attributes
+            else attributes
+        )
+
+        for attribute in attributes:
+            if attribute not in self.exclude_values_to_calculate:
+                setattr(self, attribute, None)
 
 
 class Cell:
@@ -206,6 +321,7 @@ class Battery(ABC):
 
         self.current_avg: float = None
         self.current_avg_lst: list = []
+        self.previous_current_avg: float = None
         self.current_external: float = None
         self.capacity_remain: float = None
         self.capacity: float = None
@@ -240,6 +356,28 @@ class Battery(ABC):
         self.linear_ccl_last_set: int = 0
         self.linear_dcl_last_set: int = 0
 
+        # Needed for history calculation
+        self.full_discharge_active: bool = False
+        """
+        True if the battery discharged to 0%. Reset to False after reaching at least 15% again.
+        """
+
+        self.full_charge_last_time: int = None
+        """
+        Timestamp of when the battery was fully charged
+        """
+
+        # Calculation of charge
+        self.current_calc_last_time: int = None
+        self.charge_charged: float = 0
+        self.charge_discharged: float = 0
+        self.charge_discharged_last: float = 0
+
+        # Calculation of energy
+        self.power_calc_last_time: int = None
+        self.energy_charged: float = 0
+        self.energy_discharged: float = 0
+
         # list of available callbacks, in order to display the buttons in the GUI
         self.available_callbacks: List[str] = []
 
@@ -248,36 +386,36 @@ class Battery(ABC):
         # https://github.com/victronenergy/veutil/blob/master/src/qt/bms_error.cpp
         self.state: int = 0
         """
-        State to show in the GUI
-        Can block charge/discharge
+        State to show in the GUI.
+        Can block charge/discharge.
         """
 
         self.error_code: Union[int, None] = None
         """
-        Error code to show in the GUI
-        Does not block charge/discharge
+        Error code to show in the GUI.
+        Does not block charge/discharge.
         """
 
         self.error_code_last_reset_check: int = 0
         """
-        Timestamp when it was last checked, if the error could be reset
+        Timestamp when it was last checked, if the error could be reset.
         """
 
         self.error_timestamps: list = []
         """
-        List of timestamps when an error occurred
+        List of timestamps when an error occurred.
         """
 
         self.custom_field: str = None
         """
-        Custom field that the user can define in the BMS settings via the BMS app
+        Custom field that the user can define in the BMS settings via the BMS app.
         """
 
         self.init_values()
 
     def init_values(self) -> None:
         """
-        Used to initialize and reset values, if battery unexpectly disconnects
+        Used to initialize and reset values, if battery unexpectly disconnects.
 
         :return: None
         """
@@ -715,6 +853,7 @@ class Battery(ABC):
                         charge_mode = "Float Transition"
                         # Assume battery SOC ist 100% at this stage
                         self.trigger_soc_reset()
+                        self.full_charge_last_time = int(time())
                     elif self.charge_mode.startswith("Float Transition"):
                         elapsed_time = current_time - self.transition_start_time
                         # Voltage reduction per second
@@ -1513,6 +1652,17 @@ class Battery(ABC):
             return self.capacity * self.soc_calc / 100
         return None
 
+    def get_capacity_consumed(self) -> Union[float, None]:
+        """
+        Get the consumed capacity of the battery.
+
+        :return: The consumed capacity of the battery
+        """
+        if self.capacity is not None and self.get_capacity_remain() is not None:
+            return abs(self.capacity - self.get_capacity_remain()) * -1
+
+        return None
+
     def get_timeToSoc(self, soc_target: float, percent_per_second: float, only_number: bool = False) -> str:
         """
         Calculate the time to reach a specific SoC target.
@@ -1821,6 +1971,20 @@ class Battery(ABC):
         Get the current from the battery.
         If an external current sensor is connected, use that value.
         """
+        current_time = time()
+
+        # Has to be calculated from last measurement until now
+        if self.current_calc is not None and self.current_calc_last_time is not None:
+            # Calculate charge based on the current from last measurement until now
+            charge = self.current_calc / 3600 * (current_time - self.current_calc_last_time)
+
+            # Coloumb count charged charge
+            self.charge_charged += charge if charge > 0 else 0
+
+            # Coloumb count discharged charge
+            self.charge_discharged += charge * -1 if charge < 0 else 0
+            self.charge_discharged_last += charge * -1 if charge < 0 else 0
+
         if self.dbus_external_objects is not None:
             current_external = round(self.dbus_external_objects["Current"].get_value(), 3)
             logger.debug(f"current: {self.current} - current_external: {current_external}")
@@ -1843,6 +2007,7 @@ class Battery(ABC):
                 # use current as it is
                 current = self.current
 
+        self.current_calc_last_time = current_time
         return current
 
     def get_power(self) -> Union[float, None]:
@@ -1977,3 +2142,158 @@ class Battery(ABC):
         This method can be used to implement SOC reset when the battery is assumed to be full
         """
         return False  # return False to indicate that the callback was not handled
+
+    def history_calculate_values(self) -> None:
+        """
+        Calculate missing values based on the history data
+        """
+        if "deepest_discharge" not in self.history.exclude_values_to_calculate and self.get_capacity_consumed() is not None:
+            # Has to be negative
+            if self.history.deepest_discharge is None or self.history.deepest_discharge > self.get_capacity_consumed():
+                self.history.deepest_discharge = self.get_capacity_consumed()
+
+        if "last_discharge" not in self.history.exclude_values_to_calculate:
+            # Has to be negative
+            if self.history.last_discharge is None:
+                self.history.last_discharge = 0
+            elif self.current_avg is not None:
+                if self.current_avg < 0 and self.previous_current_avg is not None and self.previous_current_avg >= 0:
+                    self.charge_discharged_last = 0
+                if self.current_avg <= 0:
+                    self.history.last_discharge = self.charge_discharged_last
+
+        if "full_discharges" not in self.history.exclude_values_to_calculate:
+            if self.history.full_discharges is None:
+                self.history.full_discharges = 0
+            else:
+                if self.soc_calc == 0:
+                    self.history.full_discharges += 1
+                    self.full_discharge_active = True
+
+                if self.full_discharge_active and self.soc_calc > 15:
+                    self.full_discharge_active = False
+
+        if "total_ah_drawn" not in self.history.exclude_values_to_calculate:
+            # Has to be negative
+            if self.history.total_ah_drawn is None:
+                # Check if charge_cycles are already available from BMS
+                if self.history.charge_cycles is not None and self.history.charge_cycles > 0 and self.capacity is not None and self.capacity > 0:
+                    self.history.total_ah_drawn = self.history.charge_cycles * self.capacity * -1
+                else:
+                    self.history.total_ah_drawn = 0
+            elif self.charge_discharged is not None:
+                self.history.total_ah_drawn += self.charge_discharged
+                # reset charge_discharged, since it is already added to the history
+                self.charge_discharged = 0
+
+        if "charge_cycles" not in self.history.exclude_values_to_calculate:
+            if self.history.total_ah_drawn is not None and self.history.total_ah_drawn > 0 and self.capacity is not None and self.capacity > 0:
+                self.history.charge_cycles = self.history.total_ah_drawn / self.capacity
+
+        if "average_discharge" not in self.history.exclude_values_to_calculate:
+            # Has to be negative
+            if self.history.total_ah_drawn is not None and self.history.charge_cycles is not None:
+                self.history.average_discharge = self.history.total_ah_drawn / self.history.charge_cycles
+
+        if "minimum_voltage" not in self.history.exclude_values_to_calculate:
+            if self.history.minimum_voltage is None or self.history.minimum_voltage > self.voltage:
+                self.history.minimum_voltage = self.voltage
+
+        if "maximum_voltage" not in self.history.exclude_values_to_calculate:
+            if self.history.maximum_voltage is None or self.history.maximum_voltage < self.voltage:
+                self.history.maximum_voltage = self.voltage
+
+        if "minimum_cell_voltage" not in self.history.exclude_values_to_calculate and self.get_min_cell_voltage() is not None:
+            if self.history.minimum_cell_voltage is None or self.history.minimum_cell_voltage > self.get_min_cell_voltage():
+                self.history.minimum_cell_voltage = self.get_min_cell_voltage()
+
+        if "maximum_cell_voltage" not in self.history.exclude_values_to_calculate and self.get_max_cell_voltage() is not None:
+            if self.history.maximum_cell_voltage is None or self.history.maximum_cell_voltage < self.get_max_cell_voltage():
+                self.history.maximum_cell_voltage = self.get_max_cell_voltage()
+
+        if "time_since_last_full_charge" not in self.history.exclude_values_to_calculate:
+            if self.full_charge_last_time is not None:
+                self.history.time_since_last_full_charge = int(time()) - self.full_charge_last_time
+
+        if "low_voltage_alarms" not in self.history.exclude_values_to_calculate:
+            if self.history.low_voltage_alarms is None:
+                self.history.low_voltage_alarms = 0
+            elif (self.protection.low_voltage is not None and self.protection.low_voltage > 0 and self.protection.previous_low_voltage == 0) or (
+                self.protection.low_cell_voltage is not None and self.protection.low_cell_voltage > 0 and self.protection.previous_low_cell_voltage == 0
+            ):
+                self.history.low_voltage_alarms += 1
+
+        if "high_voltage_alarms" not in self.history.exclude_values_to_calculate:
+            if self.history.high_voltage_alarms is None:
+                self.history.high_voltage_alarms = 0
+            elif (self.protection.high_voltage is not None and self.protection.high_voltage > 0 and self.protection.previous_high_voltage == 0) or (
+                self.protection.high_cell_voltage is not None and self.protection.high_cell_voltage > 0 and self.protection.previous_high_cell_voltage == 0
+            ):
+                self.history.high_voltage_alarms += 1
+
+        if "minimum_temperature" not in self.history.exclude_values_to_calculate and self.get_min_temp() is not None:
+            if self.history.minimum_temperature is None or self.history.minimum_temperature > self.get_min_temp():
+                self.history.minimum_temperature = self.get_min_temp()
+
+        if "maximum_temperature" not in self.history.exclude_values_to_calculate and self.get_max_temp() is not None:
+            if self.history.maximum_temperature is None or self.history.maximum_temperature < self.get_max_temp():
+                self.history.maximum_temperature = self.get_max_temp()
+
+        if "discharged_energy" not in self.history.exclude_values_to_calculate:
+            if self.history.discharged_energy is None:
+                self.history.discharged_energy = (
+                    utils.FLOAT_CELL_VOLTAGE * self.cell_count * self.capacity * self.history.charge_cycles / 1000
+                    if self.history.charge_cycles is not None
+                    else 0
+                )
+            elif self.energy_discharged is not None:
+                self.history.discharged_energy += self.energy_discharged / 1000
+                # reset energy_discharged, since it is already added to the history
+                self.energy_discharged = 0
+
+        if "charged_energy" not in self.history.exclude_values_to_calculate:
+            if self.history.charged_energy is None:
+                self.history.charged_energy = (
+                    utils.FLOAT_CELL_VOLTAGE * self.cell_count * self.capacity * self.history.charge_cycles / 1000
+                    if self.history.charge_cycles is not None
+                    else 0
+                )
+            elif self.energy_charged is not None:
+                self.history.charged_energy += self.energy_charged / 1000
+                # reset energy_charged, since it is already added to the history
+                self.energy_charged = 0
+
+    def history_reset_callback(self, path: str, value: int) -> bool:
+        """
+        Callback to reset the history values.
+
+        :param path: the path
+        :param value: the value
+        :return: True if successful
+        """
+        reset_mappings = {
+            # Reset all history values
+            1: [],
+            # Reset capacity history values
+            2: ["deepest_discharge", "last_discharge", "charge_cycles", "full_discharges", "total_ah_drawn"],
+            # Reset voltage history values
+            3: ["minimum_voltage", "maximum_voltage", "minimum_cell_voltage", "maximum_cell_voltage"],
+            # Reset time history values
+            4: ["time_since_last_full_charge"],
+            # Reset alarm history values
+            5: ["low_voltage_alarms", "high_voltage_alarms"],
+            # Reset temperature history values
+            6: ["minimum_temperature", "maximum_temperature"],
+            # Reset energy history values
+            7: ["charged_energy", "discharged_energy"],
+        }
+
+        if value in reset_mappings:
+            self.history.reset_values(reset_mappings[value])
+
+        self.history.clear = 0
+
+        if utils.HISTORY_ENABLE:
+            self.history_calculate_values()
+
+        return True

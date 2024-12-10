@@ -16,6 +16,7 @@ class Seplos(Battery):
         self.address = address
         self.type = self.BATTERYTYPE
         self.poll_interval = 5000
+        self.history.exclude_values_to_calculate = ["charge_cycles"]
 
     BATTERYTYPE = "Seplos"
 

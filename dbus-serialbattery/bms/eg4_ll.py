@@ -60,6 +60,7 @@ class EG4_LL(Battery):
         self.command_get_stats = address + b"\x03\x00\x00\x00\x27\x05\xD0"
         # self.command_get_config = b"\x01\x03\x00\x2D\x00\x5B\x94\x38"  # Pulled from PC Client
         self.command_get_config = address + b"\x03\x00\x2D\x00\x5B\x94\x38"
+        self.history.exclude_values_to_calculate = ["charge_cycles"]
 
     # Modbus uses 7C call vs Lifepower 7E, as return values do not correlate to the Lifepower ones if 7E is used.
     # at least on my own BMS.

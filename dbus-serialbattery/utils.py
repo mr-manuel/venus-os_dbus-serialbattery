@@ -14,7 +14,7 @@ import serial
 
 
 # CONSTANTS
-DRIVER_VERSION: str = "2.0.20241203dev"
+DRIVER_VERSION: str = "2.0.20241210dev"
 """
 current version of the driver
 """
@@ -386,6 +386,9 @@ TIME_TO_SOC_POINTS: List[int] = get_list_from_config("DEFAULT", "TIME_TO_SOC_POI
 TIME_TO_SOC_VALUE_TYPE: int = get_int_from_config("DEFAULT", "TIME_TO_SOC_VALUE_TYPE")
 TIME_TO_SOC_RECALCULATE_EVERY: int = max(get_int_from_config("DEFAULT", "TIME_TO_SOC_RECALCULATE_EVERY"), 5)
 TIME_TO_SOC_INC_FROM: bool = get_bool_from_config("DEFAULT", "TIME_TO_SOC_INC_FROM")
+
+# --------- History ---------
+HISTORY_ENABLE: bool = get_bool_from_config("DEFAULT", "HISTORY_ENABLE")
 
 # --------- Additional settings ---------
 BMS_TYPE: List[str] = get_list_from_config("DEFAULT", "BMS_TYPE", str)

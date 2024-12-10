@@ -24,6 +24,7 @@ class Daren485(Battery):
         # to address reflecting the position of the DIP-switches on the unit(s), starting at '01'.
         self.address = address
         self.serial_number = ""
+        self.history.exclude_values_to_calculate = ["charge_cycles", "total_ah_drawn", "charged_energy", "discharged_energy"]
 
     BATTERYTYPE = "Daren485"
 

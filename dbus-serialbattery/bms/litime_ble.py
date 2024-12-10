@@ -16,6 +16,7 @@ class LiTime_Ble(Battery):
         self.type = self.BATTERYTYPE
         self.address = address
         self.poll_interval = 2000
+        self.history.exclude_values_to_calculate = ["charge_cycles", "total_ah_drawn"]
 
     BATTERYTYPE = "LiTime"
 

@@ -14,6 +14,7 @@ class ANT(Battery):
     def __init__(self, port, baud, address):
         super(ANT, self).__init__(port, baud, address)
         self.type = self.BATTERYTYPE
+        self.history.exclude_values_to_calculate = ["charge_cycles", "total_ah_drawn"]
 
     command_general = b"\xDB\xDB\x00\x00\x00\x00"
     # command_capacity_low = b"\x5A\x5A\x1F\x00\x00\x1F"

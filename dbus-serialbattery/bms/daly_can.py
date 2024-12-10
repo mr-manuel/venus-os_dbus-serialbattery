@@ -38,6 +38,7 @@ class Daly_Can(Battery):
         self.device_address = int.from_bytes(address, byteorder="big") if address is not None else 0
         self.error_active = False
         self.last_error_time = 0
+        self.history.exclude_values_to_calculate = ["charge_cycles"]
 
     COMMAND_BASE = "COMMAND_BASE"
     COMMAND_SOC = "COMMAND_SOC"

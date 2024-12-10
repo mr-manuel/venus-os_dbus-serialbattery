@@ -15,6 +15,7 @@ class Jkbms(Battery):
         super(Jkbms, self).__init__(port, baud, address)
         self.type = self.BATTERYTYPE
         self.unique_identifier_tmp = ""
+        self.history.exclude_values_to_calculate = ["charge_cycles"]
 
     BATTERYTYPE = "JKBMS"
     LENGTH_CHECK = 1

@@ -15,6 +15,7 @@ class Sinowealth(Battery):
         super(Sinowealth, self).__init__(port, baud, address)
         self.poll_interval = 2000
         self.type = self.BATTERYTYPE
+        self.history.exclude_values_to_calculate = ["charge_cycles"]
 
     # command bytes [StartFlag=0A][Command byte][response dataLength=2 to 20 bytes][checksum]
     command_base = b"\x0A\x00\x04"

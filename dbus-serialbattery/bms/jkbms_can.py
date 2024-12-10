@@ -23,6 +23,7 @@ class Jkbms_Can(Battery):
         super(Jkbms_Can, self).__init__(port, baud, address)
         self.cell_count = 0
         self.type = self.BATTERYTYPE
+        self.history.exclude_values_to_calculate = ["charge_cycles", "total_ah_drawn"]
 
         # If multiple BMS are used simultaneously, the device address can be set via the dip switches on the BMS
         # (default address is 0, all switches down) to change the CAN frame ID sent by the BMS

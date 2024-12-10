@@ -10,6 +10,7 @@ import utils
 from xml.etree import ElementTree
 import requests
 import threading
+import json
 
 # add path to velib_python
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), "ext", "velib_python"))
@@ -60,9 +61,14 @@ class DbusHelper:
         self.save_charge_details_last = {
             "allow_max_voltage": self.battery.allow_max_voltage,
             "max_voltage_start_time": self.battery.max_voltage_start_time,
-            "soc_reset_last_reached": self.battery.soc_reset_last_reached,
             "soc_calc": (self.battery.soc_calc if self.battery.soc_calc is not None else ""),
+            "soc_reset_last_reached": self.battery.soc_reset_last_reached,
+            "history_values": "",
         }
+        self.history_calculated_last_time: int = 0
+        """
+        Last time the history values were calculated.
+        """
         self.telemetry_upload_error_count: int = 0
         self.telemetry_upload_interval: int = 60 * 60 * 24 * 7  # 1 week
         self.telemetry_upload_last: int = 0
@@ -234,6 +240,7 @@ class DbusHelper:
 
                             try:
                                 self.battery.allow_max_voltage = True if int(value["AllowMaxVoltage"]) == 1 else False
+                                logger.debug(f"AllowMaxVoltage read from dbus: {self.battery.allow_max_voltage}")
                             except Exception:
                                 # set error code, to show in the GUI that something is wrong
                                 self.battery.manage_error_code(8)
@@ -248,6 +255,7 @@ class DbusHelper:
                         if "MaxVoltageStartTime" in value and value["MaxVoltageStartTime"] != "":
                             try:
                                 self.battery.max_voltage_start_time = int(value["MaxVoltageStartTime"])
+                                logger.debug(f"MaxVoltageStartTime read from dbus: {self.battery.max_voltage_start_time}")
                             except Exception:
                                 # set error code, to show in the GUI that something is wrong
                                 self.battery.manage_error_code(8)
@@ -273,11 +281,29 @@ class DbusHelper:
                         if "SocResetLastReached" in value and value["SocResetLastReached"] != "":
                             try:
                                 self.battery.soc_reset_last_reached = int(value["SocResetLastReached"])
+                                logger.debug(f"SocResetLastReached read from dbus: {self.battery.soc_reset_last_reached}")
                             except Exception:
                                 # set error code, to show in the GUI that something is wrong
                                 self.battery.manage_error_code(8)
 
                                 logger.error("SocResetLastReached could not be converted to type int: " + str(value["SocResetLastReached"]))
+
+                        # check if the battery has HistoryValues set
+                        if "HistoryValues" in value and value["HistoryValues"] != "":
+                            try:
+                                history_values = json.loads(value["HistoryValues"])
+                                logger.debug(f"HistoryValues read from dbus: {history_values}")
+                                for key in history_values:
+                                    setattr(self.battery.history, key, float(history_values[key]))
+                                    # Restore value after driver restart
+                                    if key == "last_discharge":
+                                        self.battery.charge_discharged_last = float(history_values[key])
+
+                            except Exception:
+                                # set error code, to show in the GUI that something is wrong
+                                self.battery.manage_error_code(8)
+
+                                logger.error("HistoryValues could not be converted from json: " + str(value["HistoryValues"]))
 
                     # check the last seen time and remove the battery it it was not seen for 30 days
                     elif "LastSeen" in value and int(value["LastSeen"]) < int(time()) - (60 * 60 * 24 * 30):
@@ -294,6 +320,7 @@ class DbusHelper:
                                 "MaxVoltageStartTime",
                                 "SocCalc",
                                 "SocResetLastReached",
+                                "HistoryValues",
                                 "UniqueIdentifier",
                             ],
                         )
@@ -369,6 +396,12 @@ class DbusHelper:
             "SocResetLastReached": [
                 self.path_battery + "/SocResetLastReached",
                 self.battery.soc_reset_last_reached,
+                0,
+                0,
+            ],
+            "HistoryValues": [
+                self.path_battery + "/HistoryValues",
+                "",
                 0,
                 0,
             ],
@@ -613,6 +646,8 @@ class DbusHelper:
         self._dbusservice.add_path("/History/MaximumTemperature", None, writeable=True)
         self._dbusservice.add_path("/History/DischargedEnergy", None, writeable=True)
         self._dbusservice.add_path("/History/ChargedEnergy", None, writeable=True)
+        self._dbusservice.add_path("/History/Clear", self.battery.history.clear, writeable=True, onchangecallback=self.battery.history_reset_callback)
+        self._dbusservice.add_path("/History/CanBeCleared", 1, writeable=True)
 
         self._dbusservice.add_path("/Balancing", None, writeable=True)
         self._dbusservice.add_path("/Io/AllowToCharge", 0, writeable=True)
@@ -698,6 +733,8 @@ class DbusHelper:
         logger.debug(f"Publish config values: {utils.PUBLISH_CONFIG_VALUES}")
         if utils.PUBLISH_CONFIG_VALUES:
             publish_config_variables(self._dbusservice)
+
+        self._dbusservice.add_path("/Settings/HasTemperature", 1, writeable=True)
 
         if self.battery.has_settings:
             self._dbusservice.add_path("/Settings/HasSettings", 1, writeable=False)
@@ -862,11 +899,7 @@ class DbusHelper:
         self._dbusservice["/Dc/0/Power"] = round(self.battery.power_calc, 2) if self.battery.power_calc is not None else None
         self._dbusservice["/Dc/0/Temperature"] = self.battery.get_temp()
         self._dbusservice["/Capacity"] = self.battery.get_capacity_remain()
-        self._dbusservice["/ConsumedAmphours"] = (
-            abs(self.battery.capacity - self.battery.get_capacity_remain()) * -1
-            if self.battery.capacity is not None and self.battery.get_capacity_remain() is not None
-            else None
-        )
+        self._dbusservice["/ConsumedAmphours"] = self.battery.get_capacity_consumed()
 
         midpoint, deviation = self.battery.get_midvoltage()
         if midpoint is not None:
@@ -897,8 +930,11 @@ class DbusHelper:
         self._dbusservice["/History/TimeSinceLastFullCharge"] = self.battery.history.time_since_last_full_charge
         self._dbusservice["/History/LowVoltageAlarms"] = self.battery.history.low_voltage_alarms
         self._dbusservice["/History/HighVoltageAlarms"] = self.battery.history.high_voltage_alarms
+        self._dbusservice["/History/MinimumTemperature"] = self.battery.history.minimum_temperature
+        self._dbusservice["/History/MaximumTemperature"] = self.battery.history.maximum_temperature
         self._dbusservice["/History/DischargedEnergy"] = self.battery.history.discharged_energy
         self._dbusservice["/History/ChargedEnergy"] = self.battery.history.charged_energy
+        self._dbusservice["/History/Clear"] = self.battery.history.clear
 
         self._dbusservice["/Io/AllowToCharge"] = 1 if self.battery.get_allow_to_charge() else 0
         self._dbusservice["/Io/AllowToDischarge"] = 1 if self.battery.get_allow_to_discharge() else 0
@@ -946,6 +982,7 @@ class DbusHelper:
         self._dbusservice["/Balancing"] = self.battery.get_balancing()
 
         # Update the alarms
+        self.battery.protection.set_previous()
         self._dbusservice["/Alarms/LowVoltage"] = self.battery.protection.low_voltage
         self._dbusservice["/Alarms/LowCellVoltage"] = self.battery.protection.low_cell_voltage
         # disable high voltage warning temporarly, if loading to bulk voltage and bulk voltage reached is 30 minutes ago
@@ -1000,6 +1037,7 @@ class DbusHelper:
                 logger.error("Non blocking exception occurred: " + f"{repr(exception_object)} of type {exception_type} in {file} line #{line}")
 
         # Calculate average current for the last 300 cycles
+        self.battery.previous_current_avg = self.battery.current_avg
         if self.battery.current_calc is not None:
             self.battery.current_avg_lst.append(self.battery.current_calc)
             # delete oldest value
@@ -1096,6 +1134,11 @@ class DbusHelper:
             file = exception_traceback.tb_frame.f_code.co_filename
             line = exception_traceback.tb_lineno
             logger.error("Non blocking exception occurred: " + f"{repr(exception_object)} of type {exception_type} in {file} line #{line}")
+
+        # calculate history values every 60 seconds
+        if utils.HISTORY_ENABLE and int(time()) - self.history_calculated_last_time > 60:
+            self.battery.history_calculate_values()
+            self.history_calculated_last_time = int(time())
 
         # save settings every 15 seconds to dbus
         if int(time()) % 15:
@@ -1332,6 +1375,32 @@ class DbusHelper:
                 + f"after {self.battery.soc_reset_last_reached}",
             )
             self.save_charge_details_last["soc_reset_last_reached"] = self.battery.soc_reset_last_reached
+
+        # copy history values
+        history_values_dict = self.battery.history.__dict__.copy()
+        # remove values that should not be saved
+        history_remove_values = self.battery.history.exclude_values_to_calculate + ["exclude_values_to_calculate"]
+        # remove keys that should not be saved
+        for key in history_remove_values:
+            history_values_dict.pop(key, None)
+        # remove keys with None values
+        keys_to_remove = [key for key, value in history_values_dict.items() if value is None]
+        for key in keys_to_remove:
+            history_values_dict.pop(key)
+
+        history_values = json.dumps(history_values_dict)
+        if history_values != self.save_charge_details_last["history_values"]:
+            result = result and self.set_settings(
+                get_bus(),
+                "com.victronenergy.settings",
+                self.path_battery,
+                "HistoryValues",
+                history_values,
+            )
+            logger.debug(
+                f"Saved HistoryValues. Before {self.save_charge_details_last['history_values']}, after {history_values}",
+            )
+            self.save_charge_details_last["history_values"] = history_values
 
         return result
 
