@@ -34,7 +34,7 @@ class Revov(Battery):
         self.cell_max_no = None
         self.cell_count = 16
         self.cells = []
-        self.history.charge_cycles = None
+        self.history.exclude_values_to_calculate = ["charge_cycles"]
 
     BATTERYTYPE = "Revov"
     LENGTH_CHECK = 0

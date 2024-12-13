@@ -19,6 +19,7 @@ class Jkbms_pb(Battery):
         self.command_status = b"\x10\x16\x20\x00\x01\x02\x00\x00"
         self.command_settings = b"\x10\x16\x1E\x00\x01\x02\x00\x00"
         self.command_about = b"\x10\x16\x1C\x00\x01\x02\x00\x00"
+        self.history.exclude_values_to_calculate = ["charge_cycles"]
 
     BATTERYTYPE = "JKBMS PB Model"
     LENGTH_CHECK = 0  # ignored

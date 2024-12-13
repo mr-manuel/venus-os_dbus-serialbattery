@@ -13,7 +13,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from battery import Battery, Cell
 from utils import bytearray_to_string, logger
 from struct import unpack_from
-from typing import Union
 from time import time
 import sys
 
@@ -23,6 +22,7 @@ class Jkbms_Can(Battery):
         super(Jkbms_Can, self).__init__(port, baud, address)
         self.cell_count = 0
         self.type = self.BATTERYTYPE
+        self.history.exclude_values_to_calculate = ["charge_cycles", "total_ah_drawn"]
 
         # If multiple BMS are used simultaneously, the device address can be set via the dip switches on the BMS
         # (default address is 0, all switches down) to change the CAN frame ID sent by the BMS
@@ -30,8 +30,6 @@ class Jkbms_Can(Battery):
         self.last_error_time = 0
         self.error_active = False
         self.protocol_version = None
-        self.v1_max_cell_nr = None
-        self.v1_min_cell_nr = None
 
     BATTERYTYPE = "JKBMS CAN"
 
@@ -248,10 +246,10 @@ class Jkbms_Can(Battery):
             # Frame is send every 100ms
             elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT]:
                 v1_max_cell_volt = unpack_from("<H", bytes([data[0], data[1]]))[0] / 1000
-                self.v1_max_cell_nr = unpack_from("<B", bytes([data[2]]))[0]
+                v1_max_cell_nr = unpack_from("<B", bytes([data[2]]))[0]
 
                 v1_min_cell_volt = unpack_from("<H", bytes([data[3], data[4]]))[0] / 1000
-                self.v1_min_cell_nr = unpack_from("<B", bytes([data[5]]))[0]
+                v1_min_cell_nr = unpack_from("<B", bytes([data[5]]))[0]
 
                 # logger.info(f"Min cell: {self.min_cell_nr} {min_cell_volt} - Max cell: {self.max_cell_nr} {max_cell_volt}")
 
@@ -347,16 +345,22 @@ class Jkbms_Can(Battery):
         # fetch data from min/max values if protocol is JKBMS CAN V1 (extra frames missing)
         if data_check < 128:
 
+            cell_mean_voltage = (v1_max_cell_volt + v1_min_cell_volt) / 2
+
             if self.cell_count == 0:
-                self.cell_count = 2
+                # calculate cell count based on the voltage and min/max cell voltage
+                self.cell_count = int(round((self.voltage / cell_mean_voltage), 0))
                 self.cells = [Cell(False) for _ in range(self.cell_count)]
 
             if self.cell_count == len(self.cells):
-                self.cells[1].voltage = v1_max_cell_volt
-                # self.cells[1].balance = True
+                self.cells[v1_max_cell_nr - 1].voltage = v1_max_cell_volt
 
-                self.cells[0].voltage = v1_min_cell_volt
-                # self.cells[0].balance = True
+                self.cells[v1_min_cell_nr - 1].voltage = v1_min_cell_volt
+
+                # loop through all cells and set the mean voltage, if the cell is not the max or min cell
+                for i in range(self.cell_count):
+                    if i != v1_max_cell_nr and i != v1_min_cell_nr:
+                        self.cells[i].voltage = round(cell_mean_voltage, 3)
 
                 self.to_temp(1, v1_temperatures[0] if v1_temperatures[0] <= 100 else 100)
                 self.to_temp(2, v1_temperatures[1] if v1_temperatures[1] <= 100 else 100)
@@ -379,27 +383,3 @@ class Jkbms_Can(Battery):
             return False
 
         return True
-
-    def get_min_cell_desc(self) -> Union[str, None]:
-        """
-        Get the description of the cell with the lowest voltage.
-
-        :return: The description of the cell with the lowest voltage
-        """
-        if self.protocol_version == 1:
-            return f"C{self.v1_min_cell_nr}" if self.v1_min_cell_nr is not None else ""
-
-        cell_no = self.get_min_cell()
-        return cell_no if cell_no is None else "C" + str(cell_no + 1)
-
-    def get_max_cell_desc(self) -> Union[str, None]:
-        """
-        Get the description of the cell with the highest voltage.
-
-        :return: The description of the cell with the highest voltage
-        """
-        if self.protocol_version == 1:
-            return f"C{self.v1_max_cell_nr}" if self.v1_max_cell_nr is not None else ""
-
-        cell_no = self.get_max_cell()
-        return cell_no if cell_no is None else "C" + str(cell_no + 1)

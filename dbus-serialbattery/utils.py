@@ -14,7 +14,7 @@ import serial
 
 
 # CONSTANTS
-DRIVER_VERSION: str = "2.0.20241203dev"
+DRIVER_VERSION: str = "2.0.20241211dev"
 """
 current version of the driver
 """
@@ -186,14 +186,14 @@ if SOC_RESET_AFTER_DAYS and SOC_RESET_VOLTAGE < MAX_CELL_VOLTAGE:
 
 # --------- SoC Calculation ---------
 SOC_CALCULATION: bool = get_bool_from_config("DEFAULT", "SOC_CALCULATION")
-SOC_RESET_CURRENT: float = get_float_from_config("DEFAULT", "SOC_RESET_CURRENT")
-SOC_RESET_TIME: int = get_int_from_config("DEFAULT", "SOC_RESET_TIME")
-SOC_CALC_CURRENT_REPORTED_BY_BMS: list = get_list_from_config("DEFAULT", "SOC_CALC_CURRENT_REPORTED_BY_BMS", float)
-SOC_CALC_CURRENT_MEASURED_BY_USER: list = get_list_from_config("DEFAULT", "SOC_CALC_CURRENT_MEASURED_BY_USER", float)
+
+# --------- Current correction --------
+CURRENT_REPORTED_BY_BMS: list = get_list_from_config("DEFAULT", "CURRENT_REPORTED_BY_BMS", float)
+CURRENT_MEASURED_BY_USER: list = get_list_from_config("DEFAULT", "CURRENT_MEASURED_BY_USER", float)
 
 # check if lists are different
 # this allows to calculate linear relationship between the two lists only if needed
-SOC_CALC_CURRENT: bool = SOC_CALC_CURRENT_REPORTED_BY_BMS != SOC_CALC_CURRENT_MEASURED_BY_USER
+CURRENT_CORRECTION: bool = CURRENT_REPORTED_BY_BMS != CURRENT_MEASURED_BY_USER
 
 
 # --------- Daisy Chain Configuration (Multiple BMS on one cable) ---------
@@ -386,6 +386,9 @@ TIME_TO_SOC_POINTS: List[int] = get_list_from_config("DEFAULT", "TIME_TO_SOC_POI
 TIME_TO_SOC_VALUE_TYPE: int = get_int_from_config("DEFAULT", "TIME_TO_SOC_VALUE_TYPE")
 TIME_TO_SOC_RECALCULATE_EVERY: int = max(get_int_from_config("DEFAULT", "TIME_TO_SOC_RECALCULATE_EVERY"), 5)
 TIME_TO_SOC_INC_FROM: bool = get_bool_from_config("DEFAULT", "TIME_TO_SOC_INC_FROM")
+
+# --------- History ---------
+HISTORY_ENABLE: bool = get_bool_from_config("DEFAULT", "HISTORY_ENABLE")
 
 # --------- Additional settings ---------
 BMS_TYPE: List[str] = get_list_from_config("DEFAULT", "BMS_TYPE", str)

@@ -430,6 +430,9 @@ def main():
             )
             exit_driver(None, None, 1)
 
+        # Calculate the initial values for the battery
+        battery[key_address].set_calculated_data()
+
     # get first key from battery dict
     first_key = list(battery.keys())[0]
 

@@ -28,6 +28,7 @@ class Seplosv3(Battery):
         else:
             self.slaveaddress: int = 0
             self.slaveaddresses = list(range(16))
+        self.history.exclude_values_to_calculate = ["charge_cycles", "total_ah_drawn"]
 
     @staticmethod
     def to_signed_int(value: int) -> int:

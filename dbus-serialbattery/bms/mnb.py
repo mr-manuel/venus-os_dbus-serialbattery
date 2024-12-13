@@ -76,6 +76,7 @@ class MNB(Battery):
         self.temp3 = None
         self.temp4 = None
         self.cells = []
+        self.history.exclude_values_to_calculate = ["charge_cycles"]
 
     BATTERYTYPE = "MNB-Li SPI"
 

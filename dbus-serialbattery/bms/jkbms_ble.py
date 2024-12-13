@@ -27,6 +27,7 @@ class Jkbms_Ble(Battery):
         self.type = self.BATTERYTYPE
         self.jk = Jkbms_Brn(address, lambda: self.reset_bluetooth())
         self.unique_identifier_tmp = ""
+        self.history.exclude_values_to_calculate = ["charge_cycles"]
 
         logger.info("Init of Jkbms_Ble at " + address)
 

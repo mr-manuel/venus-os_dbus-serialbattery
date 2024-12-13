@@ -20,6 +20,7 @@ class EG4_Lifepower(Battery):
         self.command_general = b"\x7E" + address + b"\x01\x00" + self.get_command_general_part() + b"\x0D"
         self.command_hardware_version = b"\x7E" + address + b"\x42\x00\xFC\x0D"
         self.command_firmware_version = b"\x7E" + address + b"\x33\x00" + self.get_command_general_part() + b"\x0D"
+        self.history.exclude_values_to_calculate = ["charge_cycles"]
 
     balancing = 0
     BATTERYTYPE = "EG4 Lifepower"

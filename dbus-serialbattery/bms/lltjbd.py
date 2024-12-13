@@ -254,6 +254,7 @@ class LltJbd(Battery):
             "force_discharging_off_callback",
             "turn_balancing_off_callback",
         ]
+        self.history.exclude_values_to_calculate = ["charge_cycles"]
 
     BATTERYTYPE = "LLT/JBD"
     LENGTH_CHECK = 6

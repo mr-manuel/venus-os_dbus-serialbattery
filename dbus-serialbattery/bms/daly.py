@@ -45,6 +45,7 @@ class Daly(Battery):
             "force_charging_off_callback",
             "force_discharging_off_callback",
         ]
+        self.history.exclude_values_to_calculate = ["charge_cycles"]
 
     # command bytes [StartFlag=A5][Address=40][Command=94][DataLength=8][8x fill bytes][checksum]
     # use 0xAA (or 0x55) as fill bytes to allow the daly's "weak" uart to sync better
