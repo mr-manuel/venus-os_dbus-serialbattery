@@ -6,20 +6,21 @@
 # Reading bms via uni-bms lib
 
 # macGH 20.08.2024  Version 0.1.0
+# macGH 13.12.2024  Version 0.1.1 update for standalone_serialbattery naming
 
 import sys
 import signal
 import atexit
 import datetime
 from time import sleep
-import standalone_serialbattery
+from standalone_serialbattery import *
 import logging
 
 
 # "" = default = "/dev/ttyUSB0"
 # if you have another device specify here
-DEVPATH = "/dev/ttyAMA0"  # with Waveshare CAN/RS485 HAT
-# DEVPATH = "/dev/ttyUSB0"
+#DEVPATH = "/dev/ttyAMA0"  # with Waveshare CAN/RS485 HAT
+DEVPATH = "/dev/ttyUSB0"
 USEDIDADR = 1
 
 # Enter Loglevel 0,10,20,30,40,50
@@ -32,7 +33,7 @@ USEDIDADR = 1
 LOGLEVEL = 20
 logtofile = 0
 logtoconsole = 1
-logpath = "jkbms.log"
+logpath = "bmslog.log"
 
 ##################################################################
 ##################################################################
@@ -40,12 +41,10 @@ logpath = "jkbms.log"
 
 def on_exit():
     print("CLEAN UP ...")
-    Ubms.bms_close()
-
+    sasb.bms_close()
 
 def handle_exit(signum, frame):
     sys.exit(0)
-
 
 # ### Main
 atexit.register(on_exit)
@@ -70,25 +69,25 @@ if logtoconsole == 1:
     mylogs.addHandler(stream)
 
 
-Ubms = standalone_serialbattery(DEVPATH, 0, "", LOGLEVEL)
-Ubms.bms_open()
+sasb = standalone_serialbattery(DEVPATH, 0, "", LOGLEVEL)
+sasb.bms_open()
 sleep(0.5)
 time1 = datetime.datetime.now()
-ST = Ubms.bms_read()
+ST = sasb.bms_read()
 print("Runtime: " + str((datetime.datetime.now() - time1).total_seconds()))
 
 i = 0
-print("Cellcount: " + str(Ubms.cell_count))
-for i in range(Ubms.cell_count):
-    print("CellVolt" + str(i) + ": " + str(Ubms.cells[i] / 1000))
+print("Cellcount: " + str(sasb.cell_count))
+for i in range(sasb.cell_count):
+    print("CellVolt" + str(i) + ": " + str(sasb.cells[i] / 1000))
 
-print("Temp_Fet : " + str(Ubms.temp_fet))
-print("Temp_1   : " + str(Ubms.temp_1))
-print("temp_2   : " + str(Ubms.temp_2))
-print("BatVolt  : " + str(Ubms.voltage / 100))
-print("Current  : " + str(Ubms.act_current / 100))
-print("SOC      : " + str(Ubms.soc))
-print("WATT     : " + str(int((Ubms.voltage * Ubms.act_current) / 10000)))
+print("Temp_Fet : " + str(sasb.temp_fet))
+print("Temp_1   : " + str(sasb.temp_1))
+print("temp_2   : " + str(sasb.temp_2))
+print("BatVolt  : " + str(sasb.voltage / 100))
+print("Current  : " + str(sasb.act_current / 100))
+print("SOC      : " + str(sasb.soc))
+print("WATT     : " + str(int((sasb.voltage * sasb.act_current) / 10000)))
 sleep(1)
 """
 print("Cellcount: " + str(ST[0]))

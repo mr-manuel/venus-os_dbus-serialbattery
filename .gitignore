@@ -18,3 +18,4 @@ venv.bak/
 .DS_Store
 dbus-serialbattery/config.ini
 venus-data.tar.gz
+*.bak
