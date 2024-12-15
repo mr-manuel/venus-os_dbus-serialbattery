@@ -9,7 +9,18 @@
 * 🚨 The Bluetooth connection is still not stable on some systems. If you want to have a stable connection use the serial connection.
 
 
+## v1.5.20241215
+
+### What's Changed
+
+* Changed: Fixed typo in code that prevent driver from starting, if old battery instances are present by @mr-manuel
+
+
 ## v1.5.20241202
+
+### Known issues
+
+* If you have old battery instances that should be deleted, you see the error `dbus.exceptions.UnknownMethodException: org.freedesktop.DBus.Error.UnknownMethod: Unknown method: remove_settingss is not a valid method of interface com.victronenergy.Settings` in the logs and the driver does not start anymore. Upgrade to `v1.5.20241215` to solve the problem.
 
 ### What's Changed
 

@@ -209,7 +209,7 @@ if [ -d /opt/victronenergy/gui-v2 ]; then
     versionStringToNumber "v3.60~8"
 
     # change files in the destination folder, else the files are "broken" if upgrading to a the newer Venus OS version
-    qmlDir="$pathGuiV2/Victron/VenusOS/pages/settings/devicelist/battery"
+    qmlDir="/opt/victronenergy/gui-v2/Victron/VenusOS/pages/settings/devicelist/battery"
 
     if (( $venusVersionNumber < $versionNumber )); then
         echo -n "Venus OS $(head -n 1 /opt/victronenergy/version) is older than v3.60~8. Fixing class names... "

@@ -1131,7 +1131,7 @@ class DbusHelper:
         # xml_string = iface.Introspect()
         # print(xml_string)
         settings_iface = dbus.Interface(obj, "com.victronenergy.Settings")
-        method = settings_iface.get_dbus_method("remove_settingss")
+        method = settings_iface.get_dbus_method("RemoveSettings")
         try:
             logger.debug(f"Removed setting at {object_path}")
             return True if method(setting_name) == 0 else False
