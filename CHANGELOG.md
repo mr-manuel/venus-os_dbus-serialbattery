@@ -24,6 +24,10 @@
   * Changes to `config.default.ini`: `SOC_CALC_CURRENT_REPORTED_BY_BMS` was replaced by `CURRENT_REPORTED_BY_BMS`
   * Changes to `config.default.ini`: `SOC_CALC_CURRENT_MEASURED_BY_USER` was replaced by `CURRENT_MEASURED_BY_USER`
 
+* Driver version greater or equal to `v2.0.20241217dev`
+  * Changes to `config.default.ini`: `EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE` was replaced by `EXTERNAL_SENSOR_DBUS_DEVICE`
+  * Changes to `config.default.ini`: `EXTERNAL_CURRENT_SENSOR_DBUS_PATH` was replaced by `EXTERNAL_SENSOR_DBUS_PATH_CURRENT`
+
 ### What's Changed
 * Added: Calculation of history values not provided by the battery by @mr-manuel
 * Added: Felicity BMS by @versager
@@ -31,6 +35,7 @@
 * Added: LiTime BMS by @calledit
 * Added: Min/Max lifetime temperature to history class and battery template by @mr-manuel
 * Added: Pace BMS by @KoljaWindeler
+* Added: Possibility to add external sensor for SoC by @mr-manuel
 * Added: Signal handler for clean service restart/shutdown by @mr-manuel
 * Changed: A lot of under the hood optimizations by @mr-manuel
 * Changed: Consumed capacity must be negative values by @mr-manuel
@@ -44,6 +49,8 @@
 * Changed: Refactored driver installation via USB/SD card by @mr-manuel
 * Changed: The driver is now running directly from it's app folder. No need to copy the `config.ini` file anywhere, which means changes are applied by simply restarting the service by @mr-manuel
 * Changed: The root filesystem is not mounted as read-write anymore, since overlay filesystems are used now. This allows to let the core system files untouched and to revert all changes with one command. The changes are now also persistant and do not have to be installed on every Venus OS update again by @mr-manuel
+* Changed: The setting `EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE` was replaced by `EXTERNAL_SENSOR_DBUS_DEVICE` in the `config.default.ini` by @mr-manuel
+* Changed: The setting `EXTERNAL_CURRENT_SENSOR_DBUS_PATH` was replaced by `EXTERNAL_SENSOR_DBUS_PATH_CURRENT` in the `config.default.ini` by @mr-manuel
 * Changed: The setting `MODBUS_ADDRESSES` was replaced by `BATTERY_ADDRESSES` in the `config.default.ini` by @mr-manuel
 * Changed: The setting `SEPLOS_USE_BMS_VALUES` was replaced by `USE_BMS_DVCC_VALUES` in the `config.default.ini` by @mr-manuel
 * Changed: The setting `SOC_CALC_CURRENT_MEASURED_BY_USER` was replaced by `CURRENT_MEASURED_BY_USER` in the `config.default.ini` by @mr-manuel
@@ -54,7 +61,18 @@
 * Removed: The setting `SOC_RESET_TIME` was removed in the `config.default.ini` by @mr-manuel
 
 
+## v1.5.20241215
+
+### What's Changed
+
+* Changed: Fixed typo in code that prevent driver from starting, if old battery instances are present by @mr-manuel
+
+
 ## v1.5.20241202
+
+### Known issues
+
+* If you have old battery instances that should be deleted, you see the error `dbus.exceptions.UnknownMethodException: org.freedesktop.DBus.Error.UnknownMethod: Unknown method: remove_settingss is not a valid method of interface com.victronenergy.Settings` in the logs and the driver does not start anymore. Upgrade to `v1.5.20241215` to solve the problem.
 
 ### What's Changed
 

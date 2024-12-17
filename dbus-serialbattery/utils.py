@@ -14,7 +14,7 @@ import serial
 
 
 # CONSTANTS
-DRIVER_VERSION: str = "2.0.20241211dev"
+DRIVER_VERSION: str = "2.0.20241217dev"
 """
 current version of the driver
 """
@@ -239,9 +239,17 @@ LINEAR_RECALCULATION_EVERY: int = get_int_from_config("DEFAULT", "LINEAR_RECALCU
 LINEAR_RECALCULATION_ON_PERC_CHANGE: int = get_int_from_config("DEFAULT", "LINEAR_RECALCULATION_ON_PERC_CHANGE")
 
 
-# --------- External current sensor ---------
-EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE: Union[str, None] = config["DEFAULT"]["EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE"] or None
-EXTERNAL_CURRENT_SENSOR_DBUS_PATH: Union[str, None] = config["DEFAULT"]["EXTERNAL_CURRENT_SENSOR_DBUS_PATH"] or None
+# --------- External Sensor for Current and/or SoC ---------
+EXTERNAL_SENSOR_DBUS_DEVICE: Union[str, None] = config["DEFAULT"]["EXTERNAL_SENSOR_DBUS_DEVICE"] or None
+EXTERNAL_SENSOR_DBUS_PATH_CURRENT: Union[str, None] = config["DEFAULT"]["EXTERNAL_SENSOR_DBUS_PATH_CURRENT"] or None
+EXTERNAL_SENSOR_DBUS_PATH_SOC: Union[str, None] = config["DEFAULT"]["EXTERNAL_SENSOR_DBUS_PATH_SOC"] or None
+
+
+# Common configuration checks
+check_config_issue(
+    SOC_CALCULATION and EXTERNAL_SENSOR_DBUS_PATH_SOC is not None,
+    "SOC_CALCULATION and EXTERNAL_SENSOR_DBUS_PATH_SOC are both enabled. This will lead to a conflict. Please disable one of them in the configuration.",
+)
 
 
 # --------- Charge Voltage Limitation (affecting CVL) ---------

@@ -18,8 +18,9 @@ from utils import (
     bytearray_to_string,
     DRIVER_VERSION,
     EXCLUDED_DEVICES,
-    EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE,
-    EXTERNAL_CURRENT_SENSOR_DBUS_PATH,
+    EXTERNAL_SENSOR_DBUS_DEVICE,
+    EXTERNAL_SENSOR_DBUS_PATH_CURRENT,
+    EXTERNAL_SENSOR_DBUS_PATH_SOC,
     logger,
     BATTERY_ADDRESSES,
     POLL_INTERVAL,
@@ -464,9 +465,9 @@ def main():
             battery[key_address].error_code = 119
 
     # check, if external current sensor should be used
-    if EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE is not None and EXTERNAL_CURRENT_SENSOR_DBUS_PATH is not None:
+    if EXTERNAL_SENSOR_DBUS_DEVICE is not None and (EXTERNAL_SENSOR_DBUS_PATH_CURRENT is not None or EXTERNAL_SENSOR_DBUS_PATH_SOC is not None):
         for key_address in battery:
-            battery[key_address].setup_external_current_sensor()
+            battery[key_address].setup_external_sensor()
 
     # Run the main loop
     try:

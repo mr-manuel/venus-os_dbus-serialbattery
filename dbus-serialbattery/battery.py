@@ -548,11 +548,6 @@ class Battery(ABC):
 
         :return: None
         """
-        if utils.SOC_CALCULATION:
-            self.soc_calculation()
-        else:
-            self.soc_calc = self.soc
-
         # set min and max battery voltage if cell count is known
         if self.cell_count is not None:
             # set min battery voltage once
@@ -582,24 +577,14 @@ class Battery(ABC):
             self.control_voltage = round(self.max_battery_voltage, 2)
             self.charge_mode = "Keep always max voltage"
 
-    def soc_calculation(self) -> None:
+    def soc_calculation(self) -> float:
         """
-        Calculates the SOC based on the coulomb counting method.
+        Calculates the SoC based on the coulomb counting method.
 
-        :return: None
+        :return: The calculated state of charge
         """
         current_time = time()
 
-        # ### only needed, if the SOC should be reset to 100% after the battery was balanced
-        """
-        voltage_sum = 0
-
-        # calculate battery voltage from cell voltages
-        for i in range(self.cell_count):
-            voltage = self.get_cell_voltage(i)
-            if voltage:
-                voltage_sum += voltage
-        """
         SOC_RESET_TIME = 60
 
         if self.soc_calc_capacity_remain is not None:
@@ -646,7 +631,7 @@ class Battery(ABC):
             self.soc_calc_capacity_remain_last_time = current_time
 
         # calculate the SOC based on remaining capacity
-        self.soc_calc = round(max(min((self.soc_calc_capacity_remain / self.capacity) * 100, 100), 0), 3)
+        return round(max(min((self.soc_calc_capacity_remain / self.capacity) * 100, 100), 0), 3)
 
     def soc_reset_voltage_management(self) -> None:
         """
@@ -1912,18 +1897,17 @@ class Battery(ABC):
 
         return True
 
-    def setup_external_current_sensor(self) -> None:
+    def setup_external_sensor(self) -> None:
         """
-        Setup external current sensor and it's dbus items
+        Setup external sensor and it's dbus items
         """
         # TODO: sometimes it happens that the external sensor disconnects, the system switches to native sensor
         # ans after switching back to the external sensor, the system does not update the current values anymore
+        # Rework and do not use the ve_lib library anymore
         import dbus
         import os
         from dbus.mainloop.glib import DBusGMainLoop
         from vedbus import VeDbusItemImport
-
-        logger.info("Monitoring external current using: " + f"{utils.EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE}{utils.EXTERNAL_CURRENT_SENSOR_DBUS_PATH}")
 
         # setup external dbus paths
         try:
@@ -1936,21 +1920,33 @@ class Battery(ABC):
             dbus_objects = {}
 
             # check if the dbus service is available
-            is_present_in_vebus = utils.EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE in dbus_connection.list_names()
+            is_present_in_vebus = utils.EXTERNAL_SENSOR_DBUS_DEVICE in dbus_connection.list_names()
 
             if is_present_in_vebus:
-                dbus_objects["Current"] = VeDbusItemImport(
-                    dbus_connection,
-                    utils.EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE,
-                    utils.EXTERNAL_CURRENT_SENSOR_DBUS_PATH,
-                )
+
+                if utils.EXTERNAL_SENSOR_DBUS_PATH_CURRENT is not None:
+                    logger.info("Using external sensor for current: " + f"{utils.EXTERNAL_SENSOR_DBUS_DEVICE}{utils.EXTERNAL_SENSOR_DBUS_PATH_CURRENT}")
+                    dbus_objects["Current"] = VeDbusItemImport(
+                        dbus_connection,
+                        utils.EXTERNAL_SENSOR_DBUS_DEVICE,
+                        utils.EXTERNAL_SENSOR_DBUS_PATH_CURRENT,
+                    )
+
+                if utils.EXTERNAL_SENSOR_DBUS_PATH_SOC is not None:
+                    logger.info("Using external sensor for SoC: " + f"{utils.EXTERNAL_SENSOR_DBUS_DEVICE}{utils.EXTERNAL_SENSOR_DBUS_PATH_SOC}")
+                    dbus_objects["SoC"] = VeDbusItemImport(
+                        dbus_connection,
+                        utils.EXTERNAL_SENSOR_DBUS_DEVICE,
+                        utils.EXTERNAL_SENSOR_DBUS_PATH_SOC,
+                    )
 
                 self.dbus_external_objects = dbus_objects
 
         except Exception:
             # set to None to avoid crashing, fallback to battery current
-            utils.EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE = None
-            utils.EXTERNAL_CURRENT_SENSOR_DBUS_PATH = None
+            utils.EXTERNAL_SENSOR_DBUS_DEVICE = None
+            utils.EXTERNAL_SENSOR_DBUS_PATH_CURRENT = None
+            utils.EXTERNAL_SENSOR_DBUS_PATH_SOC = None
             self.dbus_external_objects = None
             (
                 exception_type,
@@ -1964,8 +1960,11 @@ class Battery(ABC):
 
     def get_current(self) -> Union[float, None]:
         """
-        Get the current from the battery.
-        If an external current sensor is connected, use that value.
+        Get the current, either from:
+        - the external sensor
+        - the battery
+
+        :return: The current
         """
         current_time = time()
 
@@ -1981,7 +1980,7 @@ class Battery(ABC):
             self.charge_discharged += charge * -1 if charge < 0 else 0
             self.charge_discharged_last += charge * -1 if charge < 0 else 0
 
-        if self.dbus_external_objects is not None:
+        if self.dbus_external_objects is not None and self.dbus_external_objects["Current"] is not None:
             current_external = round(self.dbus_external_objects["Current"].get_value(), 3)
             logger.debug(f"current: {self.current} - current_external: {current_external}")
             current = current_external
@@ -2030,6 +2029,27 @@ class Battery(ABC):
         self.power_calc_last_time = current_time
         return power
 
+    def get_soc(self) -> Union[float, None]:
+        """
+        Get the state of charge, either from:
+        - the external sensor
+        - the calculated value
+        - the battery
+
+        :return: The state of charge
+        """
+        # get external sensor value
+        if utils.EXTERNAL_SENSOR_DBUS_DEVICE is not None and utils.EXTERNAL_SENSOR_DBUS_PATH_SOC is not None:
+            soc_external = round(self.dbus_external_objects["SoC"].get_value(), 3)
+            logger.debug(f"soc: {self.soc} - soc_external: {soc_external}")
+            return soc_external
+        # get calculated value
+        elif utils.SOC_CALCULATION:
+            return self.soc_calculation()
+        # get value from battery
+        else:
+            return self.soc
+
     def set_calculated_data(self) -> None:
         """
         Execute all calculations and set the calculated data.
@@ -2038,6 +2058,7 @@ class Battery(ABC):
         """
         self.current_calc = self.get_current()
         self.power_calc = self.get_power()
+        self.soc_calc = self.get_soc()
 
     def manage_error_code(self, error_code: int = 8) -> None:
         """
