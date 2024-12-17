@@ -80,6 +80,11 @@ class Renogy(Battery):
         # Set the current limits, populate cell count, etc
         # Return True if success, False for failure
 
+        # Set fet status once, because it is not available from the BMS
+        self.charge_fet = True
+        self.discharge_fet = True
+        # self.balance_fet = True  # BMS does not have a balaner?
+
         return True
 
     def refresh_data(self):

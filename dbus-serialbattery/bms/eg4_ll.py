@@ -127,6 +127,11 @@ class EG4_LL(Battery):
         # self.balancer_voltage = int.from_bytes(config_results[25:27], "big")/1000
         # self.balancer_current_delta = int.from_bytes(config_results[27:29], "big")/1000
 
+        # Set fet status once, because it is not available from the BMS
+        self.charge_fet = True
+        self.discharge_fet = True
+        # self.balance_fet = True  # BMS does not have a balaner?
+
         return True
 
     def refresh_data(self):

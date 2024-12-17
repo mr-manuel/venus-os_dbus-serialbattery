@@ -22,6 +22,10 @@ class EG4_Lifepower(Battery):
         self.command_firmware_version = b"\x7E" + address + b"\x33\x00" + self.get_command_general_part() + b"\x0D"
         self.history.exclude_values_to_calculate = ["charge_cycles"]
 
+        # polling every second seems to create some error messages
+        # change to 2 seconds
+        self.poll_interval = 2000
+
     balancing = 0
     BATTERYTYPE = "EG4 Lifepower"
     LENGTH_CHECK = 5
@@ -117,9 +121,10 @@ class EG4_Lifepower(Battery):
 
             result_2 = True
 
-        # polling every second seems to create some error messages
-        # change to 2 seconds
-        self.poll_interval = 2000
+        # Set fet status once, because it is not available from the BMS
+        self.charge_fet = True
+        self.discharge_fet = True
+        # self.balance_fet = True  # BMS does not have a balaner?
 
         return result or result_2
 
