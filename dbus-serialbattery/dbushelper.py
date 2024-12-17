@@ -951,7 +951,7 @@ class DbusHelper:
         self._dbusservice["/System/MinTemperatureCellId"] = self.battery.get_min_temp_id()
         self._dbusservice["/System/MaxCellTemperature"] = self.battery.get_max_temp()
         self._dbusservice["/System/MaxTemperatureCellId"] = self.battery.get_max_temp_id()
-        self._dbusservice["/System/MOSTemperature"] = self.battery.get_mos_temp()
+        self._dbusservice["/System/MOSTemperature"] = self.battery.temp_mos
         self._dbusservice["/System/Temperature1"] = self.battery.temp1
         self._dbusservice["/System/Temperature1Name"] = utils.TEMP_1_NAME
         self._dbusservice["/System/Temperature2"] = self.battery.temp2

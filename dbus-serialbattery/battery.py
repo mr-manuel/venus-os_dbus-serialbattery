@@ -1861,12 +1861,6 @@ class Battery(ABC):
         except TypeError:
             return None
 
-    def get_mos_temp(self) -> Union[float, None]:
-        if self.temp_mos is not None:
-            return self.temp_mos
-        else:
-            return None
-
     def get_allow_to_charge(self) -> bool:
         return True if self.charge_fet and self.control_allow_charge and self.block_because_disconnect is False else False
 

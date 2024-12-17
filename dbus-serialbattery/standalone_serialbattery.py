@@ -409,7 +409,7 @@ class standalone_serialbattery:
                 Status.append(voltage)
                 self.cells[i] = voltage
 
-            self.temp_fet = self.helper[BatId].battery.get_mos_temp()
+            self.temp_fet = self.helper[BatId].battery.temp_mos
             self.temp_1 = self.helper[BatId].battery.temp1
             self.temp_2 = self.helper[BatId].battery.temp2
             self.temp_3 = self.helper[BatId].battery.temp3

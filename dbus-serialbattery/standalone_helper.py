@@ -82,7 +82,7 @@ class DbusHelper:
         #        logger.debug("online:    " + str(self.battery.online))
         #        logger.debug("mintemp:   " + str(self.battery.get_min_temp()))
         #        logger.debug("maxtemp:   " + str(self.battery.get_max_temp()))
-        logger.debug("mos_temp:  " + str(self.battery.get_mos_temp()))
+        logger.debug("mos_temp:  " + str(self.battery.temp_mos))
         logger.debug("temp1:     " + str(self.battery.temp1))
         logger.debug("temp2:     " + str(self.battery.temp2))
         logger.debug("temp3:     " + str(self.battery.temp3))
