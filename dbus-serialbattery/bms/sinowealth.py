@@ -16,15 +16,16 @@ class Sinowealth(Battery):
         self.poll_interval = 2000
         self.type = self.BATTERYTYPE
         self.history.exclude_values_to_calculate = ["charge_cycles"]
+        self.temperature_sensors = None
 
     # command bytes [StartFlag=0A][Command byte][response dataLength=2 to 20 bytes][checksum]
     command_base = b"\x0A\x00\x04"
     command_cell_base = b"\x01"
     command_total_voltage = b"\x0B"
-    command_temp_ext1 = b"\x0C"
-    command_temp_ext2 = b"\x0D"
-    command_temp_int1 = b"\x0E"
-    command_temp_int2 = b"\x0F"
+    command_temperature_ext1 = b"\x0C"
+    command_temperature_ext2 = b"\x0D"
+    command_temperature_int1 = b"\x0E"
+    command_temperature_int2 = b"\x0F"
     command_current = b"\x10"
     command_capacity = b"\x11"
     command_remaining_capacity = b"\x12"
@@ -128,9 +129,9 @@ class Sinowealth(Battery):
         self.protection.high_voltage = 2 if bool(battery_status[1] & int(1)) else 0  # OV
         self.protection.low_voltage = 2 if bool(battery_status[1] >> 1 & int(1)) else 0  # UV
         self.protection.high_charge_current = 2 if bool(battery_status[1] >> 2 & int(1)) or bool(battery_status[1] >> 3 & int(1)) else 0  # OC (OCC?)| OCD
-        self.protection.high_charge_temp = 2 if bool(battery_status[0] & int(1)) else 0  # OTC
+        self.protection.high_charge_temperature = 2 if bool(battery_status[0] & int(1)) else 0  # OTC
         self.protection.high_temperature = 2 if bool(battery_status[0] >> 1 & int(1)) else 0  # OTD
-        self.protection.low_charge_temp = 2 if bool(battery_status[0] >> 2 & int(1)) else 0  # UTC
+        self.protection.low_charge_temperature = 2 if bool(battery_status[0] >> 2 & int(1)) else 0  # UTC
         self.protection.low_temperature = 2 if bool(battery_status[0] >> 3 & int(1)) else 0  # UTD
         return True
 
@@ -207,9 +208,9 @@ class Sinowealth(Battery):
             logger.error(">>> ERROR: No valid cell count returnd: %u", self.cell_count)
             return False
         logger.debug(">>> INFO: Number of cells: %u", self.cell_count)
-        temp_sens_mask = int(~(1 << 6))
-        self.temp_sensors = 1 if (pack_config_data[1] & temp_sens_mask) else 2  # one means two
-        logger.debug(">>> INFO: Number of temperatur sensors: %u", self.temp_sensors)
+        temperature_sens_mask = int(~(1 << 6))
+        self.temperature_sensors = 1 if (pack_config_data[1] & temperature_sens_mask) else 2  # one means two
+        logger.debug(">>> INFO: Number of temperatur sensors: %u", self.temperature_sensors)
         return True
 
     def read_cell_data(self):
@@ -231,46 +232,46 @@ class Sinowealth(Battery):
         return cell_voltage
 
     def read_temperature_data(self):
-        if self.temp_sensors is None:
+        if self.temperature_sensors is None:
             return False
 
-        temp_ext1_data = self.read_serial_data_sinowealth(self.command_temp_ext1)
-        if temp_ext1_data is False:
+        temperature_ext1_data = self.read_serial_data_sinowealth(self.command_temperature_ext1)
+        if temperature_ext1_data is False:
             return False
 
-        temp_ext1 = unpack_from(">H", temp_ext1_data[:-1])
-        self.to_temp(1, kelvin_to_celsius(temp_ext1[0] / 10))
-        logger.debug(">>> INFO: BMS external temperature 1: %f C", self.temp1)
+        temperature_ext1 = unpack_from(">H", temperature_ext1_data[:-1])
+        self.to_temperature(1, kelvin_to_celsius(temperature_ext1[0] / 10))
+        logger.debug(">>> INFO: BMS external temperature 1: %f C", self.temperature_1)
 
-        if self.temp_sensors == 2:
-            temp_ext2_data = self.read_serial_data_sinowealth(self.command_temp_ext2)
-            if temp_ext2_data is False:
+        if self.temperature_sensors == 2:
+            temperature_ext2_data = self.read_serial_data_sinowealth(self.command_temperature_ext2)
+            if temperature_ext2_data is False:
                 return False
 
-            temp_ext2 = unpack_from(">H", temp_ext2_data[:-1])
-            self.to_temp(2, kelvin_to_celsius(temp_ext2[0] / 10))
-            logger.debug(">>> INFO: BMS external temperature 2: %f C", self.temp2)
+            temperature_ext2 = unpack_from(">H", temperature_ext2_data[:-1])
+            self.to_temperature(2, kelvin_to_celsius(temperature_ext2[0] / 10))
+            logger.debug(">>> INFO: BMS external temperature 2: %f C", self.temperature_2)
 
         # Internal temperature 1 seems to give a logical value
-        temp_int1_data = self.read_serial_data_sinowealth(self.command_temp_int1)
-        if temp_int1_data is False:
+        temperature_int1_data = self.read_serial_data_sinowealth(self.command_temperature_int1)
+        if temperature_int1_data is False:
             return False
 
-        temp_int1 = unpack_from(">H", temp_int1_data[:-1])
+        temperature_int1 = unpack_from(">H", temperature_int1_data[:-1])
         logger.debug(
             ">>> INFO: BMS internal temperature 1: %f C",
-            kelvin_to_celsius(temp_int1[0] / 10),
+            kelvin_to_celsius(temperature_int1[0] / 10),
         )
 
         # Internal temperature 2 seems to give a useless value
-        temp_int2_data = self.read_serial_data_sinowealth(self.command_temp_int2)
-        if temp_int2_data is False:
+        temperature_int2_data = self.read_serial_data_sinowealth(self.command_temperature_int2)
+        if temperature_int2_data is False:
             return False
 
-        temp_int2 = unpack_from(">H", temp_int2_data[:-1])
+        temperature_int2 = unpack_from(">H", temperature_int2_data[:-1])
         logger.debug(
             ">>> INFO: BMS internal temperature 2: %f C",
-            kelvin_to_celsius(temp_int2[0] / 10),
+            kelvin_to_celsius(temperature_int2[0] / 10),
         )
         return True
 

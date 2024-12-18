@@ -25,10 +25,10 @@ class Renogy(Battery):
     # Core data = voltage, temp, current, soc
     command_cell_count = b"\x13\x88\x00\x01"  # Register  5000
     command_cell_voltages = b"\x13\x89\x00\x04"  # Registers 5001-5004
-    command_cell_temps = b"\x13\x9A\x00\x04"  # Registers 5018-5021
+    command_cell_temperatures = b"\x13\x9A\x00\x04"  # Registers 5018-5021
     command_total_voltage = b"\x13\xB3\x00\x01"  # Register  5043
-    command_bms_temp1 = b"\x13\xAD\x00\x01"  # Register  5037
-    command_bms_temp2 = b"\x13\xB0\x00\x01"  # Register  5040
+    command_bms_temperature_1 = b"\x13\xAD\x00\x01"  # Register  5037
+    command_bms_temperature_2 = b"\x13\xB0\x00\x01"  # Register  5040
     command_current = b"\x13\xB2\x00\x01"  # Register  5042 (signed int)
     command_capacity = b"\x13\xB6\x00\x02"  # Registers 5046-5047 (long)
     command_soc = b"\x13\xB2\x00\x04"  # Registers 5042-5045 (amps, volts, soc as long)
@@ -93,7 +93,7 @@ class Renogy(Battery):
         # Return True if success, False for failure
         result = self.read_soc_data()
         result = result and self.read_cell_data()
-        result = result and self.read_temp_data()
+        result = result and self.read_temperature_data()
 
         return result
 
@@ -114,9 +114,6 @@ class Renogy(Battery):
             self.hardware_version = f"{manufacturer} {model_num}"
 
         logger.info(self.hardware_version)
-
-        # TODO: This isn't really accurate I think.
-        self.temp_sensors = 2
 
         if self.cell_count is None:
             cc = self.read_serial_data_renogy(self.command_cell_count)
@@ -159,56 +156,56 @@ class Renogy(Battery):
 
     def read_cell_data(self):
         cell_volt_data = self.read_serial_data_renogy(self.command_cell_voltages)
-        cell_temp_data = self.read_serial_data_renogy(self.command_cell_temps)
+        cell_temperature_data = self.read_serial_data_renogy(self.command_cell_temperatures)
         for c in range(self.cell_count):
             try:
                 cell_volts = unpack_from(">H", cell_volt_data, c * 2)
-                cell_temp = unpack_from(">H", cell_temp_data, c * 2)
+                cell_temperature = unpack_from(">H", cell_temperature_data, c * 2)
                 if len(cell_volts) != 0:
                     self.cells[c].voltage = cell_volts[0] / 10
-                    self.cells[c].temp = cell_temp[0] / 10
+                    self.cells[c].temperature = cell_temperature[0] / 10
             except struct.error:
                 self.cells[c].voltage = 0
         return True
 
     """
-    # Did not found who changed this. "command_env_temp_count" is missing
-    def read_temp_data(self):
+    # Did not found who changed this. "command_env_temperature_count" is missing
+    def read_temperature_data(self):
         # Check to see how many Enviromental Temp Sensors this battery has, it may have none.
-        num_env_temps = self.read_serial_data_renogy(self.command_env_temp_count)
+        num_env_temps = self.read_serial_data_renogy(self.command_env_temperature_count)
         logger.info("Number of Enviromental Sensors = %s", num_env_temps)
 
         if num_env_temps == 0:
             return False
 
         if num_env_temps == 1:
-            temp1 = self.read_serial_data_renogy(self.command_env_temp1)
+            temperature_1 = self.read_serial_data_renogy(self.command_env_temperature_1)
 
-        if temp1 is False:
+        if temperature_1 is False:
             return False
         else:
-            self.temp1 = unpack(">H", temp1)[0] / 10
-            logger.info("temp1 = %s °C", temp1)
+            self.temperature_1 = unpack(">H", temperature_1)[0] / 10
+            logger.info("temperature_1 = %s °C", temperature_1)
 
         if num_env_temps == 2:
-            temp2 = self.read_serial_data_renogy(self.command_env_temp2)
+            temperature_2 = self.read_serial_data_renogy(self.command_env_temperature_2)
 
-        if temp2 is False:
+        if temperature_2 is False:
             return False
         else:
-            self.temp2 = unpack(">H", temp2)[0] / 10
-            logger.info("temp2 = %s °C", temp2)
+            self.temperature_2 = unpack(">H", temperature_2)[0] / 10
+            logger.info("temperature_2 = %s °C", temperature_2)
 
         return True
     """
 
-    def read_temp_data(self):
-        temp1 = self.read_serial_data_renogy(self.command_bms_temp1)
-        temp2 = self.read_serial_data_renogy(self.command_bms_temp2)
-        if temp1 is False:
+    def read_temperature_data(self):
+        temperature_1 = self.read_serial_data_renogy(self.command_bms_temperature_1)
+        temperature_2 = self.read_serial_data_renogy(self.command_bms_temperature_2)
+        if temperature_1 is False:
             return False
-        self.temp1 = unpack(">H", temp1)[0] / 10
-        self.temp2 = unpack(">H", temp2)[0] / 10
+        self.temperature_1 = unpack(">H", temperature_1)[0] / 10
+        self.temperature_2 = unpack(">H", temperature_2)[0] / 10
 
         return True
 

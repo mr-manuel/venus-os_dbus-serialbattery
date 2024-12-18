@@ -176,7 +176,7 @@ class Daly_Can(Battery):
             if normalized_arbitration_id in self.CAN_FRAMES[self.COMMAND_STATUS]:
                 (
                     self.cell_count,
-                    self.temp_sensors,
+                    temperature_sensors,
                     self.charger_connected,
                     self.load_connected,
                     state,
@@ -249,8 +249,8 @@ class Daly_Can(Battery):
                 # store temperatures in a dict to assign the temperature to the correct sensor
                 temperatures = {min_no: (min_temp - self.TEMP_ZERO_CONSTANT), max_no: (max_temp - self.TEMP_ZERO_CONSTANT)}
 
-                self.to_temp(1, temperatures[0])
-                self.to_temp(2, temperatures[1])
+                self.to_temperature(1, temperatures[0])
+                self.to_temperature(2, temperatures[1])
 
             # FET data
             elif normalized_arbitration_id in self.CAN_FRAMES[self.COMMAND_FET]:
@@ -296,21 +296,21 @@ class Daly_Can(Battery):
 
                 if al_temp & 2:
                     # High charge temp - Alarm
-                    self.protection.high_charge_temp = 2
+                    self.protection.high_charge_temperature = 2
                 elif al_temp & 1:
                     # High charge temp - Pre-alarm
-                    self.protection.high_charge_temp = 1
+                    self.protection.high_charge_temperature = 1
                 else:
-                    self.protection.high_charge_temp = 0
+                    self.protection.high_charge_temperature = 0
 
                 if al_temp & 8:
                     # Low charge temp - Alarm
-                    self.protection.low_charge_temp = 2
+                    self.protection.low_charge_temperature = 2
                 elif al_temp & 4:
                     # Low charge temp - Pre-alarm
-                    self.protection.low_charge_temp = 1
+                    self.protection.low_charge_temperature = 1
                 else:
-                    self.protection.low_charge_temp = 0
+                    self.protection.low_charge_temperature = 0
 
                 if al_temp & 32:
                     # High discharge temp - Alarm

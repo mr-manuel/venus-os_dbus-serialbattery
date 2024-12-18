@@ -14,7 +14,7 @@ import serial
 
 
 # CONSTANTS
-DRIVER_VERSION: str = "2.0.20241217dev"
+DRIVER_VERSION: str = "2.0.20241218dev"
 """
 current version of the driver
 """
@@ -408,11 +408,11 @@ Poll interval in milliseconds
 PUBLISH_CONFIG_VALUES: bool = get_bool_from_config("DEFAULT", "PUBLISH_CONFIG_VALUES")
 BATTERY_CELL_DATA_FORMAT: int = get_int_from_config("DEFAULT", "BATTERY_CELL_DATA_FORMAT")
 MIDPOINT_ENABLE: bool = get_bool_from_config("DEFAULT", "MIDPOINT_ENABLE")
-TEMP_BATTERY: int = get_int_from_config("DEFAULT", "TEMP_BATTERY")
-TEMP_1_NAME: str = config["DEFAULT"]["TEMP_1_NAME"]
-TEMP_2_NAME: str = config["DEFAULT"]["TEMP_2_NAME"]
-TEMP_3_NAME: str = config["DEFAULT"]["TEMP_3_NAME"]
-TEMP_4_NAME: str = config["DEFAULT"]["TEMP_4_NAME"]
+TEMPERATURE_SOURCE_BATTERY: int = get_int_from_config("DEFAULT", "TEMPERATURE_SOURCE_BATTERY")
+TEMPERATURE_1_NAME: str = config["DEFAULT"]["TEMPERATURE_1_NAME"]
+TEMPERATURE_2_NAME: str = config["DEFAULT"]["TEMPERATURE_2_NAME"]
+TEMPERATURE_3_NAME: str = config["DEFAULT"]["TEMPERATURE_3_NAME"]
+TEMPERATURE_4_NAME: str = config["DEFAULT"]["TEMPERATURE_4_NAME"]
 GUI_PARAMETERS_SHOW_ADDITIONAL_INFO: bool = get_bool_from_config("DEFAULT", "GUI_PARAMETERS_SHOW_ADDITIONAL_INFO")
 TELEMETRY: bool = get_bool_from_config("DEFAULT", "TELEMETRY")
 
@@ -546,14 +546,14 @@ def is_bit_set(value: Any) -> bool:
     return value != ZERO_CHAR
 
 
-def kelvin_to_celsius(temp: float) -> float:
+def kelvin_to_celsius(temperature: float) -> float:
     """
     Convert Kelvin to Celsius.
 
-    :param temp: Temperature in Kelvin
+    :param temperature: Temperature in Kelvin
     :return: Temperature in Celsius
     """
-    return temp - 273.15
+    return temperature - 273.15
 
 
 def bytearray_to_string(data: bytearray) -> str:

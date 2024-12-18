@@ -180,8 +180,8 @@ class Seplos(Battery):
         self.protection.high_voltage = Seplos.decode_alarm_byte(data_byte=voltage_alarm_byte, alarm_bit=5, warn_bit=4)
 
         temperature_alarm_byte = data[31]
-        self.protection.low_charge_temp = Seplos.decode_alarm_byte(data_byte=temperature_alarm_byte, alarm_bit=3, warn_bit=2)
-        self.protection.high_charge_temp = Seplos.decode_alarm_byte(data_byte=temperature_alarm_byte, alarm_bit=1, warn_bit=0)
+        self.protection.low_charge_temperature = Seplos.decode_alarm_byte(data_byte=temperature_alarm_byte, alarm_bit=3, warn_bit=2)
+        self.protection.high_charge_temperature = Seplos.decode_alarm_byte(data_byte=temperature_alarm_byte, alarm_bit=1, warn_bit=0)
         self.protection.low_temperature = Seplos.decode_alarm_byte(data_byte=temperature_alarm_byte, alarm_bit=7, warn_bit=6)
         self.protection.high_temperature = Seplos.decode_alarm_byte(data_byte=temperature_alarm_byte, alarm_bit=5, warn_bit=4)
 
@@ -222,17 +222,17 @@ class Seplos(Battery):
                 self.cells[i].voltage = voltage
                 logger.debug("Voltage cell[{}]={}V".format(i, voltage))
 
-        self.temp1 = (Seplos.int_from_2byte_hex_ascii(data, temps_offset + 0 * 4) - 2731) / 10
-        self.temp2 = (Seplos.int_from_2byte_hex_ascii(data, temps_offset + 1 * 4) - 2731) / 10
-        self.temp3 = (Seplos.int_from_2byte_hex_ascii(data, temps_offset + 2 * 4) - 2731) / 10
-        self.temp4 = (Seplos.int_from_2byte_hex_ascii(data, temps_offset + 3 * 4) - 2731) / 10
-        temp_environment = (Seplos.int_from_2byte_hex_ascii(data, temps_offset + 4 * 4) - 2731) / 10  # currently not available in the Battery class
-        self.temp_mos = (Seplos.int_from_2byte_hex_ascii(data, temps_offset + 5 * 4) - 2731) / 10
-        logger.debug("Temp cell1={}°C".format(self.temp1))
-        logger.debug("Temp cell2={}°C".format(self.temp2))
-        logger.debug("Temp cell3={}°C".format(self.temp3))
-        logger.debug("Temp cell4={}°C".format(self.temp4))
-        logger.debug("Environment temp = {}°C,  Power/MOSFET temp = {}°C".format(temp_environment, self.temp_mos))
+        self.temperature_1 = (Seplos.int_from_2byte_hex_ascii(data, temps_offset + 0 * 4) - 2731) / 10
+        self.temperature_2 = (Seplos.int_from_2byte_hex_ascii(data, temps_offset + 1 * 4) - 2731) / 10
+        self.temperature_3 = (Seplos.int_from_2byte_hex_ascii(data, temps_offset + 2 * 4) - 2731) / 10
+        self.temperature_4 = (Seplos.int_from_2byte_hex_ascii(data, temps_offset + 3 * 4) - 2731) / 10
+        temperature_environment = (Seplos.int_from_2byte_hex_ascii(data, temps_offset + 4 * 4) - 2731) / 10  # currently not available in the Battery class
+        self.temperature_mos = (Seplos.int_from_2byte_hex_ascii(data, temps_offset + 5 * 4) - 2731) / 10
+        logger.debug("Temp cell1={}°C".format(self.temperature_1))
+        logger.debug("Temp cell2={}°C".format(self.temperature_2))
+        logger.debug("Temp cell3={}°C".format(self.temperature_3))
+        logger.debug("Temp cell4={}°C".format(self.temperature_4))
+        logger.debug("Environment temperature = {}°C,  Power/MOSFET temperature = {}°C".format(temperature_environment, self.temperature_mos))
 
         self.current = Seplos.int_from_2byte_hex_ascii(data, offset=96, signed=True) / 100
         self.voltage = Seplos.int_from_2byte_hex_ascii(data, offset=100) / 100

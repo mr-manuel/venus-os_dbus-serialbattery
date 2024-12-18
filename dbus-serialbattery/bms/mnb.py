@@ -58,9 +58,8 @@ class MNB(Battery):
         self.soc = 50
         self.cell_min_no = None
         self.cell_max_no = None
-        self.temp_sensors = None
-        self.temp_max_no = None
-        self.temp_min_no = None
+        self.temperature_max_no = None
+        self.temperature_min_no = None
         self.T_C_max = None
         self.T_C_min = None
         self.poll_interval = None
@@ -73,8 +72,8 @@ class MNB(Battery):
         self.capacity = None
         self.C_rating = None
         self.current = None
-        self.temp3 = None
-        self.temp4 = None
+        self.temperature_3 = None
+        self.temperature_4 = None
         self.cells = []
         self.history.exclude_values_to_calculate = ["charge_cycles"]
 
@@ -121,7 +120,7 @@ class MNB(Battery):
         self.V_C_max = 3.65  # Max cell voltage permitted
         self.cell_count = 8  # Number of cells in series (max) 8 for 24V
         self.version = "V2.01"
-        self.temp_sensors = 6
+        # temperature_sensors = 6
         self.T_C_max = 40
         self.T_C_min = 15
         self.max_battery_voltage = self.V_C_max * self.cell_count

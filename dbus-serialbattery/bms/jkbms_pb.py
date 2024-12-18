@@ -180,23 +180,23 @@ class Jkbms_pb(Battery):
                 self.cells[c].voltage = unpack_from("<H", status_data, c * 2 + 6)[0] / 1000
 
         # MOSFET temperature
-        temp_mos = unpack_from("<h", status_data, 144)[0] / 10
-        self.to_temp(0, temp_mos if temp_mos < 99 else (100 - temp_mos))
+        temperature_mos = unpack_from("<h", status_data, 144)[0] / 10
+        self.to_temperature(0, temperature_mos if temperature_mos < 99 else (100 - temperature_mos))
 
         # Temperature sensors
-        temp1 = unpack_from("<h", status_data, 162)[0] / 10
-        temp2 = unpack_from("<h", status_data, 164)[0] / 10
-        temp3 = unpack_from("<h", status_data, 256)[0] / 10
-        temp4 = unpack_from("<h", status_data, 258)[0] / 10
+        temperature_1 = unpack_from("<h", status_data, 162)[0] / 10
+        temperature_2 = unpack_from("<h", status_data, 164)[0] / 10
+        temperature_3 = unpack_from("<h", status_data, 256)[0] / 10
+        temperature_4 = unpack_from("<h", status_data, 258)[0] / 10
 
         if unpack_from("<B", status_data, 214)[0] & 0x02:
-            self.to_temp(1, temp1 if temp1 < 99 else (100 - temp1))
+            self.to_temperature(1, temperature_1 if temperature_1 < 99 else (100 - temperature_1))
         if unpack_from("<B", status_data, 214)[0] & 0x04:
-            self.to_temp(2, temp2 if temp2 < 99 else (100 - temp2))
+            self.to_temperature(2, temperature_2 if temperature_2 < 99 else (100 - temperature_2))
         if unpack_from("<B", status_data, 214)[0] & 0x10:
-            self.to_temp(3, temp3 if temp3 < 99 else (100 - temp3))
+            self.to_temperature(3, temperature_3 if temperature_3 < 99 else (100 - temperature_3))
         if unpack_from("<B", status_data, 214)[0] & 0x20:
-            self.to_temp(4, temp4 if temp4 < 99 else (100 - temp4))
+            self.to_temperature(4, temperature_4 if temperature_4 < 99 else (100 - temperature_4))
 
         # Battery voltage
         self.voltage = unpack_from("<I", status_data, 150)[0] / 1000
@@ -236,12 +236,12 @@ class Jkbms_pb(Battery):
         """
         for c in range(self.cell_count):
                 logger.error("Cell "+str(c)+" voltage: "+str(self.cells[c].voltage)+"V")
-        logger.error("Temp 2: "+str(temp1))
-        logger.error("Temp 3: "+str(temp2))
+        logger.error("Temperature 2: "+str(temperature_1))
+        logger.error("Temperature 3: "+str(temperature_2))
         logger.error("voltage: "+str(self.voltage)+"V")
         logger.error("Current: "+str(self.current))
         logger.error("SOC: "+str(self.soc)+"%")
-        logger.error("Mos Temperature: "+str(temp_mos))
+        logger.error("Mos Temperature: "+str(temperature_mos))
         """
 
         return True
@@ -306,7 +306,7 @@ class Jkbms_pb(Battery):
         # low capacity alarm
         self.protection.low_soc = (byte_data & 0x00001000) * 2
         # MOSFET temperature alarm
-        self.protection.high_internal_temp = (byte_data & 0x00000002) * 2
+        self.protection.high_internal_temperature = (byte_data & 0x00000002) * 2
         # charge over voltage alarm
         self.protection.high_voltage = (byte_data & 0x00000020) * 2
         # discharge under voltage alarm
@@ -322,8 +322,8 @@ class Jkbms_pb(Battery):
         # cell undervoltage alarm
         self.protection.low_cell_voltage = (byte_data & 0x00001000) * 2
         # battery overtemperature alarm OR overtemperature alarm in the battery box
-        self.protection.high_charge_temp = (byte_data & 0x00000100) * 2
-        self.protection.low_charge_temp = (byte_data & 0x00000200) * 2
+        self.protection.high_charge_temperature = (byte_data & 0x00000100) * 2
+        self.protection.low_charge_temperature = (byte_data & 0x00000200) * 2
         # check if low/high temp alarm arise during discharging
         self.protection.high_temperature = (byte_data & 0x00008000) * 2
         self.protection.low_temperature = 0

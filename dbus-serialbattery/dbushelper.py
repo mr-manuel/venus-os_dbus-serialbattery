@@ -679,6 +679,7 @@ class DbusHelper:
         self._dbusservice.add_path("/Alarms/LowCellVoltage", None, writeable=True)
         self._dbusservice.add_path("/Alarms/HighCellVoltage", None, writeable=True)
         self._dbusservice.add_path("/Alarms/LowSoc", None, writeable=True)
+        self._dbusservice.add_path("/Alarms/StateOfHealth", None, writeable=True)
         self._dbusservice.add_path("/Alarms/HighChargeCurrent", None, writeable=True)
         self._dbusservice.add_path("/Alarms/HighDischargeCurrent", None, writeable=True)
         self._dbusservice.add_path("/Alarms/CellImbalance", None, writeable=True)
@@ -899,7 +900,7 @@ class DbusHelper:
         self._dbusservice["/Dc/0/Voltage"] = round(self.battery.voltage, 2) if self.battery.voltage is not None else None
         self._dbusservice["/Dc/0/Current"] = round(self.battery.current_calc, 2) if self.battery.current_calc is not None else None
         self._dbusservice["/Dc/0/Power"] = round(self.battery.power_calc, 2) if self.battery.power_calc is not None else None
-        self._dbusservice["/Dc/0/Temperature"] = self.battery.get_temp()
+        self._dbusservice["/Dc/0/Temperature"] = self.battery.get_temperature()
         self._dbusservice["/Capacity"] = self.battery.get_capacity_remain()
         self._dbusservice["/ConsumedAmphours"] = self.battery.get_capacity_consumed()
 
@@ -947,19 +948,19 @@ class DbusHelper:
         self._dbusservice["/System/NrOfModulesBlockingDischarge"] = 0 if self.battery.get_allow_to_discharge() else 1
         self._dbusservice["/System/NrOfModulesOnline"] = 1 if self.battery.online else 0
         self._dbusservice["/System/NrOfModulesOffline"] = 0 if self.battery.online else 1
-        self._dbusservice["/System/MinCellTemperature"] = self.battery.get_min_temp()
-        self._dbusservice["/System/MinTemperatureCellId"] = self.battery.get_min_temp_id()
-        self._dbusservice["/System/MaxCellTemperature"] = self.battery.get_max_temp()
-        self._dbusservice["/System/MaxTemperatureCellId"] = self.battery.get_max_temp_id()
-        self._dbusservice["/System/MOSTemperature"] = self.battery.temp_mos
-        self._dbusservice["/System/Temperature1"] = self.battery.temp1
-        self._dbusservice["/System/Temperature1Name"] = utils.TEMP_1_NAME
-        self._dbusservice["/System/Temperature2"] = self.battery.temp2
-        self._dbusservice["/System/Temperature2Name"] = utils.TEMP_2_NAME
-        self._dbusservice["/System/Temperature3"] = self.battery.temp3
-        self._dbusservice["/System/Temperature3Name"] = utils.TEMP_3_NAME
-        self._dbusservice["/System/Temperature4"] = self.battery.temp4
-        self._dbusservice["/System/Temperature4Name"] = utils.TEMP_4_NAME
+        self._dbusservice["/System/MinCellTemperature"] = self.battery.get_min_temperature()
+        self._dbusservice["/System/MinTemperatureCellId"] = self.battery.get_min_temperature_id()
+        self._dbusservice["/System/MaxCellTemperature"] = self.battery.get_max_temperature()
+        self._dbusservice["/System/MaxTemperatureCellId"] = self.battery.get_max_temperature_id()
+        self._dbusservice["/System/MOSTemperature"] = self.battery.temperature_mos
+        self._dbusservice["/System/Temperature1"] = self.battery.temperature_1
+        self._dbusservice["/System/Temperature1Name"] = utils.TEMPERATURE_1_NAME
+        self._dbusservice["/System/Temperature2"] = self.battery.temperature_2
+        self._dbusservice["/System/Temperature2Name"] = utils.TEMPERATURE_2_NAME
+        self._dbusservice["/System/Temperature3"] = self.battery.temperature_3
+        self._dbusservice["/System/Temperature3Name"] = utils.TEMPERATURE_3_NAME
+        self._dbusservice["/System/Temperature4"] = self.battery.temperature_4
+        self._dbusservice["/System/Temperature4Name"] = utils.TEMPERATURE_4_NAME
 
         # Voltage control
         self._dbusservice["/Info/MaxChargeVoltage"] = (
@@ -1005,12 +1006,12 @@ class DbusHelper:
         self._dbusservice["/Alarms/HighDischargeCurrent"] = self.battery.protection.high_discharge_current
         self._dbusservice["/Alarms/CellImbalance"] = self.battery.protection.cell_imbalance
         self._dbusservice["/Alarms/InternalFailure"] = self.battery.protection.internal_failure
-        self._dbusservice["/Alarms/HighChargeTemperature"] = self.battery.protection.high_charge_temp
-        self._dbusservice["/Alarms/LowChargeTemperature"] = self.battery.protection.low_charge_temp
+        self._dbusservice["/Alarms/HighChargeTemperature"] = self.battery.protection.high_charge_temperature
+        self._dbusservice["/Alarms/LowChargeTemperature"] = self.battery.protection.low_charge_temperature
         self._dbusservice["/Alarms/HighTemperature"] = self.battery.protection.high_temperature
         self._dbusservice["/Alarms/LowTemperature"] = self.battery.protection.low_temperature
         self._dbusservice["/Alarms/BmsCable"] = 2 if self.battery.block_because_disconnect else 0
-        self._dbusservice["/Alarms/HighInternalTemperature"] = self.battery.protection.high_internal_temp
+        self._dbusservice["/Alarms/HighInternalTemperature"] = self.battery.protection.high_internal_temperature
         self._dbusservice["/Alarms/FuseBlown"] = self.battery.protection.fuse_blown
 
         # cell voltages

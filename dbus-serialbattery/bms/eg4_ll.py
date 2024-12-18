@@ -187,9 +187,9 @@ class EG4_LL(Battery):
         self.soc = int.from_bytes(packet[51:53], "big")
         self.soh = int.from_bytes(packet[49:51], "big")
         self.history.charge_cycles = int.from_bytes(packet[61:65], "big")
-        self.temp1 = int.from_bytes(packet[39:41], "big", signed=True)
-        self.temp2 = int.from_bytes(packet[69:70], "big", signed=True)
-        self.temp_mos = int.from_bytes(packet[70:71], "big", signed=True)
+        self.temperature_1 = int.from_bytes(packet[39:41], "big", signed=True)
+        self.temperature_2 = int.from_bytes(packet[69:70], "big", signed=True)
+        self.temperature_mos = int.from_bytes(packet[70:71], "big", signed=True)
         self.cell_count = int.from_bytes(packet[75:77], "big")
         status_hex = packet[54:55].hex().upper()
         warning_hex = packet[55:57].hex().upper()
@@ -259,19 +259,19 @@ class EG4_LL(Battery):
             self.protection.high_charge_current = 1
         elif warning_hex == "0040":
             warning_alarm = f"Warning: {warning_hex} - Ambient High Temp"
-            self.protection.high_internal_temp = 1
+            self.protection.high_internal_temperature = 1
         elif warning_hex == "0080":
             warning_alarm = f"Warning: {warning_hex} - Mosfets High Temp"
-            self.protection.high_internal_temp = 1
+            self.protection.high_internal_temperature = 1
         elif warning_hex == "0100":
             warning_alarm = f"Warning: {warning_hex} - Charge Over Temp"
-            self.protection.high_charge_temp = 1
+            self.protection.high_charge_temperature = 1
         elif warning_hex == "0200":
             warning_alarm = f"Warning: {warning_hex} - Discharge Over Temp"
             self.protection.high_temperature = 1
         elif warning_hex == "0400":
             warning_alarm = f"Warning: {warning_hex} - Charge Under Temp"
-            self.protection.low_charge_temp = 1
+            self.protection.low_charge_temperature = 1
         elif warning_hex == "1000":
             warning_alarm = f"Warning: {warning_hex} - Low Capacity"
             self.protection.low_soc = 1
@@ -303,22 +303,22 @@ class EG4_LL(Battery):
             self.protection.high_charge_current = 2
         elif protection_hex == "0040":
             protection_alarm = f"Protection: {protection_hex} - High Ambient Temp"
-            self.protection.high_internal_temp = 2
+            self.protection.high_internal_temperature = 2
         elif protection_hex == "0080":
             protection_alarm = f"Protection: {protection_hex} - Mosfets High Temp"
-            self.protection.high_internal_temp = 2
+            self.protection.high_internal_temperature = 2
         elif protection_hex == "0100":
             protection_alarm = f"Protection: {protection_hex} - Charge Over Temp"
-            self.protection.high_charge_temp = 2
+            self.protection.high_charge_temperature = 2
         elif protection_hex == "0200":
             protection_alarm = f"Protection: {protection_hex} - Discharge Over Temp"
             self.protection.high_temperature = 2
         elif protection_hex == "0400":
             protection_alarm = f"Protection: {protection_hex} - Charge Under Temp"
-            self.protection.low_charge_temp = 2
+            self.protection.low_charge_temperature = 2
         elif protection_hex == "0800":
             protection_alarm = f"Protection: {protection_hex} - Discharge Under Temp"
-            self.protection.low_charge_temp = 2
+            self.protection.low_charge_temperature = 2
         elif protection_hex == "1000":
             protection_alarm = f"Protection: {protection_hex} - Low Capacity"
             self.protection.low_soc = 2
@@ -353,8 +353,8 @@ class EG4_LL(Battery):
         logger.info(f" {warning_alarm}")
         logger.info(f" {protection_alarm}")
         logger.info(f" {error}")
-        logger.info("===== Temp =====")
-        logger.info(f"Temp 1: {self.temp1}c | Temp 2: {self.temp2}c | Temp Mos: {self.temp_mos}c")
+        logger.info("===== Temperature =====")
+        logger.info(f"Temp 1: {self.temperature_1}c | Temp 2: {self.temperature_2}c | Temp Mos: {self.temperature_mos}c")
         logger.info(f'Avg: {int.from_bytes(packet[41:43], "big", signed=True)}c | ' + f'Temp Max: {int.from_bytes(packet[43:45], "big", signed=True)}c')
         logger.info(f"Heater Status: {heater_state}")
         logger.info("===== Battery Stats =====")
@@ -367,7 +367,7 @@ class EG4_LL(Battery):
 
         return True
 
-    def read_temp_data(self):
+    def read_temperature_data(self):
         # Temp Data is collected when the cell data is read
         result = self.read_cell_data()
         if result is False:

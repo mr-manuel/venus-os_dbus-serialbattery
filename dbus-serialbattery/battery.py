@@ -38,11 +38,11 @@ class Protection(object):
         self.high_discharge_current: int = None
         self.cell_imbalance: int = None
         self.internal_failure: int = None
-        self.high_charge_temp: int = None
-        self.low_charge_temp: int = None
+        self.high_charge_temperature: int = None
+        self.low_charge_temperature: int = None
         self.high_temperature: int = None
         self.low_temperature: int = None
-        self.high_internal_temp: int = None
+        self.high_internal_temperature: int = None
         self.fuse_blown: int = None
 
         # previous values to check if the value has changed
@@ -55,11 +55,11 @@ class Protection(object):
         self.previous_high_discharge_current: int = None
         self.previous_cell_imbalance: int = None
         self.previous_internal_failure: int = None
-        self.previous_high_charge_temp: int = None
-        self.previous_low_charge_temp: int = None
+        self.previous_high_charge_temperature: int = None
+        self.previous_low_charge_temperature: int = None
         self.previous_high_temperature: int = None
         self.previous_low_temperature: int = None
-        self.previous_high_internal_temp: int = None
+        self.previous_high_internal_temperature: int = None
         self.previous_fuse_blown: int = None
 
     def set_previous(self) -> None:
@@ -77,11 +77,11 @@ class Protection(object):
         self.previous_high_discharge_current = self.high_discharge_current
         self.previous_cell_imbalance = self.cell_imbalance
         self.previous_internal_failure = self.internal_failure
-        self.previous_high_charge_temp = self.high_charge_temp
-        self.previous_low_charge_temp = self.low_charge_temp
+        self.previous_high_charge_temperature = self.high_charge_temperature
+        self.previous_low_charge_temperature = self.low_charge_temperature
         self.previous_high_temperature = self.high_temperature
         self.previous_low_temperature = self.low_temperature
-        self.previous_high_internal_temp = self.high_internal_temp
+        self.previous_high_internal_temperature = self.high_internal_temperature
         self.previous_fuse_blown = self.fuse_blown
 
 
@@ -330,12 +330,11 @@ class Battery(ABC):
         self.history = History()
         self.version = None
         self.time_to_soc_update: int = 0
-        self.temp_sensors: int = None
-        self.temp1: float = None
-        self.temp2: float = None
-        self.temp3: float = None
-        self.temp4: float = None
-        self.temp_mos: float = None
+        self.temperature_1: float = None
+        self.temperature_2: float = None
+        self.temperature_3: float = None
+        self.temperature_4: float = None
+        self.temperature_mos: float = None
         self.cells: List[Cell] = []
         self.control_voltage: float = None
         self.soc_reset_requested: bool = False
@@ -522,7 +521,7 @@ class Battery(ABC):
         """
         return False
 
-    def to_temp(self, sensor: int, value: float) -> None:
+    def to_temperature(self, sensor: int, value: float) -> None:
         """
         Keep the temp value between -20 and 100 to handle sensor issues or no data.
         The BMS should already have protected the battery before those limits have been reached.
@@ -532,15 +531,15 @@ class Battery(ABC):
         :return: None
         """
         if sensor == 0:
-            self.temp_mos = round(min(max(value, -20), 100), 1)
+            self.temperature_mos = round(min(max(value, -20), 100), 1)
         if sensor == 1:
-            self.temp1 = round(min(max(value, -20), 100), 1)
+            self.temperature_1 = round(min(max(value, -20), 100), 1)
         if sensor == 2:
-            self.temp2 = round(min(max(value, -20), 100), 1)
+            self.temperature_2 = round(min(max(value, -20), 100), 1)
         if sensor == 3:
-            self.temp3 = round(min(max(value, -20), 100), 1)
+            self.temperature_3 = round(min(max(value, -20), 100), 1)
         if sensor == 4:
-            self.temp4 = round(min(max(value, -20), 100), 1)
+            self.temperature_4 = round(min(max(value, -20), 100), 1)
 
     def manage_charge_voltage(self) -> None:
         """
@@ -1365,40 +1364,40 @@ class Battery(ABC):
 
         :return: The maximum charge current
         """
-        if self.get_max_temp() is None or self.get_min_temp() is None:
+        if self.get_max_temperature() is None or self.get_min_temperature() is None:
             logging.warning(
                 "calc_max_charge_current_from_temperature():"
-                + f" get_max_temp() is {self.get_max_temp()} or get_min_temp() is {self.get_min_temp()}"
+                + f" get_max_temperature() is {self.get_max_temperature()} or get_min_temperature() is {self.get_min_temperature()}"
                 + ", using default current instead."
                 + " If you don't see this warning very often, you can ignore it."
             )
             return self.max_battery_charge_current
 
-        temps = {0: self.get_max_temp(), 1: self.get_min_temp()}
+        temperatures = {0: self.get_max_temperature(), 1: self.get_min_temperature()}
 
         try:
-            for key, currentMaxTemperature in temps.items():
+            for key, currentMaxTemperature in temperatures.items():
                 if utils.LINEAR_LIMITATION_ENABLE:
-                    temps[key] = utils.calc_linear_relationship(
+                    temperatures[key] = utils.calc_linear_relationship(
                         currentMaxTemperature,
                         utils.TEMPERATURES_WHILE_CHARGING,
                         utils.MAX_CHARGE_CURRENT_T,
                     )
                 else:
-                    temps[key] = utils.calc_step_relationship(
+                    temperatures[key] = utils.calc_step_relationship(
                         currentMaxTemperature,
                         utils.TEMPERATURES_WHILE_CHARGING,
                         utils.MAX_CHARGE_CURRENT_T,
                         False,
                     )
-            return min(temps[0], temps[1])
+            return min(temperatures[0], temperatures[1])
         except Exception:
             # set error code, to show in the GUI that something is wrong
             self.manage_error_code(8)
 
             logger.error("calc_max_charge_current_from_temperature(): Error while executing," + " using default current instead.")
             logger.error(
-                f"temps: {temps}"
+                f"temperatures: {temperatures}"
                 + f" • TEMPERATURES_WHILE_CHARGING: {utils.TEMPERATURES_WHILE_CHARGING}"
                 + f" • MAX_CHARGE_CURRENT_T: {utils.MAX_CHARGE_CURRENT_T}"
             )
@@ -1415,40 +1414,40 @@ class Battery(ABC):
 
         :return: The maximum discharge current
         """
-        if self.get_max_temp() is None or self.get_min_temp() is None:
+        if self.get_max_temperature() is None or self.get_min_temperature() is None:
             logging.warning(
                 "calc_max_discharge_current_from_temperature():"
-                + f" get_max_temp() is {self.get_max_temp()} or get_min_temp() is {self.get_min_temp()}"
+                + f" get_max_temperature() is {self.get_max_temperature()} or get_min_temperature() is {self.get_min_temperature()}"
                 + ", using default current instead."
                 + " If you don't see this warning very often, you can ignore it."
             )
             return self.max_battery_discharge_current
 
-        temps = {0: self.get_max_temp(), 1: self.get_min_temp()}
+        temperatures = {0: self.get_max_temperature(), 1: self.get_min_temperature()}
 
         try:
-            for key, currentMaxTemperature in temps.items():
+            for key, currentMaxTemperature in temperatures.items():
                 if utils.LINEAR_LIMITATION_ENABLE:
-                    temps[key] = utils.calc_linear_relationship(
+                    temperatures[key] = utils.calc_linear_relationship(
                         currentMaxTemperature,
                         utils.TEMPERATURES_WHILE_DISCHARGING,
                         utils.MAX_DISCHARGE_CURRENT_T,
                     )
                 else:
-                    temps[key] = utils.calc_step_relationship(
+                    temperatures[key] = utils.calc_step_relationship(
                         currentMaxTemperature,
                         utils.TEMPERATURES_WHILE_DISCHARGING,
                         utils.MAX_DISCHARGE_CURRENT_T,
                         True,
                     )
-            return min(temps[0], temps[1])
+            return min(temperatures[0], temperatures[1])
         except Exception:
             # set error code, to show in the GUI that something is wrong
             self.manage_error_code(8)
 
             logger.error("calc_max_discharge_current_from_temperature(): Error while executing," + " using default current instead.")
             logger.error(
-                f"temps: {temps}"
+                f"temperatures: {temperatures}"
                 + f" • TEMPERATURES_WHILE_DISCHARGING: {utils.TEMPERATURES_WHILE_DISCHARGING}"
                 + f" • MAX_DISCHARGE_CURRENT_T: {utils.MAX_DISCHARGE_CURRENT_T}"
             )
@@ -1785,79 +1784,71 @@ class Battery(ABC):
                 return 1
         return 0
 
-    def get_temp(self) -> Union[float, None]:
+    def get_temperature(self) -> Union[float, None]:
         try:
-            if utils.TEMP_BATTERY == 1:
-                return self.temp1
-            elif utils.TEMP_BATTERY == 2:
-                return self.temp2
-            elif utils.TEMP_BATTERY == 3:
-                return self.temp3
-            elif utils.TEMP_BATTERY == 4:
-                return self.temp4
-            else:
-                temps = [t for t in [self.temp1, self.temp2, self.temp3, self.temp4] if t is not None]
-                n = len(temps)
-                if not temps or n == 0:
-                    return None
-                data = sorted(temps)
-                if n % 2 == 1:
-                    return data[n // 2]
-                else:
-                    i = n // 2
-                    return (data[i - 1] + data[i]) / 2
+            temperature_map = {1: self.temperature_1, 2: self.temperature_2, 3: self.temperature_3, 4: self.temperature_4}
+            temperature = temperature_map.get(utils.TEMPERATURE_SOURCE_BATTERY)
+            if temperature is not None:
+                return temperature
+
+            temperatures = [t for t in [self.temperature_1, self.temperature_2, self.temperature_3, self.temperature_4] if t is not None]
+            if not temperatures:
+                return None
+
+            return round(sum(temperatures) / len(temperatures), 1)
+
         except TypeError:
             return None
 
-    def get_min_temp(self) -> Union[float, None]:
+    def get_min_temperature(self) -> Union[float, None]:
         try:
-            temps = [t for t in [self.temp1, self.temp2, self.temp3, self.temp4] if t is not None]
-            if not temps:
+            temperatures = [t for t in [self.temperature_1, self.temperature_2, self.temperature_3, self.temperature_4] if t is not None]
+            if not temperatures:
                 return None
-            return min(temps)
+            return min(temperatures)
         except TypeError:
             return None
 
-    def get_min_temp_id(self) -> Union[str, None]:
+    def get_min_temperature_id(self) -> Union[str, None]:
         try:
-            temps = [(t, i) for i, t in enumerate([self.temp1, self.temp2, self.temp3, self.temp4]) if t is not None]
-            if not temps:
+            temperatures = [(t, i) for i, t in enumerate([self.temperature_1, self.temperature_2, self.temperature_3, self.temperature_4]) if t is not None]
+            if not temperatures:
                 return None
-            index = min(temps)[1]
+            index = min(temperatures)[1]
             if index == 0:
-                return utils.TEMP_1_NAME
+                return utils.TEMPERATURE_1_NAME
             if index == 1:
-                return utils.TEMP_2_NAME
+                return utils.TEMPERATURE_2_NAME
             if index == 2:
-                return utils.TEMP_3_NAME
+                return utils.TEMPERATURE_3_NAME
             if index == 3:
-                return utils.TEMP_4_NAME
+                return utils.TEMPERATURE_4_NAME
         except TypeError:
             return None
 
-    def get_max_temp(self) -> Union[float, None]:
+    def get_max_temperature(self) -> Union[float, None]:
         try:
-            temps = [t for t in [self.temp1, self.temp2, self.temp3, self.temp4] if t is not None]
-            if not temps:
+            temperatures = [t for t in [self.temperature_1, self.temperature_2, self.temperature_3, self.temperature_4] if t is not None]
+            if not temperatures:
                 return None
-            return max(temps)
+            return max(temperatures)
         except TypeError:
             return None
 
-    def get_max_temp_id(self) -> Union[str, None]:
+    def get_max_temperature_id(self) -> Union[str, None]:
         try:
-            temps = [(t, i) for i, t in enumerate([self.temp1, self.temp2, self.temp3, self.temp4]) if t is not None]
-            if not temps:
+            temperatures = [(t, i) for i, t in enumerate([self.temperature_1, self.temperature_2, self.temperature_3, self.temperature_4]) if t is not None]
+            if not temperatures:
                 return None
-            index = max(temps)[1]
+            index = max(temperatures)[1]
             if index == 0:
-                return utils.TEMP_1_NAME
+                return utils.TEMPERATURE_1_NAME
             if index == 1:
-                return utils.TEMP_2_NAME
+                return utils.TEMPERATURE_2_NAME
             if index == 2:
-                return utils.TEMP_3_NAME
+                return utils.TEMPERATURE_3_NAME
             if index == 3:
-                return utils.TEMP_4_NAME
+                return utils.TEMPERATURE_4_NAME
         except TypeError:
             return None
 
@@ -2238,13 +2229,13 @@ class Battery(ABC):
             ):
                 self.history.high_voltage_alarms += 1
 
-        if "minimum_temperature" not in self.history.exclude_values_to_calculate and self.get_min_temp() is not None:
-            if self.history.minimum_temperature is None or self.history.minimum_temperature > self.get_min_temp():
-                self.history.minimum_temperature = self.get_min_temp()
+        if "minimum_temperature" not in self.history.exclude_values_to_calculate and self.get_min_temperature() is not None:
+            if self.history.minimum_temperature is None or self.history.minimum_temperature > self.get_min_temperature():
+                self.history.minimum_temperature = self.get_min_temperature()
 
-        if "maximum_temperature" not in self.history.exclude_values_to_calculate and self.get_max_temp() is not None:
-            if self.history.maximum_temperature is None or self.history.maximum_temperature < self.get_max_temp():
-                self.history.maximum_temperature = self.get_max_temp()
+        if "maximum_temperature" not in self.history.exclude_values_to_calculate and self.get_max_temperature() is not None:
+            if self.history.maximum_temperature is None or self.history.maximum_temperature < self.get_max_temperature():
+                self.history.maximum_temperature = self.get_max_temperature()
 
         if "discharged_energy" not in self.history.exclude_values_to_calculate:
             if self.history.discharged_energy is None:

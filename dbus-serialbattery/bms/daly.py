@@ -57,11 +57,11 @@ class Daly(Battery):
     command_batt_code = b"\x57"
     command_soc = b"\x90"
     command_minmax_cell_volts = b"\x91"  # no reply
-    command_minmax_temp = b"\x92"  # no reply
+    command_minmax_temperature = b"\x92"  # no reply
     command_fet = b"\x93"  # no reply
     command_status = b"\x94"
     command_cell_volts = b"\x95"
-    command_temp = b"\x96"
+    command_temperature = b"\x96"
     command_cell_balance = b"\x97"  # no reply
     command_alarm = b"\x98"  # no reply
     command_disable_discharge_mos = b"\xD9"
@@ -188,7 +188,7 @@ class Daly(Battery):
         try:
             (
                 cell_count,
-                self.temp_sensors,
+                temperature_sensors,
                 self.charger_connected,
                 self.load_connected,
                 state,
@@ -293,21 +293,21 @@ class Daly(Battery):
 
         if al_temp & 2:
             # High charge temp - Alarm
-            self.protection.high_charge_temp = 2
+            self.protection.high_charge_temperature = 2
         elif al_temp & 1:
             # High charge temp - Pre-alarm
-            self.protection.high_charge_temp = 1
+            self.protection.high_charge_temperature = 1
         else:
-            self.protection.high_charge_temp = 0
+            self.protection.high_charge_temperature = 0
 
         if al_temp & 8:
             # Low charge temp - Alarm
-            self.protection.low_charge_temp = 2
+            self.protection.low_charge_temperature = 2
         elif al_temp & 4:
             # Low charge temp - Pre-alarm
-            self.protection.low_charge_temp = 1
+            self.protection.low_charge_temperature = 1
         else:
-            self.protection.low_charge_temp = 0
+            self.protection.low_charge_temperature = 0
 
         if al_temp & 32:
             # High discharge temp - Alarm
@@ -458,15 +458,15 @@ class Daly(Battery):
         return True
 
     def read_temperature_range_data(self, ser):
-        minmax_data = self.request_data(ser, self.command_minmax_temp)
+        minmax_data = self.request_data(ser, self.command_minmax_temperature)
         # check if connection success
         if minmax_data is False:
             logger.debug("No data received in read_temperature_range_data()")
             return False
 
         max_temp, max_no, min_temp, min_no = unpack_from(">bbbb", minmax_data)
-        self.temp1 = min_temp - self.TEMP_ZERO_CONSTANT
-        self.temp2 = max_temp - self.TEMP_ZERO_CONSTANT
+        self.temperature_1 = min_temp - self.TEMP_ZERO_CONSTANT
+        self.temperature_2 = max_temp - self.TEMP_ZERO_CONSTANT
         return True
 
     def read_fed_data(self, ser):

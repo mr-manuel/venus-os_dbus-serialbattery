@@ -367,9 +367,9 @@ class Pace(Battery):
             v = int(status_data[85 + i * 4 : 85 + i * 4 + 4], 16) / 100
             logger.debug("Temperature [" + str(i) + "]: " + str(v))
             if i < 4:  # 0,1,2,3 are internal temps
-                self.to_temp(i + 1, v)
+                self.to_temperature(i + 1, v)
             if i == 4:  # mosfet
-                self.to_temp(0, v)
+                self.to_temperature(0, v)
 
         # Battery voltage
         self.voltage = int(status_data[113:117], 16) / 1000

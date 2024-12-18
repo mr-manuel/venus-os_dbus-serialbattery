@@ -144,12 +144,12 @@ class Jkbms_Can(Battery):
         self.protection.high_discharge_current = 2 if int(tmp[pos - 12 : pos - 10], 2) > 0 else 0
         self.protection.high_charge_current = 2 if int(tmp[pos - 14 : pos - 12], 2) > 0 else 0
 
-        # there is just a BMS and Battery temp alarm (not for charge and discharge)
-        self.protection.high_charge_temp = 2 if int(tmp[pos - 16 : pos - 14], 2) > 0 else 0
+        # there is just a BMS and Battery temperature_ alarm (not for charge and discharge)
+        self.protection.high_charge_temperature = 2 if int(tmp[pos - 16 : pos - 14], 2) > 0 else 0
         self.protection.high_temperature = 2 if int(tmp[pos - 16 : pos - 14], 2) > 0 else 0
-        self.protection.low_charge_temp = 2 if int(tmp[pos - 18 : pos - 16], 2) > 0 else 0
+        self.protection.low_charge_temperature = 2 if int(tmp[pos - 18 : pos - 16], 2) > 0 else 0
         self.protection.low_temperature = 2 if int(tmp[pos - 18 : pos - 16], 2) > 0 else 0
-        self.protection.high_charge_temp = 2 if int(tmp[pos - 20 : pos - 18], 2) > 0 else 0
+        self.protection.high_charge_temperature = 2 if int(tmp[pos - 20 : pos - 18], 2) > 0 else 0
         self.protection.high_temperature = 2 if int(tmp[pos - 20 : pos - 18], 2) > 0 else 0
         self.protection.low_soc = 2 if int(tmp[pos - 22 : pos - 20], 2) > 0 else 0
         self.protection.internal_failure = 2 if int(tmp[pos - 24 : pos - 22], 2) > 0 else 0
@@ -166,12 +166,12 @@ class Jkbms_Can(Battery):
         self.protection.high_discharge_current = 0
         self.protection.high_charge_current = 0
 
-        # there is just a BMS and Battery temp alarm (not for charge and discharge)
-        self.protection.high_charge_temp = 0
+        # there is just a BMS and Battery temperature_ alarm (not for charge and discharge)
+        self.protection.high_charge_temperature = 0
         self.protection.high_temperature = 0
-        self.protection.low_charge_temp = 0
+        self.protection.low_charge_temperature = 0
         self.protection.low_temperature = 0
-        self.protection.high_charge_temp = 0
+        self.protection.high_charge_temperature = 0
         self.protection.high_temperature = 0
         self.protection.low_soc = 0
         self.protection.internal_failure = 0
@@ -258,40 +258,40 @@ class Jkbms_Can(Battery):
 
             # Frame is send every 500ms
             elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_TEMP]:
-                v1_max_temp = unpack_from("<B", bytes([data[0]]))[0] - 50
+                v1_max_temperature = unpack_from("<B", bytes([data[0]]))[0] - 50
                 v1_max_nr = unpack_from("<B", bytes([data[1]]))[0]
-                v1_min_temp = unpack_from("<B", bytes([data[2]]))[0] - 50
+                v1_min_temperature = unpack_from("<B", bytes([data[2]]))[0] - 50
                 v1_min_nr = unpack_from("<B", bytes([data[3]]))[0]
 
                 # store temperatures in a dict to assign the temperature to the correct sensor
-                v1_temperatures = {v1_min_nr: v1_min_temp, v1_max_nr: v1_max_temp}
+                v1_temperatures = {v1_min_nr: v1_min_temperature, v1_max_nr: v1_max_temperature}
 
                 # check if all needed data is available
                 data_check += 16
 
             # Frame is send every 500ms
             elif normalized_arbitration_id in self.CAN_FRAMES[self.ALL_TEMP]:
-                # temp_sensor_cnt = unpack_from("<B", bytes([data[0]]))[0]
-                # temp1
+                # temperature_sensor_cnt = unpack_from("<B", bytes([data[0]]))[0]
+                # temperature_1
                 if data[1] != 0x00:
-                    temp1 = unpack_from("<B", bytes([data[1]]))[0] - 50
-                    self.to_temp(1, temp1)
-                # temp2
+                    temperature_1 = unpack_from("<B", bytes([data[1]]))[0] - 50
+                    self.to_temperature(1, temperature_1)
+                # temperature_2
                 if data[2] != 0x00:
-                    temp2 = unpack_from("<B", bytes([data[2]]))[0] - 50
-                    self.to_temp(2, temp2)
-                # temp3 equals mosfet temp
+                    temperature_2 = unpack_from("<B", bytes([data[2]]))[0] - 50
+                    self.to_temperature(2, temperature_2)
+                # temperature_3 equals mosfet temperature_
                 if data[3] != 0x00:
-                    temp_mosfet = unpack_from("<B", bytes([data[3]]))[0] - 50
-                    self.to_temp(0, temp_mosfet)
-                # temp4 (currently only JKBMS PB Model)
+                    temperature_mosfet = unpack_from("<B", bytes([data[3]]))[0] - 50
+                    self.to_temperature(0, temperature_mosfet)
+                # temperature_4 (currently only JKBMS PB Model)
                 if data[4] != 0x00:
-                    temp4 = unpack_from("<B", bytes([data[4]]))[0] - 50
-                    self.to_temp(3, temp4)
-                # temp5 (currently only JKBMS PB Model)
+                    temperature_4 = unpack_from("<B", bytes([data[4]]))[0] - 50
+                    self.to_temperature(3, temperature_4)
+                # temperature_5 (currently only JKBMS PB Model)
                 if data[5] != 0x00:
-                    temp5 = unpack_from("<B", bytes([data[5]]))[0] - 50
-                    self.to_temp(4, temp5)
+                    temperature_5 = unpack_from("<B", bytes([data[5]]))[0] - 50
+                    self.to_temperature(4, temperature_5)
 
                 # check if all needed data is available
                 data_check += 32
@@ -362,8 +362,8 @@ class Jkbms_Can(Battery):
                     if i != v1_max_cell_nr and i != v1_min_cell_nr:
                         self.cells[i].voltage = round(cell_mean_voltage, 3)
 
-                self.to_temp(1, v1_temperatures[0] if v1_temperatures[0] <= 100 else 100)
-                self.to_temp(2, v1_temperatures[1] if v1_temperatures[1] <= 100 else 100)
+                self.to_temperature(1, v1_temperatures[0] if v1_temperatures[0] <= 100 else 100)
+                self.to_temperature(2, v1_temperatures[1] if v1_temperatures[1] <= 100 else 100)
 
             self.protocol_version = 1
             self.type = "JKBMS CAN"

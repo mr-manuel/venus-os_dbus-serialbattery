@@ -98,7 +98,7 @@ class ANT(Battery):
 
         self.charge_fet, self.discharge_fet, self.balancing = unpack_from(">bbb", status_data, 103)
 
-        self.temp1, self.temp2 = unpack_from(">bxb", status_data, 96)
+        self.temperature_1, self.temperature_2 = unpack_from(">bxb", status_data, 96)
 
         self.hardware_version = "ANT BMS " + str(self.cell_count) + "S"
 
@@ -106,7 +106,7 @@ class ANT(Battery):
         self.protection.high_voltage = 2 if self.charge_fet == 2 else 0
         self.protection.low_voltage = 2 if self.discharge_fet == 2 or self.discharge_fet == 5 else 0
         self.protection.low_cell_voltage = 2 if self.cell_min_voltage < MIN_CELL_VOLTAGE - 0.1 else 1 if self.cell_min_voltage < MIN_CELL_VOLTAGE else 0
-        self.protection.high_charge_temp = 1 if self.charge_fet == 3 or self.charge_fet == 6 else 0
+        self.protection.high_charge_temperature = 1 if self.charge_fet == 3 or self.charge_fet == 6 else 0
         self.protection.high_temperature = 1 if self.discharge_fet == 7 or self.discharge_fet == 6 else 0
         self.protection.high_charge_current = 2 if self.charge_fet == 3 else 0
         self.protection.high_discharge_current = 2 if self.discharge_fet == 3 else 0

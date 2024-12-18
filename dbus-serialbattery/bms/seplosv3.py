@@ -169,13 +169,13 @@ class Seplosv3(Battery):
             for i in range(0, self.cell_count):
                 cell = Cell(False)
                 cell.voltage = pib[i] / 1000.0
-                cell.temp = pib[0x10 + math.floor(i / 4)] / 10 - 273.0
+                cell.temperature = pib[0x10 + math.floor(i / 4)] / 10 - 273.0
                 self.cells.append(cell)
-            self.temp1 = pib[0x10] / 10 - 273.0
-            self.temp2 = pib[0x11] / 10 - 273.0
-            self.temp3 = pib[0x12] / 10 - 273.0
-            self.temp4 = pib[0x13] / 10 - 273.0
-            self.temp_mos = pib[0x19] / 10 - 273.0
+            self.temperature_1 = pib[0x10] / 10 - 273.0
+            self.temperature_2 = pib[0x11] / 10 - 273.0
+            self.temperature_3 = pib[0x12] / 10 - 273.0
+            self.temperature_4 = pib[0x13] / 10 - 273.0
+            self.temperature_mos = pib[0x19] / 10 - 273.0
         except Exception as e:
             logger.info(f"Error updating cells {e}")
             return False
@@ -199,7 +199,7 @@ class Seplosv3(Battery):
 
     def update_sysinfo(self, spa) -> bool:
         try:
-            self.temp_sensors = spa[0x00]
+            # temperature_sensors = spa[0x00]
             self.cell_count = spa[1]
             self.capacity = spa[0x59] / 100
             # self.capacity_remain = spa[0x5A] / 100
@@ -229,11 +229,11 @@ class Seplosv3(Battery):
             self.protection.high_charge_current = 2 if sfa[0x21] == 0 else 1 if sfa[0x20] == 0 else 0
             self.protection.high_discharge_current = 2 if sfa[0x24] == 0 else 1 if sfa[0x23] == 0 else 0
             self.protection.internal_failure = 2 if (sfa[0x48] + sfa[0x49] + sfa[0x4A] + sfa[0x4B] + sfa[0x4D] + sfa[53]) < 5 else 0
-            self.protection.high_charge_temp = 2 if sfa[0x09] == 0 else 1 if sfa[0x08] == 0 else 0
-            self.protection.low_charge_temp = 2 if sfa[0x0B] == 0 else 1 if sfa[0x0A] == 0 else 0
+            self.protection.high_charge_temperature = 2 if sfa[0x09] == 0 else 1 if sfa[0x08] == 0 else 0
+            self.protection.low_charge_temperature = 2 if sfa[0x0B] == 0 else 1 if sfa[0x0A] == 0 else 0
             self.protection.high_temperature = 2 if sfa[0x0D] == 0 else 1 if sfa[0x0C] == 0 else 0
             self.protection.low_temperature = 2 if sfa[0x0F] == 0 else 1 if sfa[0x0E] == 0 else 0
-            self.protection.high_internal_temp = 2 if sfa[0x15] == 0 else 1 if sfa[0x14] == 0 else 0
+            self.protection.high_internal_temperature = 2 if sfa[0x15] == 0 else 1 if sfa[0x14] == 0 else 0
         except Exception as e:
             logger.info(f"Error updating alarm info {e}")
             return False

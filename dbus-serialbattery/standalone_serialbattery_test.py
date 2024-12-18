@@ -82,13 +82,13 @@ print("Cellcount: " + str(Ubms.cell_count))
 for i in range(Ubms.cell_count):
     print("CellVolt" + str(i) + ": " + str(Ubms.cells[i] / 1000))
 
-print("Temp_Fet : " + str(Ubms.temp_fet))
-print("Temp_1   : " + str(Ubms.temp_1))
-print("temp_2   : " + str(Ubms.temp_2))
-print("BatVolt  : " + str(Ubms.voltage / 100))
-print("Current  : " + str(Ubms.act_current / 100))
-print("SOC      : " + str(Ubms.soc))
-print("WATT     : " + str(int((Ubms.voltage * Ubms.act_current) / 10000)))
+print("Temperature_Fet : " + str(Ubms.temperature_fet))
+print("Temperature_1   : " + str(Ubms.temperature_1))
+print("temperature_2   : " + str(Ubms.temperature_2))
+print("BatVolt         : " + str(Ubms.voltage / 100))
+print("Current         : " + str(Ubms.act_current / 100))
+print("SOC             : " + str(Ubms.soc))
+print("WATT            : " + str(int((Ubms.voltage * Ubms.act_current) / 10000)))
 sleep(1)
 """
 print("Cellcount: " + str(ST[0]))
@@ -96,12 +96,12 @@ for i in range(ST[0]) :
     print("CellVolt" + str(i) + ": " + str(ST[i+1]/1000))
 
 i=ST[0]+1 #first is the cellscount and cells
-print("Temp_Fet : " + str(ST[i]))
-print("Temp_1   : " + str(ST[i+1]))
-print("temp_2   : " + str(ST[i+2]))
-print("BatVolt  : " + str(ST[i+3]))
-print("Current  : " + str(ST[i+4]))
-print("SOC      : " + str(ST[i+5]))
+print("Temperature_Fet : " + str(ST[i]))
+print("Temperature_1   : " + str(ST[i+1]))
+print("temperature_2   : " + str(ST[i+2]))
+print("BatVolt         : " + str(ST[i+3]))
+print("Current         : " + str(ST[i+4]))
+print("SOC             : " + str(ST[i+5]))
 """
 
 sys.exit(0)

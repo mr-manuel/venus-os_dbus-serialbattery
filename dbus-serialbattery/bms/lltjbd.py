@@ -466,8 +466,8 @@ class LltJbd(Battery):
 
         self.protection.high_voltage = 2 if is_bit_set(tmp[10]) else 0
         self.protection.low_voltage = 2 if is_bit_set(tmp[9]) else 0
-        self.protection.high_charge_temp = 1 if is_bit_set(tmp[8]) else 0
-        self.protection.low_charge_temp = 1 if is_bit_set(tmp[7]) else 0
+        self.protection.high_charge_temperature = 1 if is_bit_set(tmp[8]) else 0
+        self.protection.low_charge_temperature = 1 if is_bit_set(tmp[7]) else 0
         self.protection.high_temperature = 1 if is_bit_set(tmp[6]) else 0
         self.protection.low_temperature = 1 if is_bit_set(tmp[5]) else 0
         self.protection.high_charge_current = 1 if is_bit_set(tmp[4]) else 0
@@ -560,7 +560,7 @@ class LltJbd(Battery):
             soc,
             fet,
             self.cell_count,
-            self.temp_sensors,
+            temperature_sensors,
         ) = unpack_from(">HhHHHHhHHBBBBB", gen_data)
 
         self.voltage = voltage / 100
@@ -586,20 +586,20 @@ class LltJbd(Battery):
         self.to_protection_bits(protection)
 
         # 0 = MOS, 1 = temp 1, 2 = temp 2
-        for t in range(self.temp_sensors):
+        for t in range(temperature_sensors):
             if len(gen_data) < 23 + (2 * t) + 2:
                 logger.warn(
                     "Expected %d temperature sensors, but received only %d sensor readings!",
-                    self.temp_sensors,
+                    temperature_sensors,
                     t,
                 )
                 return True
             temperature = unpack_from(">H", gen_data, 23 + (2 * t))[0]
             # if there is only one sensor, use it as the main temperature sensor
-            if self.temp_sensors == 1:
-                self.to_temp(1, kelvin_to_celsius(temperature / 10))
+            if temperature_sensors == 1:
+                self.to_temperature(1, kelvin_to_celsius(temperature / 10))
             else:
-                self.to_temp(t, kelvin_to_celsius(temperature / 10))
+                self.to_temperature(t, kelvin_to_celsius(temperature / 10))
 
         return True
 

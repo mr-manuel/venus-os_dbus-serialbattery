@@ -233,16 +233,16 @@ class Daren485(Battery):
                 self.soc = int(payload[2:6], base=16) / 100
                 self.voltage = int(payload[6:10], base=16) / 100
                 self.current = unpack(">h", bytes.fromhex(payload[106:110]))[0] / 100
-                temp_mos = unpack(">h", bytes.fromhex(payload[84:88]))[0] / 10
-                self.to_temp(0, temp_mos)
-                temp1 = unpack(">h", bytes.fromhex(payload[90:94]))[0] / 10
-                self.to_temp(1, temp1)
-                temp2 = unpack(">h", bytes.fromhex(payload[94:98]))[0] / 10
-                self.to_temp(2, temp2)
-                temp3 = unpack(">h", bytes.fromhex(payload[98:102]))[0] / 10
-                self.to_temp(3, temp3)
-                temp4 = unpack(">h", bytes.fromhex(payload[102:106]))[0] / 10
-                self.to_temp(4, temp4)
+                temperature_mos = unpack(">h", bytes.fromhex(payload[84:88]))[0] / 10
+                self.to_temperature(0, temperature_mos)
+                temperature_1 = unpack(">h", bytes.fromhex(payload[90:94]))[0] / 10
+                self.to_temperature(1, temperature_1)
+                temperature_2 = unpack(">h", bytes.fromhex(payload[94:98]))[0] / 10
+                self.to_temperature(2, temperature_2)
+                temperature_3 = unpack(">h", bytes.fromhex(payload[98:102]))[0] / 10
+                self.to_temperature(3, temperature_3)
+                temperature_4 = unpack(">h", bytes.fromhex(payload[102:106]))[0] / 10
+                self.to_temperature(4, temperature_4)
                 self.capacity = int(payload[120:124], base=16) / 100
                 self.capacity_remaining = int(payload[124:128], base=16) / 100
                 self.history.charge_cycles = int(payload[128:132], base=16)
@@ -250,7 +250,7 @@ class Daren485(Battery):
 
                 voltagestatus = int(payload[132:136], base=16)
                 currentstatus = int(payload[136:140], base=16)
-                tempstatus = int(payload[140:144], base=16)
+                temperaturestatus = int(payload[140:144], base=16)
                 warningstatus = int(payload[144:148], base=16)
 
                 # check bit 2 for TOT_OVV_PROT and bit 0 for cell_OVV_PROT
@@ -326,49 +326,49 @@ class Daren485(Battery):
                     self.protection.internal_failure = 0
 
                 # check bit 0 for CHG_H_TEMP_PROT
-                if tempstatus & (1 << 0):
-                    self.protection.high_charge_temp = 2
+                if temperaturestatus & (1 << 0):
+                    self.protection.high_charge_temperature = 2
                 # check bit 8 for CHG_H_TEMP_alarm
-                elif tempstatus & (1 << 8):
-                    self.protection.high_charge_temp = 1
+                elif temperaturestatus & (1 << 8):
+                    self.protection.high_charge_temperature = 1
                 else:
-                    self.protection.high_charge_temp = 0
+                    self.protection.high_charge_temperature = 0
 
                 # check bit 1 for CHG_L_TEMP_PROT
-                if tempstatus & (1 << 1):
-                    self.protection.low_charge_temp = 2
+                if temperaturestatus & (1 << 1):
+                    self.protection.low_charge_temperature = 2
                 # check bit 9 for CHG_L_TEMP_alarm
-                elif tempstatus & (1 << 9):
-                    self.protection.low_charge_temp = 1
+                elif temperaturestatus & (1 << 9):
+                    self.protection.low_charge_temperature = 1
                 else:
-                    self.protection.low_charge_temp = 0
+                    self.protection.low_charge_temperature = 0
 
                 # check bit 0 for CHG_H_TEMP_PROT and bit 2 for DISCH_H_TEMP_PROT
-                if tempstatus & (1 << 0) or tempstatus & (1 << 2):
+                if temperaturestatus & (1 << 0) or temperaturestatus & (1 << 2):
                     self.protection.high_temperature = 2
                 # check bit 8 for CHG_H_TEMP_alarm and bit 10 for DISCH_H_TEMP_alarm
-                elif tempstatus & (1 << 8) or tempstatus & (1 << 10):
+                elif temperaturestatus & (1 << 8) or temperaturestatus & (1 << 10):
                     self.protection.high_temperature = 1
                 else:
                     self.protection.high_temperature = 0
 
                 # check bit 1 for CHG_L_TEMP_PROT and bit 3 for DISCH_L_TEMP_PROT
-                if tempstatus & (1 << 1) or tempstatus & (1 << 3):
+                if temperaturestatus & (1 << 1) or temperaturestatus & (1 << 3):
                     self.protection.low_temperature = 2
                 # check bit 9 for CHG_L_TEMP_alarm and bit 11 for DISCH_L_TEMP_alarm
-                elif tempstatus & (1 << 9) or tempstatus & (1 << 11):
+                elif temperaturestatus & (1 << 9) or temperaturestatus & (1 << 11):
                     self.protection.low_temperature = 1
                 else:
                     self.protection.low_temperature = 0
 
                 # check bit 6 for MOS_H_TEMP_PROT and 4 for ENV_H_TEMP_PROT
-                if tempstatus & (1 << 6) or tempstatus & (1 << 4):
-                    self.protection.high_internal_temp = 2
+                if temperaturestatus & (1 << 6) or temperaturestatus & (1 << 4):
+                    self.protection.high_internal_temperature = 2
                 # check bit 14 for MOS_H_TEMP_alarm and 12 for ENV_H_TEMP_alarm
-                elif tempstatus & (1 << 14) or tempstatus & (1 << 12):
-                    self.protection.high_internal_temp = 1
+                elif temperaturestatus & (1 << 14) or temperaturestatus & (1 << 12):
+                    self.protection.high_internal_temperature = 1
                 else:
-                    self.protection.high_internal_temp = 0
+                    self.protection.high_internal_temperature = 0
 
                 # check bit 13 for blown_fuse from voltagestatus
                 if voltagestatus & (1 << 13):

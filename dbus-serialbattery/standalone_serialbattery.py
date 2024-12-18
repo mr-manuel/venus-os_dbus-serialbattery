@@ -28,9 +28,9 @@
 # Cellcount: Nr
 # CellVolt1 to CellVolt[nr] in *1000 notation -> 3200 = 3,2V
 # ....
-# Temp_Fet in °C
-# Temp_1   in °C
-# temp_2   in °C
+# Temperature_Fet in °C
+# Temperature_1   in °C
+# temperature_2   in °C
 # BatVolt in *100 notation -> 2380 = 23,80V
 # Current in *100 notation -> 1300 = 13,00A; positive = DisCharge current, negative = Charge current
 # SOC     in % (0..100)
@@ -390,11 +390,11 @@ class standalone_serialbattery:
 
             # Cellcount
             # Cellvoltage
-            # temp_FET
-            # temp1
-            # temp2
-            # temp3
-            # temp4
+            # temperature_FET
+            # temperature_1
+            # temperature_2
+            # temperature_3
+            # temperature_4
             # total voltage
             # current
             # soc
@@ -409,26 +409,26 @@ class standalone_serialbattery:
                 Status.append(voltage)
                 self.cells[i] = voltage
 
-            self.temp_fet = self.helper[BatId].battery.temp_mos
-            self.temp_1 = self.helper[BatId].battery.temp1
-            self.temp_2 = self.helper[BatId].battery.temp2
-            self.temp_3 = self.helper[BatId].battery.temp3
-            self.temp_4 = self.helper[BatId].battery.temp4
-            if self.temp_fet is None:
-                self.temp_fet = 0
-            if self.temp_1 is None:
-                self.temp_1 = 0
-            if self.temp_2 is None:
-                self.temp_2 = 0
-            if self.temp_3 is None:
-                self.temp_3 = 0
-            if self.temp_4 is None:
-                self.temp_4 = 0
-            Status.append(self.temp_fet)
-            Status.append(self.temp_1)
-            Status.append(self.temp_2)
-            Status.append(self.temp_3)
-            Status.append(self.temp_4)
+            self.temperature_fet = self.helper[BatId].battery.temperature_mos
+            self.temperature_1 = self.helper[BatId].battery.temperature_1
+            self.temperature_2 = self.helper[BatId].battery.temperature_2
+            self.temperature_3 = self.helper[BatId].battery.temperature_3
+            self.temperature_4 = self.helper[BatId].battery.temperature_4
+            if self.temperature_fet is None:
+                self.temperature_fet = 0
+            if self.temperature_1 is None:
+                self.temperature_1 = 0
+            if self.temperature_2 is None:
+                self.temperature_2 = 0
+            if self.temperature_3 is None:
+                self.temperature_3 = 0
+            if self.temperature_4 is None:
+                self.temperature_4 = 0
+            Status.append(self.temperature_fet)
+            Status.append(self.temperature_1)
+            Status.append(self.temperature_2)
+            Status.append(self.temperature_3)
+            Status.append(self.temperature_4)
 
             # Battery voltage in 100 -> 25,81 = 2581
             self.voltage = int(self.helper[BatId].battery.voltage * 100)

@@ -28,6 +28,13 @@
   * Changes to `config.default.ini`: `EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE` was replaced by `EXTERNAL_SENSOR_DBUS_DEVICE`
   * Changes to `config.default.ini`: `EXTERNAL_CURRENT_SENSOR_DBUS_PATH` was replaced by `EXTERNAL_SENSOR_DBUS_PATH_CURRENT`
 
+* Driver version greater or equal to `v2.0.20241218dev`
+  * Changes to `config.default.ini`: `TEMP_BATTERY` was replaced by `TEMPERATURE_SOURCE_BATTERY`
+  * Changes to `config.default.ini`: `TEMP_1_NAME` was replaced by `TEMPERATURE_1_NAME`
+  * Changes to `config.default.ini`: `TEMP_2_NAME` was replaced by `TEMPERATURE_2_NAME`
+  * Changes to `config.default.ini`: `TEMP_3_NAME` was replaced by `TEMPERATURE_3_NAME`
+  * Changes to `config.default.ini`: `TEMP_4_NAME` was replaced by `TEMPERATURE_4_NAME`
+
 ### What's Changed
 * Added: Calculation of history values not provided by the battery by @mr-manuel
 * Added: Felicity BMS by @versager
@@ -56,6 +63,11 @@
 * Changed: The setting `SEPLOS_USE_BMS_VALUES` was replaced by `USE_BMS_DVCC_VALUES` in the `config.default.ini` by @mr-manuel
 * Changed: The setting `SOC_CALC_CURRENT_MEASURED_BY_USER` was replaced by `CURRENT_MEASURED_BY_USER` in the `config.default.ini` by @mr-manuel
 * Changed: The setting `SOC_CALC_CURRENT_REPORTED_BY_BMS` was replaced by `CURRENT_REPORTED_BY_BMS` in the `config.default.ini` by @mr-manuel
+* Changed: The setting `TEMP_BATTERY` was replaced by `TEMPERATURE_SOURCE_BATTERY` in the `config.default.ini` by @mr-manuel
+* Changed: The setting `TEMP_1_NAME` was replaced by `TEMPERATURE_1_NAME` in the `config.default.ini` by @mr-manuel
+* Changed: The setting `TEMP_2_NAME` was replaced by `TEMPERATURE_2_NAME` in the `config.default.ini` by @mr-manuel
+* Changed: The setting `TEMP_3_NAME` was replaced by `TEMPERATURE_3_NAME` in the `config.default.ini` by @mr-manuel
+* Changed: The setting `TEMP_4_NAME` was replaced by `TEMPERATURE_4_NAME` in the `config.default.ini` by @mr-manuel
 * Changed: Use corrected current for both normal current and SOC calculation if `SOC_CALCULATION` is enabled by @mr-manuel
 * Changed: When `SOC_CALCULATION` is enabled, the SoC is reset to 100%, if the battery switches to float. Old options were removed by @mr-manuel
 * Removed: The setting `SOC_RESET_CURRENT` was removed in the `config.default.ini` by @mr-manuel

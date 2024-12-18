@@ -171,8 +171,8 @@ class BatteryTemplate(Battery):
         self.soc = VALUE_FROM_BMS
 
         # temperature sensor 1 in °C (float)
-        temp1 = VALUE_FROM_BMS
-        self.to_temp(1, temp1)
+        temperature_1 = VALUE_FROM_BMS
+        self.to_temperature(1, temperature_1)
 
         # status of the battery if charging is enabled (bool)
         self.charge_fet = VALUE_FROM_BMS
@@ -188,20 +188,20 @@ class BatteryTemplate(Battery):
         self.capacity_remaining = VALUE_FROM_BMS
 
         # temperature sensor 2 in °C (float)
-        temp2 = VALUE_FROM_BMS
-        self.to_temp(2, temp2)
+        temperature_2 = VALUE_FROM_BMS
+        self.to_temperature(2, temperature_2)
 
         # temperature sensor 3 in °C (float)
-        temp3 = VALUE_FROM_BMS
-        self.to_temp(3, temp3)
+        temperature_3 = VALUE_FROM_BMS
+        self.to_temperature(3, temperature_3)
 
         # temperature sensor 4 in °C (float)
-        temp4 = VALUE_FROM_BMS
-        self.to_temp(4, temp4)
+        temperature_4 = VALUE_FROM_BMS
+        self.to_temperature(4, temperature_4)
 
         # temperature sensor MOSFET in °C (float)
-        temp_mos = VALUE_FROM_BMS
-        self.to_temp(0, temp_mos)
+        temperature_mos = VALUE_FROM_BMS
+        self.to_temperature(0, temperature_mos)
 
         # status of the battery if balancing is enabled (bool)
         self.balance_fet = VALUE_FROM_BMS
@@ -236,10 +236,10 @@ class BatteryTemplate(Battery):
         self.protection.internal_failure = VALUE_FROM_BMS
 
         # high charge temperature alarm (int)
-        self.protection.high_charge_temp = VALUE_FROM_BMS
+        self.protection.high_charge_temperature = VALUE_FROM_BMS
 
         # low charge temperature alarm (int)
-        self.protection.low_charge_temp = VALUE_FROM_BMS
+        self.protection.low_charge_temperature = VALUE_FROM_BMS
 
         # high temperature alarm (int)
         self.protection.high_temperature = VALUE_FROM_BMS
@@ -248,7 +248,7 @@ class BatteryTemplate(Battery):
         self.protection.low_temperature = VALUE_FROM_BMS
 
         # high internal temperature alarm (int)
-        self.protection.high_internal_temp = VALUE_FROM_BMS
+        self.protection.high_internal_temperature = VALUE_FROM_BMS
 
         # fuse blown alarm (int)
         self.protection.fuse_blown = VALUE_FROM_BMS
