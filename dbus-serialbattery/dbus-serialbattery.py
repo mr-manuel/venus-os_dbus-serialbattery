@@ -178,7 +178,7 @@ def main():
 
         return True
 
-    def get_battery(_port: str, _modbus_address: hex = None, _can_message_cache_callback: callable = None) -> Union[Battery, None]:
+    def get_battery(_port: str, _modbus_address: hex = None, can_transport_interface: object = None) -> Union[Battery, None]:
         """
         Attempts to establish a connection to the battery and returns the battery object if successful.
 
@@ -209,7 +209,7 @@ def main():
                     batteryClass = test["bms"]
                     baud = test["baud"] if "baud" in test else None
                     battery: Battery = batteryClass(port=_port, baud=baud, address=_bms_address)
-                    battery.set_message_cache_callback(_can_message_cache_callback)
+                    battery.set_can_transport_interface(can_transport_interface)
                     if battery.test_connection() and battery.validate_data():
                         logger.info("-- Connection established to " + battery.__class__.__name__)
                         return battery
@@ -356,7 +356,7 @@ def main():
         expected_bms_types = [battery_type for battery_type in supported_bms_types if battery_type["bms"].__name__ in BMS_TYPE or len(BMS_TYPE) == 0]
 
         # start the corresponding CanReceiverThread if BMS for this type found
-        from utils_can import CanReceiverThread
+        from utils_can import CanReceiverThread, CanTransportInterface
 
         try:
             can_thread = CanReceiverThread.get_instance(bustype="socketcan", channel=port)
@@ -367,11 +367,15 @@ def main():
         # Slowest message cycle trasmission is every 1 second, wait a bit more for the fist time to fetch all needed data
         sleep(2)
 
+        can_transport_interface = CanTransportInterface()
+        can_transport_interface.can_message_cache_callback = can_thread.get_message_cache
+        can_transport_interface.can_bus = can_thread.bus
+
         # check if BATTERY_ADDRESSES is not empty
         if BATTERY_ADDRESSES:
             logger.info(">>> CAN multi device mode")
             for address in BATTERY_ADDRESSES:
-                checkbatt = get_battery(port, address, can_thread.get_message_cache)
+                checkbatt = get_battery(port, address, can_transport_interface)
                 if checkbatt is not None:
                     battery[address] = checkbatt
                     logger.info("Successful battery connection at " + port + " and this device address " + str(address))
@@ -379,7 +383,7 @@ def main():
                     logger.warning("No battery connection at " + port + " and this device address " + str(address))
         # use default address
         else:
-            battery[0] = get_battery(port, None, can_thread.get_message_cache)
+            battery[0] = get_battery(port, None, can_transport_interface)
 
     # SERIAL
     else:

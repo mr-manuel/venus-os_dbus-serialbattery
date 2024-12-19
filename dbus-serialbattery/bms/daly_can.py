@@ -20,6 +20,8 @@ from utils import (
 from struct import unpack_from
 from time import time
 import sys
+from can import Message
+from time import sleep
 
 
 class Daly_Can(Battery):
@@ -113,16 +115,13 @@ class Daly_Can(Battery):
         result = False
         try:
             # get settings to check if the data is valid and the connection is working
-            result = self.get_settings()
+            self.get_settings()
+            result = self.refresh_data()
 
             # if there are no messages in the cache after sleeping, something is wrong
-            if not self.can_message_cache_callback().items():
+            if not result:
                 logger.error("Error: found no messages on can bus, is it properly configured?")
-                result = False
 
-            # get the rest of the data to be sure, that all data is valid and the correct battery type is recognized
-            # only read next data if the first one was successful, this saves time when checking multiple battery types
-            result = result and self.refresh_data()
         except Exception:
             (
                 exception_type,
@@ -148,12 +147,35 @@ class Daly_Can(Battery):
         # call all functions that will refresh the battery data.
         # This will be called for every iteration (1 second)
         # Return True if success, False for failure
+        self.request_daly_can()
+        sleep(0.1)
+
         result = self.read_daly_can()
         # check if connection success
-        if result is False:
-            return False
+        return result
 
-        return True
+    def request_daly_can(self):
+        data = bytearray(b"\x00\x00\x00\x00\x00\x00\x00\x00")
+
+        message = Message(arbitration_id=self.CAN_FRAMES[self.COMMAND_SOC][0], data=data)
+        self.can_transport_interface.can_bus.send(message, timeout=0.2)
+        message = Message(arbitration_id=self.CAN_FRAMES[self.COMMAND_MINMAX_CELL_VOLTS][0], data=data)
+        self.can_transport_interface.can_bus.send(message, timeout=0.2)
+        message = Message(arbitration_id=self.CAN_FRAMES[self.COMMAND_MINMAX_TEMP][0], data=data)
+        self.can_transport_interface.can_bus.send(message, timeout=0.2)
+        message = Message(arbitration_id=self.CAN_FRAMES[self.COMMAND_FET][0], data=data)
+        self.can_transport_interface.can_bus.send(message, timeout=0.2)
+        message = Message(arbitration_id=self.CAN_FRAMES[self.COMMAND_STATUS][0], data=data)
+        self.can_transport_interface.can_bus.send(message, timeout=0.2)
+        message = Message(arbitration_id=self.CAN_FRAMES[self.COMMAND_CELL_VOLTS][0], data=data)
+        self.can_transport_interface.can_bus.send(message, timeout=0.2)
+        # unused
+        # message = Message(arbitration_id=self.CAN_FRAMES[self.COMMAND_TEMP][0], data=data)
+        # self.can_transport_interface.can_bus.send(message, timeout=0.2)
+        message = Message(arbitration_id=self.CAN_FRAMES[self.COMMAND_CELL_BALANCE][0], data=data)
+        self.can_transport_interface.can_bus.send(message, timeout=0.2)
+        message = Message(arbitration_id=self.CAN_FRAMES[self.COMMAND_ALARM][0], data=data)
+        self.can_transport_interface.can_bus.send(message, timeout=0.2)
 
     def read_daly_can(self):
         # reset errors after timeout
@@ -169,11 +191,10 @@ class Daly_Can(Battery):
         crntMinValid = -(MAX_BATTERY_DISCHARGE_CURRENT * 2.1)
         crntMaxValid = MAX_BATTERY_CHARGE_CURRENT * 1.3
 
-        for frame_id, data in self.can_message_cache_callback().items():
+        for frame_id, data in self.can_transport_interface.can_message_cache_callback().items():
             normalized_arbitration_id = frame_id + self.device_address
-
             # Status data
-            if normalized_arbitration_id in self.CAN_FRAMES[self.COMMAND_STATUS]:
+            if normalized_arbitration_id in self.CAN_FRAMES[self.RESPONSE_STATUS]:
                 (
                     self.cell_count,
                     temperature_sensors,
@@ -181,14 +202,14 @@ class Daly_Can(Battery):
                     self.load_connected,
                     state,
                     self.history.charge_cycles,
-                ) = unpack_from(">BB??BHX", data)
+                ) = unpack_from(">bb??bhx", data)
 
                 if self.cell_count != 0:
                     # check if all needed data is available
                     data_check += 1
 
             # SOC data
-            elif normalized_arbitration_id in self.CAN_FRAMES[self.COMMAND_SOC]:
+            elif normalized_arbitration_id in self.CAN_FRAMES[self.RESPONSE_SOC]:
 
                 voltage, tmp, current, soc = unpack_from(">HHHH", data)
                 current = (current - self.CURRENT_ZERO_CONSTANT) / -10 * INVERT_CURRENT_MEASUREMENT
@@ -202,7 +223,7 @@ class Daly_Can(Battery):
                     data_check += 1
 
             # Cell voltage data
-            elif normalized_arbitration_id in self.CAN_FRAMES[self.COMMAND_CELL_VOLTS]:
+            elif normalized_arbitration_id in self.CAN_FRAMES[self.RESPONSE_CELL_VOLTS]:
                 if self.cell_count is not None:
 
                     frameCell = [0, 0, 0]
@@ -227,7 +248,7 @@ class Daly_Can(Battery):
                         bufIdx += 8
 
             # Cell voltage range data
-            elif normalized_arbitration_id in self.CAN_FRAMES[self.COMMAND_MINMAX_CELL_VOLTS]:
+            elif normalized_arbitration_id in self.CAN_FRAMES[self.RESPONSE_MINMAX_CELL_VOLTS]:
                 (
                     cell_max_voltage,
                     self.cell_max_no,
@@ -242,18 +263,18 @@ class Daly_Can(Battery):
                 self.cell_min_voltage = cell_min_voltage / 1000
 
             # Temperature range data
-            elif normalized_arbitration_id in self.CAN_FRAMES[self.COMMAND_MINMAX_TEMP]:
+            elif normalized_arbitration_id in self.CAN_FRAMES[self.RESPONSE_MINMAX_TEMP]:
 
                 max_temp, max_no, min_temp, min_no = unpack_from(">BBBB", data)
 
                 # store temperatures in a dict to assign the temperature to the correct sensor
                 temperatures = {min_no: (min_temp - self.TEMP_ZERO_CONSTANT), max_no: (max_temp - self.TEMP_ZERO_CONSTANT)}
 
-                self.to_temperature(1, temperatures[0])
-                self.to_temperature(2, temperatures[1])
+                self.to_temperature(1, temperatures[min_no])
+                self.to_temperature(2, temperatures[max_no])
 
             # FET data
-            elif normalized_arbitration_id in self.CAN_FRAMES[self.COMMAND_FET]:
+            elif normalized_arbitration_id in self.CAN_FRAMES[self.RESPONSE_FET]:
                 (
                     status,
                     self.charge_fet,
@@ -264,7 +285,7 @@ class Daly_Can(Battery):
                 self.capacity_remain = capacity_remain / 1000
 
             # Alarm data
-            elif normalized_arbitration_id in self.CAN_FRAMES[self.COMMAND_ALARM]:
+            elif normalized_arbitration_id in self.CAN_FRAMES[self.RESPONSE_ALARM]:
                 (
                     al_volt,
                     al_temp,

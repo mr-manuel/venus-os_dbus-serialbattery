@@ -285,7 +285,7 @@ class Battery(ABC):
         self.port: str = port
         self.baud_rate: int = baud
         self.address: str = address
-        self.can_message_cache_callback: callable = None
+        self.can_transport_interface: object = None
         self.role: str = "battery"
         self.type: str = "Generic"
         self.poll_interval: int = 1000
@@ -490,14 +490,14 @@ class Battery(ABC):
         """
         return False
 
-    def set_message_cache_callback(self, callback: callable) -> None:
+    def set_can_transport_interface(self, can_transport_interface: object) -> None:
         """
-        Set the callback for the can message cache.
+        Set the access object for the can interface.
 
-        :param callback: the callback
+        :param can_transport_interface: the can_transport_interface object
         :return: None
         """
-        self.can_message_cache_callback: callable = callback
+        self.can_transport_interface: object = can_transport_interface
 
     @abstractmethod
     def get_settings(self) -> bool:
@@ -2192,7 +2192,7 @@ class Battery(ABC):
 
         if "average_discharge" not in self.history.exclude_values_to_calculate:
             # Has to be negative
-            if self.history.total_ah_drawn is not None and self.history.charge_cycles is not None:
+            if self.history.total_ah_drawn is not None and self.history.charge_cycles is not None and self.history.charge_cycles > 0:
                 self.history.average_discharge = self.history.total_ah_drawn / self.history.charge_cycles
 
         if "minimum_voltage" not in self.history.exclude_values_to_calculate:
