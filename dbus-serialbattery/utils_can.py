@@ -40,6 +40,8 @@ class CanReceiverThread(threading.Thread):
         return cls._instances[(channel, bustype)]
 
     def run(self):
+        # bring up can interface on os level
+        self.setup_can(self.channel)
         self.bus = can.interface.Bus(channel=self.channel, bustype=self.bustype)
 
         # fetch the bitrate from the current port, for logging only
@@ -75,4 +77,23 @@ class CanReceiverThread(threading.Thread):
                     return int(line.split("bitrate")[1].split()[0])
         except Exception as e:
             logger.error(f"Error fetching bitrate: {e}")
+            raise
+
+    @staticmethod
+    def setup_can(channel):
+        try:
+            subprocess.run(["ip", "link", "set", f"{channel}", "down"], capture_output=True, text=True, check=True)
+            result = subprocess.run(
+                ["ip", "link", "set", f"{channel}", "type", "can", "bitrate", "250000"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            result.check_returncode()
+
+            result = subprocess.run(["ip", "link", "set", f"{channel}", "up"], capture_output=True, text=True, check=True)
+            result.check_returncode()
+
+        except Exception as e:
+            logger.error(f"Error bringing up {channel}: {e}")
             raise
