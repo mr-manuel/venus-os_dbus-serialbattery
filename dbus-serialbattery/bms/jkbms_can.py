@@ -94,7 +94,7 @@ class Jkbms_Can(Battery):
             result = self.get_settings()
 
             # if there are no messages in the cache after sleeping, something is wrong
-            if not self.can_message_cache_callback().items():
+            if not self.can_transport_interface.can_message_cache_callback().items():
                 logger.error("Error: found no messages on can bus, is it properly configured?")
                 result = False
 
@@ -197,7 +197,7 @@ class Jkbms_Can(Battery):
         # check if all needed data is available
         data_check = 0
 
-        for frame_id, data in self.can_message_cache_callback().items():
+        for frame_id, data in self.can_transport_interface.can_message_cache_callback().items():
             normalized_arbitration_id = frame_id + self.device_address
 
             # Frame is send every 20ms
