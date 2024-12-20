@@ -251,41 +251,6 @@ class History:
             if attribute not in self.exclude_values_to_calculate:
                 setattr(self, attribute, None)
 
-    def reset_values(self, attributes: list = []) -> None:
-        """
-        Reset all calculated values that are not excluded.
-
-        :param attributes: list of attributes to reset, if empty all attributes are reset
-        :return: None
-        """
-        attributes = (
-            [
-                "deepest_discharge",
-                "last_discharge",
-                "average_discharge",
-                "total_ah_drawn",
-                "charge_cycles",
-                "time_since_last_full_charge",
-                "full_discharges",
-                "minimum_voltage",
-                "maximum_voltage",
-                "minimum_cell_voltage",
-                "maximum_cell_voltage",
-                "low_voltage_alarms",
-                "high_voltage_alarms",
-                "minimum_temperature",
-                "maximum_temperature",
-                "discharged_energy",
-                "charged_energy",
-            ]
-            if not attributes
-            else attributes
-        )
-
-        for attribute in attributes:
-            if attribute not in self.exclude_values_to_calculate:
-                setattr(self, attribute, None)
-
 
 class Cell:
     """
