@@ -36,7 +36,7 @@ class Daly_Can(Battery):
         self.poll_interval = 1000
         self.poll_step = 0
         self.type = self.BATTERYTYPE
-        self.can_bus = None
+        # self.can_bus = None
         self.device_address = int.from_bytes(address, byteorder="big") if address is not None else 0
         self.error_active = False
         self.last_error_time = 0

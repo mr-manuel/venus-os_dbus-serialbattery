@@ -360,16 +360,15 @@ def main():
 
         try:
             can_thread = CanReceiverThread.get_instance(bustype="socketcan", channel=port)
+            can_transport_interface = CanTransportInterface()
+            can_transport_interface.can_message_cache_callback = can_thread.get_message_cache
+            can_transport_interface.can_bus = can_thread.bus
         except Exception as e:
             print(f"Error: {e}")
 
         logger.debug("Wait shortly to make sure that all needed data is in the cache")
         # Slowest message cycle trasmission is every 1 second, wait a bit more for the fist time to fetch all needed data
         sleep(2)
-
-        can_transport_interface = CanTransportInterface()
-        can_transport_interface.can_message_cache_callback = can_thread.get_message_cache
-        can_transport_interface.can_bus = can_thread.bus
 
         # check if BATTERY_ADDRESSES is not empty
         if BATTERY_ADDRESSES:

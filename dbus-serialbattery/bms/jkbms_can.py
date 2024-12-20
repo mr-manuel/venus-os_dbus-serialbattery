@@ -342,6 +342,13 @@ class Jkbms_Can(Battery):
             elif normalized_arbitration_id in self.CAN_FRAMES[self.CELL_VOLT_EXT6]:
                 self.update_cell_voltages(20, 23, data)
 
+        # check if all needed data is available
+        # sum of all data checks except for alarms
+        logger.debug("Data check: %d" % (data_check))
+        if data_check == 0:
+            logger.error(">>> ERROR: No reply - returning")
+            return False
+
         # fetch data from min/max values if protocol is JKBMS CAN V1 (extra frames missing)
         if data_check < 128:
 
@@ -374,12 +381,5 @@ class Jkbms_Can(Battery):
 
         if self.hardware_version is None:
             self.hardware_version = "JKBMS CAN" + (" V2" + str(self.cell_count) + "S" if self.protocol_version == 2 else "")
-
-        # check if all needed data is available
-        # sum of all data checks except for alarms
-        logger.debug("Data check: %d" % (data_check))
-        if data_check == 0:
-            logger.error(">>> ERROR: No reply - returning")
-            return False
 
         return True

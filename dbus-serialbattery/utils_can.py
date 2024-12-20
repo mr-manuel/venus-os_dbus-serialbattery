@@ -41,7 +41,7 @@ class CanReceiverThread(threading.Thread):
 
     def run(self):
         # bring up can interface on os level
-        self.setup_can(self.channel)
+        # self.setup_can(self.channel)
         self.bus = can.interface.Bus(channel=self.channel, bustype=self.bustype)
 
         # fetch the bitrate from the current port, for logging only
