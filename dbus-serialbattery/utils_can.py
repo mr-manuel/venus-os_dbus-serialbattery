@@ -53,6 +53,11 @@ class CanReceiverThread(threading.Thread):
 
             if message is not None:
                 with self.cache_lock:
+
+                    # daly hack: cell voltage messages are sent with same id, so use frame id additionally
+                    if message.arbitration_id == 0x18954001:
+                        message.arbitration_id = message.arbitration_id + message.data[0]
+
                     # cache data with arbitration id as key
                     self.message_cache[message.arbitration_id] = message.data
                 # print(f"[{self.channel}] Empfangen: ID={hex(message.arbitration_id)}, Daten={message.data}")
