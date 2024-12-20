@@ -19,7 +19,7 @@ import logging
 
 # "" = default = "/dev/ttyUSB0"
 # if you have another device specify here
-#DEVPATH = "/dev/ttyAMA0"  # with Waveshare CAN/RS485 HAT
+# DEVPATH = "/dev/ttyAMA0"  # with Waveshare CAN/RS485 HAT
 DEVPATH = "/dev/ttyUSB0"
 USEDIDADR = 1
 
@@ -43,8 +43,10 @@ def on_exit():
     print("CLEAN UP ...")
     sasb.bms_close()
 
+
 def handle_exit(signum, frame):
     sys.exit(0)
+
 
 # ### Main
 atexit.register(on_exit)
