@@ -157,6 +157,9 @@ class Daly_Can(Battery):
     def request_daly_can(self):
         data = bytearray(b"\x00\x00\x00\x00\x00\x00\x00\x00")
 
+        if self.can_transport_interface.can_bus is None:
+            raise RuntimeError("Can Interface not initialised")
+
         message = Message(arbitration_id=self.CAN_FRAMES[self.COMMAND_SOC][0], data=data)
         self.can_transport_interface.can_bus.send(message, timeout=0.2)
         message = Message(arbitration_id=self.CAN_FRAMES[self.COMMAND_MINMAX_CELL_VOLTS][0], data=data)
