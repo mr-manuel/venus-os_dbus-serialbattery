@@ -147,7 +147,7 @@ class HLPdataBMS4S(Battery):
             return False
         par0 = p0[ix - 1 : len(p0)]
 
-        # v1,v2,v3,v4,current,soc,chargeoff,loadoff,vbat2,socnow,adj,beep,led,temp1,temp2...
+        # v1,v2,v3,v4,current,soc,chargeoff,loadoff,vbat2,socnow,adj,beep,led,temperature_1,temperature_2...
         # 0  1  2  3  4       5   6         7       8     9      10  11   12  13    14...
 
         self.voltage = float(par0) + float(par[1]) + float(par[2]) + float(par[3])
@@ -166,13 +166,13 @@ class HLPdataBMS4S(Battery):
 
         beep = int(par[11])
         if beep == 2:
-            self.protection.low_charge_temp = 1
+            self.protection.low_charge_temperature = 1
         else:
-            self.protection.low_charge_temp = 0
+            self.protection.low_charge_temperature = 0
         if beep == 3:
-            self.protection.high_charge_temp = 1
+            self.protection.high_charge_temperature = 1
         else:
-            self.protection.high_charge_temp = 0
+            self.protection.high_charge_temperature = 0
         if beep == 4:
             self.protection.low_voltage = 2
         else:
@@ -192,19 +192,19 @@ class HLPdataBMS4S(Battery):
                 if len(tmp) == 2:
                     name = tmp[0]
                     if name[0] == "b":
-                        temp = int("".join(filter(str.isdigit, tmp[1])))
+                        temperature = int("".join(filter(str.isdigit, tmp[1])))
                         nb += 1
-                        if temp > max:
-                            max = temp
-                        if temp < min:
-                            min = temp
+                        if temperature > max:
+                            max = temperature
+                        if temperature < min:
+                            min = temperature
                 else:
-                    logger.error(">>> ERROR: temp")
+                    logger.error(">>> ERROR: temperature")
             if nb == 1:
-                self.temp1 = max
+                self.temperature_1 = max
             if nb > 1:
-                self.temp1 = max
-                self.temp2 = min
+                self.temperature_1 = max
+                self.temperature_2 = min
         return True
 
     def manage_charge_voltage(self):

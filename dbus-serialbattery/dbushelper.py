@@ -679,6 +679,7 @@ class DbusHelper:
         self._dbusservice.add_path("/Alarms/LowCellVoltage", None, writeable=True)
         self._dbusservice.add_path("/Alarms/HighCellVoltage", None, writeable=True)
         self._dbusservice.add_path("/Alarms/LowSoc", None, writeable=True)
+        self._dbusservice.add_path("/Alarms/StateOfHealth", None, writeable=True)
         self._dbusservice.add_path("/Alarms/HighChargeCurrent", None, writeable=True)
         self._dbusservice.add_path("/Alarms/HighDischargeCurrent", None, writeable=True)
         self._dbusservice.add_path("/Alarms/CellImbalance", None, writeable=True)
@@ -763,6 +764,20 @@ class DbusHelper:
             # Call the battery's refresh_data function
             result = self.battery.refresh_data()
 
+            # Check if external sensor is still connected
+            if utils.EXTERNAL_SENSOR_DBUS_DEVICE is not None and (
+                utils.EXTERNAL_SENSOR_DBUS_PATH_CURRENT is not None or utils.EXTERNAL_SENSOR_DBUS_PATH_SOC is not None
+            ):
+                # Check if external sensor was and is still connected
+                if self.battery.dbus_external_objects is not None and utils.EXTERNAL_SENSOR_DBUS_DEVICE not in get_bus().list_names():
+                    logger.error("External current sensor was disconnected, falling back to internal sensor")
+                    self.battery.dbus_external_objects = None
+
+                # Check if external current sensor was not connected and is now connected
+                elif self.battery.dbus_external_objects is None and utils.EXTERNAL_SENSOR_DBUS_DEVICE in get_bus().list_names():
+                    logger.info("External current sensor was connected, switching to external sensor")
+                    self.battery.setup_external_sensor()
+
             # Calculate the values for the battery
             self.battery.set_calculated_data()
 
@@ -834,18 +849,6 @@ class DbusHelper:
                 if time_since_first_error >= 60 * utils.BLOCK_ON_DISCONNECT_TIMEOUT_MINUTES and not utils.BLOCK_ON_DISCONNECT:
                     loop.quit()
 
-            # Check if external current sensor is still connected
-            if utils.EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE is not None and utils.EXTERNAL_CURRENT_SENSOR_DBUS_PATH is not None:
-                # Check if external current sensor was and is still connected
-                if self.battery.dbus_external_objects is not None and utils.EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE not in get_bus().list_names():
-                    logger.error("External current sensor was disconnected, falling back to internal sensor")
-                    self.battery.dbus_external_objects = None
-
-                # Check if external current sensor was not connected and is now connected
-                elif self.battery.dbus_external_objects is None and utils.EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE in get_bus().list_names():
-                    logger.info("External current sensor was connected, switching to external sensor")
-                    self.battery.setup_external_current_sensor()
-
             # This is to manage CVCL
             self.battery.manage_charge_voltage()
 
@@ -897,7 +900,7 @@ class DbusHelper:
         self._dbusservice["/Dc/0/Voltage"] = round(self.battery.voltage, 2) if self.battery.voltage is not None else None
         self._dbusservice["/Dc/0/Current"] = round(self.battery.current_calc, 2) if self.battery.current_calc is not None else None
         self._dbusservice["/Dc/0/Power"] = round(self.battery.power_calc, 2) if self.battery.power_calc is not None else None
-        self._dbusservice["/Dc/0/Temperature"] = self.battery.get_temp()
+        self._dbusservice["/Dc/0/Temperature"] = self.battery.get_temperature()
         self._dbusservice["/Capacity"] = self.battery.get_capacity_remain()
         self._dbusservice["/ConsumedAmphours"] = self.battery.get_capacity_consumed()
 
@@ -927,7 +930,9 @@ class DbusHelper:
         self._dbusservice["/History/MaximumVoltage"] = self.battery.history.maximum_voltage
         self._dbusservice["/History/MinimumCellVoltage"] = self.battery.history.minimum_cell_voltage
         self._dbusservice["/History/MaximumCellVoltage"] = self.battery.history.maximum_cell_voltage
-        self._dbusservice["/History/TimeSinceLastFullCharge"] = self.battery.history.time_since_last_full_charge
+        self._dbusservice["/History/TimeSinceLastFullCharge"] = (
+            int(time()) - self.battery.history.timestamp_last_full_charge if self.battery.history.timestamp_last_full_charge is not None else None
+        )
         self._dbusservice["/History/LowVoltageAlarms"] = self.battery.history.low_voltage_alarms
         self._dbusservice["/History/HighVoltageAlarms"] = self.battery.history.high_voltage_alarms
         self._dbusservice["/History/MinimumTemperature"] = self.battery.history.minimum_temperature
@@ -943,19 +948,19 @@ class DbusHelper:
         self._dbusservice["/System/NrOfModulesBlockingDischarge"] = 0 if self.battery.get_allow_to_discharge() else 1
         self._dbusservice["/System/NrOfModulesOnline"] = 1 if self.battery.online else 0
         self._dbusservice["/System/NrOfModulesOffline"] = 0 if self.battery.online else 1
-        self._dbusservice["/System/MinCellTemperature"] = self.battery.get_min_temp()
-        self._dbusservice["/System/MinTemperatureCellId"] = self.battery.get_min_temp_id()
-        self._dbusservice["/System/MaxCellTemperature"] = self.battery.get_max_temp()
-        self._dbusservice["/System/MaxTemperatureCellId"] = self.battery.get_max_temp_id()
-        self._dbusservice["/System/MOSTemperature"] = self.battery.get_mos_temp()
-        self._dbusservice["/System/Temperature1"] = self.battery.temp1
-        self._dbusservice["/System/Temperature1Name"] = utils.TEMP_1_NAME
-        self._dbusservice["/System/Temperature2"] = self.battery.temp2
-        self._dbusservice["/System/Temperature2Name"] = utils.TEMP_2_NAME
-        self._dbusservice["/System/Temperature3"] = self.battery.temp3
-        self._dbusservice["/System/Temperature3Name"] = utils.TEMP_3_NAME
-        self._dbusservice["/System/Temperature4"] = self.battery.temp4
-        self._dbusservice["/System/Temperature4Name"] = utils.TEMP_4_NAME
+        self._dbusservice["/System/MinCellTemperature"] = self.battery.get_min_temperature()
+        self._dbusservice["/System/MinTemperatureCellId"] = self.battery.get_min_temperature_id()
+        self._dbusservice["/System/MaxCellTemperature"] = self.battery.get_max_temperature()
+        self._dbusservice["/System/MaxTemperatureCellId"] = self.battery.get_max_temperature_id()
+        self._dbusservice["/System/MOSTemperature"] = self.battery.temperature_mos
+        self._dbusservice["/System/Temperature1"] = self.battery.temperature_1
+        self._dbusservice["/System/Temperature1Name"] = utils.TEMPERATURE_1_NAME
+        self._dbusservice["/System/Temperature2"] = self.battery.temperature_2
+        self._dbusservice["/System/Temperature2Name"] = utils.TEMPERATURE_2_NAME
+        self._dbusservice["/System/Temperature3"] = self.battery.temperature_3
+        self._dbusservice["/System/Temperature3Name"] = utils.TEMPERATURE_3_NAME
+        self._dbusservice["/System/Temperature4"] = self.battery.temperature_4
+        self._dbusservice["/System/Temperature4Name"] = utils.TEMPERATURE_4_NAME
 
         # Voltage control
         self._dbusservice["/Info/MaxChargeVoltage"] = (
@@ -1001,12 +1006,12 @@ class DbusHelper:
         self._dbusservice["/Alarms/HighDischargeCurrent"] = self.battery.protection.high_discharge_current
         self._dbusservice["/Alarms/CellImbalance"] = self.battery.protection.cell_imbalance
         self._dbusservice["/Alarms/InternalFailure"] = self.battery.protection.internal_failure
-        self._dbusservice["/Alarms/HighChargeTemperature"] = self.battery.protection.high_charge_temp
-        self._dbusservice["/Alarms/LowChargeTemperature"] = self.battery.protection.low_charge_temp
+        self._dbusservice["/Alarms/HighChargeTemperature"] = self.battery.protection.high_charge_temperature
+        self._dbusservice["/Alarms/LowChargeTemperature"] = self.battery.protection.low_charge_temperature
         self._dbusservice["/Alarms/HighTemperature"] = self.battery.protection.high_temperature
         self._dbusservice["/Alarms/LowTemperature"] = self.battery.protection.low_temperature
         self._dbusservice["/Alarms/BmsCable"] = 2 if self.battery.block_because_disconnect else 0
-        self._dbusservice["/Alarms/HighInternalTemperature"] = self.battery.protection.high_internal_temp
+        self._dbusservice["/Alarms/HighInternalTemperature"] = self.battery.protection.high_internal_temperature
         self._dbusservice["/Alarms/FuseBlown"] = self.battery.protection.fuse_blown
 
         # cell voltages

@@ -24,18 +24,32 @@
   * Changes to `config.default.ini`: `SOC_CALC_CURRENT_REPORTED_BY_BMS` was replaced by `CURRENT_REPORTED_BY_BMS`
   * Changes to `config.default.ini`: `SOC_CALC_CURRENT_MEASURED_BY_USER` was replaced by `CURRENT_MEASURED_BY_USER`
 
+* Driver version greater or equal to `v2.0.20241217dev`
+  * Changes to `config.default.ini`: `EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE` was replaced by `EXTERNAL_SENSOR_DBUS_DEVICE`
+  * Changes to `config.default.ini`: `EXTERNAL_CURRENT_SENSOR_DBUS_PATH` was replaced by `EXTERNAL_SENSOR_DBUS_PATH_CURRENT`
+
+* Driver version greater or equal to `v2.0.20241218dev`
+  * Changes to `config.default.ini`: `TEMP_BATTERY` was replaced by `TEMPERATURE_SOURCE_BATTERY`
+  * Changes to `config.default.ini`: `TEMP_1_NAME` was replaced by `TEMPERATURE_1_NAME`
+  * Changes to `config.default.ini`: `TEMP_2_NAME` was replaced by `TEMPERATURE_2_NAME`
+  * Changes to `config.default.ini`: `TEMP_3_NAME` was replaced by `TEMPERATURE_3_NAME`
+  * Changes to `config.default.ini`: `TEMP_4_NAME` was replaced by `TEMPERATURE_4_NAME`
+
 ### What's Changed
 * Added: Calculation of history values not provided by the battery by @mr-manuel
 * Added: Felicity BMS by @versager
 * Added: JKBMS CAN - Extended protocol with version V2 by @Hooorny and @mr-manuel
 * Added: LiTime BMS by @calledit
 * Added: Min/Max lifetime temperature to history class and battery template by @mr-manuel
+* Added: Pace BMS by @KoljaWindeler
+* Added: Possibility to add external sensor for SoC by @mr-manuel
 * Added: Signal handler for clean service restart/shutdown by @mr-manuel
 * Changed: A lot of under the hood optimizations by @mr-manuel
 * Changed: Consumed capacity must be negative values by @mr-manuel
 * Changed: Daly CAN - Refactored driver to match new CAN standard by @mr-manuel
 * Changed: Dependencies are now shipped with the driver and not downloaded anymore which allows a complete offline installation by @mr-manuel
 * Changed: Driver was moved from `/data/etc/dbus-serialbattery` to `/data/apps/dbus-serialbattery` by @mr-manuel
+* Changed: Fix missing charge/discharge fet status for EG4 LifePower, EG4 LL and Renogy. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/129 by @mr-manuel
 * Changed: Fixed issue, when calculated SOC is restored from dbus and BMS SOC is 0 by @mr-manuel
 * Changed: Improved driver and `config.default.ini` descriptions by @mr-manuel
 * Changed: JKBMS CAN - Per default only address 0 is recognized. Change `BATTERY_ADDRESS` to match your device address by @Hooorny and @mr-manuel
@@ -43,17 +57,35 @@
 * Changed: Refactored driver installation via USB/SD card by @mr-manuel
 * Changed: The driver is now running directly from it's app folder. No need to copy the `config.ini` file anywhere, which means changes are applied by simply restarting the service by @mr-manuel
 * Changed: The root filesystem is not mounted as read-write anymore, since overlay filesystems are used now. This allows to let the core system files untouched and to revert all changes with one command. The changes are now also persistant and do not have to be installed on every Venus OS update again by @mr-manuel
+* Changed: The setting `EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE` was replaced by `EXTERNAL_SENSOR_DBUS_DEVICE` in the `config.default.ini` by @mr-manuel
+* Changed: The setting `EXTERNAL_CURRENT_SENSOR_DBUS_PATH` was replaced by `EXTERNAL_SENSOR_DBUS_PATH_CURRENT` in the `config.default.ini` by @mr-manuel
 * Changed: The setting `MODBUS_ADDRESSES` was replaced by `BATTERY_ADDRESSES` in the `config.default.ini` by @mr-manuel
 * Changed: The setting `SEPLOS_USE_BMS_VALUES` was replaced by `USE_BMS_DVCC_VALUES` in the `config.default.ini` by @mr-manuel
 * Changed: The setting `SOC_CALC_CURRENT_MEASURED_BY_USER` was replaced by `CURRENT_MEASURED_BY_USER` in the `config.default.ini` by @mr-manuel
 * Changed: The setting `SOC_CALC_CURRENT_REPORTED_BY_BMS` was replaced by `CURRENT_REPORTED_BY_BMS` in the `config.default.ini` by @mr-manuel
+* Changed: The setting `TEMP_BATTERY` was replaced by `TEMPERATURE_SOURCE_BATTERY` in the `config.default.ini` by @mr-manuel
+* Changed: The setting `TEMP_1_NAME` was replaced by `TEMPERATURE_1_NAME` in the `config.default.ini` by @mr-manuel
+* Changed: The setting `TEMP_2_NAME` was replaced by `TEMPERATURE_2_NAME` in the `config.default.ini` by @mr-manuel
+* Changed: The setting `TEMP_3_NAME` was replaced by `TEMPERATURE_3_NAME` in the `config.default.ini` by @mr-manuel
+* Changed: The setting `TEMP_4_NAME` was replaced by `TEMPERATURE_4_NAME` in the `config.default.ini` by @mr-manuel
 * Changed: Use corrected current for both normal current and SOC calculation if `SOC_CALCULATION` is enabled by @mr-manuel
 * Changed: When `SOC_CALCULATION` is enabled, the SoC is reset to 100%, if the battery switches to float. Old options were removed by @mr-manuel
 * Removed: The setting `SOC_RESET_CURRENT` was removed in the `config.default.ini` by @mr-manuel
 * Removed: The setting `SOC_RESET_TIME` was removed in the `config.default.ini` by @mr-manuel
 
 
+## v1.5.20241215
+
+### What's Changed
+
+* Changed: Fixed typo in code that prevent driver from starting, if old battery instances are present by @mr-manuel
+
+
 ## v1.5.20241202
+
+### Known issues
+
+* If you have old battery instances that should be deleted, you see the error `dbus.exceptions.UnknownMethodException: org.freedesktop.DBus.Error.UnknownMethod: Unknown method: remove_settingss is not a valid method of interface com.victronenergy.Settings` in the logs and the driver does not start anymore. Upgrade to `v1.5.20241215` to solve the problem.
 
 ### What's Changed
 

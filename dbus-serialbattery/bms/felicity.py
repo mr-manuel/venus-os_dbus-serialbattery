@@ -29,13 +29,13 @@ class Felicity(Battery):
 
     command_read = b"\x03"
     command_cell_voltages = b"\x13\x2a\x00\x10"  # Registers 4906
-    command_bms_temp1_3 = b"\x13\x39\x00\x05"  # Register  4929-4931 (tempsensor1-3)
+    command_bms_temperature_1_3 = b"\x13\x39\x00\x05"  # Register  4929-4931 (tempsensor1-3)
 
     command_dvcc = b"\x13\x1C\x00\x04"  # Registers  4892(charger and discharger informations)
     command_status = b"\x13\x02\x00\x03"  # Registers 4866(battery status and fault informations)
 
     command_total_voltage_current = b"\x13\x06\x00\x02"  # Register 4870-4871
-    command_bms_temp1 = b"\x13\x0A\x00\x01"  # Register  4874 (bms_temp)
+    command_bms_temperature_1 = b"\x13\x0A\x00\x01"  # Register  4874 (bms_temp)
     command_soc = b"\x13\x0B\x00\x01"  # Registers 4875(soc)
     command_firmware_version = b"\xF8\x0B\x00\x01"  # Registers 63499 (1 byte string)
     command_serialnumber = b"\xF8\x04\x00\x05"  # Registers 63492 (1 byte string)
@@ -83,7 +83,7 @@ class Felicity(Battery):
         # Return True if success, False for failure
         result = self.read_soc_data()
         result = result and self.read_cell_data()
-        result = result and self.read_temp_data()
+        result = result and self.read_temperature_data()
 
         return result
 
@@ -118,7 +118,7 @@ class Felicity(Battery):
         for c in range(self.cell_count):
             self.cells.append(Cell(False))
 
-        self.temp_sensors = 4
+        # temperature_sensors = 4
 
         return True
 
@@ -197,11 +197,11 @@ class Felicity(Battery):
             # Discharge current high status
             self.protection.high_discharge_current = 2 if (fault_int & 0b0000000000100000) > 0 else 0
             # BMS Temperature high status
-            self.protection.high_internal_temp = 2 if (fault_int & 0b0000000001000000) > 0 else 0
+            self.protection.high_internal_temperature = 2 if (fault_int & 0b0000000001000000) > 0 else 0
             # Cell Temperature high status
-            self.protection.high_charge_temp = 2 if (fault_int & 0b0000000100000000) > 0 else 0
+            self.protection.high_charge_temperature = 2 if (fault_int & 0b0000000100000000) > 0 else 0
             # Cell Temperature low status
-            self.protection.low_charge_temp = 2 if (fault_int & 0b0000001000000000) > 0 else 0
+            self.protection.low_charge_temperature = 2 if (fault_int & 0b0000001000000000) > 0 else 0
 
         return True
 
@@ -219,8 +219,8 @@ class Felicity(Battery):
                     self.cells[c].voltage = 0
         return True
 
-    def read_temp_data(self):
-        tempBms_data = self.read_serial_data_felicity(self.command_bms_temp1)
+    def read_temperature_data(self):
+        tempBms_data = self.read_serial_data_felicity(self.command_bms_temperature_1)
 
         if tempBms_data is False:
             return False
@@ -228,24 +228,24 @@ class Felicity(Battery):
         if len(tempBms_data) != 2:
             logger.error(">>> INFO: BMS Temp Data size are wrong: %s", len(tempBms_data))
         else:
-            self.temp_mos = unpack(">h", tempBms_data)[0]
+            self.temperature_mos = unpack(">h", tempBms_data)[0]
 
-        temp1_3_data = self.read_serial_data_felicity(self.command_bms_temp1_3)
+        temperature_1_3_data = self.read_serial_data_felicity(self.command_bms_temperature_1_3)
 
-        if temp1_3_data is False:
+        if temperature_1_3_data is False:
             return False
 
-        if len(temp1_3_data) != 10:
-            logger.error(">>> INFO: Temp Data size are wrong: %s", len(temp1_3_data))
+        if len(temperature_1_3_data) != 10:
+            logger.error(">>> INFO: Temp Data size are wrong: %s", len(temperature_1_3_data))
         else:
-            self.temp1 = unpack_from(">h", temp1_3_data, 1 * 2)[0]
-            self.temp2 = unpack_from(">h", temp1_3_data, 2 * 2)[0]
-            self.temp3 = unpack_from(">h", temp1_3_data, 3 * 2)[0]
+            self.temperature_1 = unpack_from(">h", temperature_1_3_data, 1 * 2)[0]
+            self.temperature_2 = unpack_from(">h", temperature_1_3_data, 2 * 2)[0]
+            self.temperature_3 = unpack_from(">h", temperature_1_3_data, 3 * 2)[0]
 
-            logger.debug(">>> INFO: Battery TempMos: %f C", self.temp_mos)
-            logger.debug(">>> INFO: Battery Temp1: %f C", self.temp1)
-            logger.debug(">>> INFO: Battery Temp2: %f C", self.temp2)
-            logger.debug(">>> INFO: Battery Temp3: %f C", self.temp3)
+            logger.debug(">>> INFO: Battery TempMos: %f C", self.temperature_mos)
+            logger.debug(">>> INFO: Battery Temperature_1: %f C", self.temperature_1)
+            logger.debug(">>> INFO: Battery Temperature_2: %f C", self.temperature_2)
+            logger.debug(">>> INFO: Battery Temperature_3: %f C", self.temperature_3)
 
         return True
 

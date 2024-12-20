@@ -91,7 +91,7 @@ class Revov(Battery):
         # Return True if success, False for failure
         result = self.read_soc_data()
         result = result and self.read_cell_data()
-        # result = result and self.read_temp_data()
+        # result = result and self.read_temperature_data()
         return result
 
     def read_gen_data(self):
@@ -142,7 +142,7 @@ class Revov(Battery):
             return False
 
         # cell_volt_data = self.read_serial_data_revov(self.command_cell_voltages)
-        # cell_temp_data = self.read_serial_data_revov(self.command_cell_temps)
+        # cell_temperature_data = self.read_serial_data_revov(self.command_cell_temps)
 
         self.voltage = unpack_from(">H", packet, 72)[0]
         if self.voltage > 9999:
@@ -191,16 +191,16 @@ class Revov(Battery):
         logger.warn("Cell Total: " + "%.2fv" % cell_total)
         return True
 
-    def read_temp_data(self):
+    def read_temperature_data(self):
         return True
         # disabled for now.  I need to find what bytes map to the 2 temp sensors
 
-        temp1 = self.read_serial_data_revov(self.command_bms_temp1)
-        temp2 = self.read_serial_data_revov(self.command_bms_temp2)
-        if temp1 is False:
+        temperature_1 = self.read_serial_data_revov(self.command_bms_temperature_1)
+        temperature_2 = self.read_serial_data_revov(self.command_bms_temperature_2)
+        if temperature_1 is False:
             return False
-        self.temp1 = unpack(">H", temp1)[0] / 10
-        self.temp2 = unpack(">H", temp2)[0] / 10
+        self.temperature_1 = unpack(">H", temperature_1)[0] / 10
+        self.temperature_2 = unpack(">H", temperature_2)[0] / 10
 
         return True
 

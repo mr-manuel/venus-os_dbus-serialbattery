@@ -228,9 +228,18 @@ fi
 
 
 # INSTALL WASM BUILD
+if [ -d "/var/www/venus/gui-v2" ] && [ ! -L "/var/www/venus/gui-v2" ]; then
+    pathGuiWww="/var/www/venus/gui-v2"
+elif [ -d "/var/www/venus/gui-beta" ] && [ ! -L "/var/www/venus/gui-beta" ]; then
+    pathGuiWww="/var/www/venus/gui-beta"
+fi
 
-hash_installed=$(cat /var/www/venus/gui-v2/venus-gui-v2.wasm.sha256)
-hash_online=$(curl -s https://raw.githubusercontent.com/mr-manuel/venus-os_dbus-serialbattery_gui-v2/refs/heads/master/venus-gui-v2.wasm.sha256)
+if [ -f "$pathGuiWww/venus-gui-v2.wasm.sha256" ]; then
+    hash_installed=$(cat "$pathGuiWww/venus-gui-v2.wasm.sha256")
+else
+    hash_installed="no hash installed"
+fi
+hash_online=$(curl -s "https://raw.githubusercontent.com/mr-manuel/venus-os_dbus-serialbattery_gui-v2/refs/heads/master/venus-gui-v2.wasm.sha256")
 
 # Check if hash_online contains "venus-gui-v2.wasm", if not the online request failed
 if [[ "$hash_online" == *"venus-gui-v2.wasm"* ]]; then
@@ -241,16 +250,16 @@ if [[ "$hash_online" == *"venus-gui-v2.wasm"* ]]; then
         # Download new version
         echo "New version of GUIv2 web version available. Downloading..."
         if [ ! -d "/data/apps/dbus-serialbattery/ext/venus-os_dbus-serialbattery_gui-v2" ]; then
-            mkdir -p /data/apps/dbus-serialbattery/ext/venus-os_dbus-serialbattery_gui-v2
+            mkdir -p "/data/apps/dbus-serialbattery/ext/venus-os_dbus-serialbattery_gui-v2"
         fi
 
-        wget -q -O /data/apps/dbus-serialbattery/ext/venus-os_dbus-serialbattery_gui-v2/venus-webassembly.zip https://raw.githubusercontent.com/mr-manuel/venus-os_dbus-serialbattery_gui-v2/refs/heads/master/venus-webassembly.zip
+        wget -q -O "/data/apps/dbus-serialbattery/ext/venus-os_dbus-serialbattery_gui-v2/venus-webassembly.zip" "https://raw.githubusercontent.com/mr-manuel/venus-os_dbus-serialbattery_gui-v2/refs/heads/master/venus-webassembly.zip"
 
         # check if download was successful
         if [ $? -ne 0 ]; then
             echo "ERROR: Download of GUIv2 web version failed."
         else
-            wget -q -O /data/apps/dbus-serialbattery/ext/venus-os_dbus-serialbattery_gui-v2/venus-gui-v2.wasm.sha256 https://raw.githubusercontent.com/mr-manuel/venus-os_dbus-serialbattery_gui-v2/refs/heads/master/venus-gui-v2.wasm.sha256
+            wget -q -O "/data/apps/dbus-serialbattery/ext/venus-os_dbus-serialbattery_gui-v2/venus-gui-v2.wasm.sha256" "https://raw.githubusercontent.com/mr-manuel/venus-os_dbus-serialbattery_gui-v2/refs/heads/master/venus-gui-v2.wasm.sha256"
 
             # check if download was successful
             if [ $? -ne 0 ]; then
@@ -260,10 +269,16 @@ if [[ "$hash_online" == *"venus-gui-v2.wasm"* ]]; then
 
     fi
 
+else
+    echo "WARNING: Download of hash file for GUIv2 web version failed. Are you connected to the internet? If you are offline, you can ignore this message."
 fi
 
 # Check if offline version is already installed
-hash_available=$(cat /data/apps/dbus-serialbattery/ext/venus-os_dbus-serialbattery_gui-v2/venus-gui-v2.wasm.sha256)
+if [ -f "/data/apps/dbus-serialbattery/ext/venus-os_dbus-serialbattery_gui-v2/venus-gui-v2.wasm.sha256" ]; then
+    hash_available=$(cat "/data/apps/dbus-serialbattery/ext/venus-os_dbus-serialbattery_gui-v2/venus-gui-v2.wasm.sha256")
+else
+    hash_available="no hash available"
+fi
 if [ "$hash_installed" != "$hash_available" ]; then
 
     if [ $overlayWwwStatusCode -eq 1 ]; then
@@ -284,12 +299,6 @@ if [ "$hash_installed" != "$hash_available" ]; then
             # remove unneeded files
             if [ -f "/tmp/wasm/Makefile" ]; then
                 rm -f /tmp/wasm/Makefile
-            fi
-
-            if [ -d "/var/www/venus/gui-v2" ] && [ ! -L "/var/www/venus/gui-v2" ]; then
-                pathGuiWww="/var/www/venus/gui-v2"
-            elif [ -d "/var/www/venus/gui-beta" ] && [ ! -L "/var/www/venus/gui-beta" ]; then
-                pathGuiWww="/var/www/venus/gui-beta"
             fi
 
             # "remove" old files

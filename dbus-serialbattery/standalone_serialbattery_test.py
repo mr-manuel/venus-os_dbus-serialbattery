@@ -83,13 +83,13 @@ print("Cellcount: " + str(sasb.cell_count))
 for i in range(sasb.cell_count):
     print("CellVolt" + str(i) + ": " + str(sasb.cells[i] / 1000))
 
-print("Temp_Fet : " + str(sasb.temp_fet))
-print("Temp_1   : " + str(sasb.temp_1))
-print("temp_2   : " + str(sasb.temp_2))
-print("BatVolt  : " + str(sasb.voltage / 100))
-print("Current  : " + str(sasb.act_current / 100))
-print("SOC      : " + str(sasb.soc))
-print("WATT     : " + str(int((sasb.voltage * sasb.act_current) / 10000)))
+print("Temperature_Fet : " + str(sasb.temperature_fet))
+print("Temperature_1   : " + str(sasb.temperature_1))
+print("temperature_2   : " + str(sasb.temperature_2))
+print("BatVolt         : " + str(sasb.voltage / 100))
+print("Current         : " + str(sasb.act_current / 100))
+print("SOC             : " + str(sasb.soc))
+print("WATT            : " + str(int((sasb.voltage * sasb.act_current) / 10000)))
 sleep(1)
 """
 print("Cellcount: " + str(ST[0]))
@@ -97,12 +97,12 @@ for i in range(ST[0]) :
     print("CellVolt" + str(i) + ": " + str(ST[i+1]/1000))
 
 i=ST[0]+1 #first is the cellscount and cells
-print("Temp_Fet : " + str(ST[i]))
-print("Temp_1   : " + str(ST[i+1]))
-print("temp_2   : " + str(ST[i+2]))
-print("BatVolt  : " + str(ST[i+3]))
-print("Current  : " + str(ST[i+4]))
-print("SOC      : " + str(ST[i+5]))
+print("Temperature_Fet : " + str(ST[i]))
+print("Temperature_1   : " + str(ST[i+1]))
+print("temperature_2   : " + str(ST[i+2]))
+print("BatVolt         : " + str(ST[i+3]))
+print("Current         : " + str(ST[i+4]))
+print("SOC             : " + str(ST[i+5]))
 """
 
 sys.exit(0)

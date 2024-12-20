@@ -116,23 +116,23 @@ class Jkbms(Battery):
 
         # MOSFET temperature
         offset = cellbyte_count + 3
-        temp_mos = unpack_from(">H", self.get_data(status_data, b"\x80", offset, 2))[0]
+        temperature_mos = unpack_from(">H", self.get_data(status_data, b"\x80", offset, 2))[0]
         # check if the mosfet temperature is valid
-        if temp_mos >= 0:
-            self.to_temp(0, temp_mos if temp_mos < 99 else (100 - temp_mos))
+        if temperature_mos >= 0:
+            self.to_temperature(0, temperature_mos if temperature_mos < 99 else (100 - temperature_mos))
 
         # Temperature sensors
         offset = cellbyte_count + 6
-        temp1 = unpack_from(">H", self.get_data(status_data, b"\x81", offset, 2))[0]
+        temperature_1 = unpack_from(">H", self.get_data(status_data, b"\x81", offset, 2))[0]
         # check if the temperature is valid
-        if temp1 >= 0:
-            self.to_temp(1, temp1 if temp1 < 99 else (100 - temp1))
+        if temperature_1 >= 0:
+            self.to_temperature(1, temperature_1 if temperature_1 < 99 else (100 - temperature_1))
 
         offset = cellbyte_count + 9
-        temp2 = unpack_from(">H", self.get_data(status_data, b"\x82", offset, 2))[0]
+        temperature_2 = unpack_from(">H", self.get_data(status_data, b"\x82", offset, 2))[0]
         # check if the temperature is valid
-        if temp2 >= 0:
-            self.to_temp(2, temp2 if temp2 < 99 else (100 - temp2))
+        if temperature_2 >= 0:
+            self.to_temperature(2, temperature_2 if temperature_2 < 99 else (100 - temperature_2))
 
         offset = cellbyte_count + 12
         voltage = unpack_from(">H", self.get_data(status_data, b"\x83", offset, 2))[0]
@@ -287,7 +287,7 @@ class Jkbms(Battery):
         # low capacity alarm
         self.protection.low_soc = 2 if is_bit_set(tmp[pos - 0]) else 0
         # MOSFET temperature alarm
-        self.protection.high_internal_temp = 2 if is_bit_set(tmp[pos - 1]) else 0
+        self.protection.high_internal_temperature = 2 if is_bit_set(tmp[pos - 1]) else 0
         # charge over voltage alarm
         # TODO: check if "self.soc_reset_requested is False" works,
         # else use "self.soc_reset_last_reached < int(time()) - (60 * 60)"
@@ -301,19 +301,19 @@ class Jkbms(Battery):
         # core differential pressure alarm
         self.protection.cell_imbalance = 1 if is_bit_set(tmp[pos - 7]) else 0
         # battery overtemperature alarm OR overtemperature alarm in the battery box
-        alarm_temp_high = 1 if is_bit_set(tmp[pos - 4]) or is_bit_set(tmp[pos - 8]) else 0
+        alarm_temperature_high = 1 if is_bit_set(tmp[pos - 4]) or is_bit_set(tmp[pos - 8]) else 0
         # battery low temperature alarm
-        alarm_temp_low = 1 if is_bit_set(tmp[pos - 9]) else 0
+        alarm_temperature_low = 1 if is_bit_set(tmp[pos - 9]) else 0
         # cell overvoltage alarm
         self.protection.high_cell_voltage = 1 if is_bit_set(tmp[pos - 10]) else 0
         # cell undervoltage alarm
         self.protection.low_cell_voltage = 1 if is_bit_set(tmp[pos - 11]) else 0
         # check if low/high temp alarm arise during charging
-        self.protection.high_charge_temp = 1 if self.current > 0 and alarm_temp_high == 1 else 0
-        self.protection.low_charge_temp = 1 if self.current > 0 and alarm_temp_low == 1 else 0
+        self.protection.high_charge_temperature = 1 if self.current > 0 and alarm_temperature_high == 1 else 0
+        self.protection.low_charge_temperature = 1 if self.current > 0 and alarm_temperature_low == 1 else 0
         # check if low/high temp alarm arise during discharging
-        self.protection.high_temperature = 1 if self.current <= 0 and alarm_temp_high == 1 else 0
-        self.protection.low_temperature = 1 if self.current <= 0 and alarm_temp_low == 1 else 0
+        self.protection.high_temperature = 1 if self.current <= 0 and alarm_temperature_high == 1 else 0
+        self.protection.low_temperature = 1 if self.current <= 0 and alarm_temperature_low == 1 else 0
 
     def read_serial_data_jkbms(self, command: str) -> bool:
         """

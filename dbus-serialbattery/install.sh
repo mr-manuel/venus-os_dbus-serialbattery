@@ -280,7 +280,7 @@ if [ "$version" = "stable" ] || [ "$version" = "beta" ] || [ "$version" = "speci
         mv /tmp/dbus-serialbattery /data/apps/dbus-serialbattery
     # driver < v2.0.0
     elif [ -d "/tmp/etc/dbus-serialbattery" ]; then
-        mv /tmp/etc/dbus-serialbattery /data/apps/dbus-serialbattery
+        mv /tmp/etc/dbus-serialbattery /data/etc/dbus-serialbattery
         rmdir /tmp/etc
     else
         echo "ERROR: Something went wrong during moving the files from the temporary TAR location to the final location. Please try again."
@@ -412,17 +412,20 @@ fi
 restore_config
 
 
-# install overlay-fs if not already installed
-if [ ! -d "/data/apps/overlay-fs" ]; then
-    if [ -d "/data/apps/dbus-serialbattery/ext/venus-os_overlay-fs" ]; then
-        echo
-        echo "Install overlay-fs app..."
-        bash /data/apps/dbus-serialbattery/ext/venus-os_overlay-fs/install.sh --copy
+# check if installed version is >= v2.0.0
+if [ -d "/data/apps/dbus-serialbattery" ]; then
+    # install overlay-fs if not already installed
+    if [ ! -d "/data/apps/overlay-fs" ]; then
+        if [ -d "/data/apps/dbus-serialbattery/ext/venus-os_overlay-fs" ]; then
+            echo
+            echo "Install overlay-fs app..."
+            bash /data/apps/dbus-serialbattery/ext/venus-os_overlay-fs/install.sh --copy
+        else
+            echo "ERROR: overlay-fs app not found. Please install it manually."
+        fi
     else
-        echo "ERROR: overlay-fs app not found. Please install it manually."
+        echo
     fi
-else
-    echo
 fi
 
 

@@ -38,11 +38,11 @@ class Protection(object):
         self.high_discharge_current: int = None
         self.cell_imbalance: int = None
         self.internal_failure: int = None
-        self.high_charge_temp: int = None
-        self.low_charge_temp: int = None
+        self.high_charge_temperature: int = None
+        self.low_charge_temperature: int = None
         self.high_temperature: int = None
         self.low_temperature: int = None
-        self.high_internal_temp: int = None
+        self.high_internal_temperature: int = None
         self.fuse_blown: int = None
 
         # previous values to check if the value has changed
@@ -55,11 +55,11 @@ class Protection(object):
         self.previous_high_discharge_current: int = None
         self.previous_cell_imbalance: int = None
         self.previous_internal_failure: int = None
-        self.previous_high_charge_temp: int = None
-        self.previous_low_charge_temp: int = None
+        self.previous_high_charge_temperature: int = None
+        self.previous_low_charge_temperature: int = None
         self.previous_high_temperature: int = None
         self.previous_low_temperature: int = None
-        self.previous_high_internal_temp: int = None
+        self.previous_high_internal_temperature: int = None
         self.previous_fuse_blown: int = None
 
     def set_previous(self) -> None:
@@ -77,11 +77,11 @@ class Protection(object):
         self.previous_high_discharge_current = self.high_discharge_current
         self.previous_cell_imbalance = self.cell_imbalance
         self.previous_internal_failure = self.internal_failure
-        self.previous_high_charge_temp = self.high_charge_temp
-        self.previous_low_charge_temp = self.low_charge_temp
+        self.previous_high_charge_temperature = self.high_charge_temperature
+        self.previous_low_charge_temperature = self.low_charge_temperature
         self.previous_high_temperature = self.high_temperature
         self.previous_low_temperature = self.low_temperature
-        self.previous_high_internal_temp = self.high_internal_temp
+        self.previous_high_internal_temperature = self.high_internal_temperature
         self.previous_fuse_blown = self.fuse_blown
 
 
@@ -147,9 +147,9 @@ class History:
         Total Amp hours drawn from the battery divided by the capacity.
         """
 
-        self.time_since_last_full_charge: int = None
+        self.timestamp_last_full_charge: int = None
         """
-        Time since last full charge in seconds.
+        Timestamp of full charge.
         """
 
         self.full_discharges: int = None
@@ -215,6 +215,41 @@ class History:
         """
         Total charged energy in Kilowatt-hour.
         """
+
+    def reset_values(self, attributes: list = []) -> None:
+        """
+        Reset all calculated values that are not excluded.
+
+        :param attributes: list of attributes to reset, if empty all attributes are reset
+        :return: None
+        """
+        attributes = (
+            [
+                "deepest_discharge",
+                "last_discharge",
+                "average_discharge",
+                "total_ah_drawn",
+                "charge_cycles",
+                "timestamp_last_full_charge",
+                "full_discharges",
+                "minimum_voltage",
+                "maximum_voltage",
+                "minimum_cell_voltage",
+                "maximum_cell_voltage",
+                "low_voltage_alarms",
+                "high_voltage_alarms",
+                "minimum_temperature",
+                "maximum_temperature",
+                "discharged_energy",
+                "charged_energy",
+            ]
+            if not attributes
+            else attributes
+        )
+
+        for attribute in attributes:
+            if attribute not in self.exclude_values_to_calculate:
+                setattr(self, attribute, None)
 
     def reset_values(self, attributes: list = []) -> None:
         """
@@ -330,12 +365,11 @@ class Battery(ABC):
         self.history = History()
         self.version = None
         self.time_to_soc_update: int = 0
-        self.temp_sensors: int = None
-        self.temp1: float = None
-        self.temp2: float = None
-        self.temp3: float = None
-        self.temp4: float = None
-        self.temp_mos: float = None
+        self.temperature_1: float = None
+        self.temperature_2: float = None
+        self.temperature_3: float = None
+        self.temperature_4: float = None
+        self.temperature_mos: float = None
         self.cells: List[Cell] = []
         self.control_voltage: float = None
         self.soc_reset_requested: bool = False
@@ -360,11 +394,6 @@ class Battery(ABC):
         self.full_discharge_active: bool = False
         """
         True if the battery discharged to 0%. Reset to False after reaching at least 15% again.
-        """
-
-        self.full_charge_last_time: int = None
-        """
-        Timestamp of when the battery was fully charged
         """
 
         # Calculation of charge
@@ -527,7 +556,7 @@ class Battery(ABC):
         """
         return False
 
-    def to_temp(self, sensor: int, value: float) -> None:
+    def to_temperature(self, sensor: int, value: float) -> None:
         """
         Keep the temp value between -20 and 100 to handle sensor issues or no data.
         The BMS should already have protected the battery before those limits have been reached.
@@ -537,15 +566,15 @@ class Battery(ABC):
         :return: None
         """
         if sensor == 0:
-            self.temp_mos = round(min(max(value, -20), 100), 1)
+            self.temperature_mos = round(min(max(value, -20), 100), 1)
         if sensor == 1:
-            self.temp1 = round(min(max(value, -20), 100), 1)
+            self.temperature_1 = round(min(max(value, -20), 100), 1)
         if sensor == 2:
-            self.temp2 = round(min(max(value, -20), 100), 1)
+            self.temperature_2 = round(min(max(value, -20), 100), 1)
         if sensor == 3:
-            self.temp3 = round(min(max(value, -20), 100), 1)
+            self.temperature_3 = round(min(max(value, -20), 100), 1)
         if sensor == 4:
-            self.temp4 = round(min(max(value, -20), 100), 1)
+            self.temperature_4 = round(min(max(value, -20), 100), 1)
 
     def manage_charge_voltage(self) -> None:
         """
@@ -553,11 +582,6 @@ class Battery(ABC):
 
         :return: None
         """
-        if utils.SOC_CALCULATION:
-            self.soc_calculation()
-        else:
-            self.soc_calc = self.soc
-
         # set min and max battery voltage if cell count is known
         if self.cell_count is not None:
             # set min battery voltage once
@@ -587,24 +611,14 @@ class Battery(ABC):
             self.control_voltage = round(self.max_battery_voltage, 2)
             self.charge_mode = "Keep always max voltage"
 
-    def soc_calculation(self) -> None:
+    def soc_calculation(self) -> float:
         """
-        Calculates the SOC based on the coulomb counting method.
+        Calculates the SoC based on the coulomb counting method.
 
-        :return: None
+        :return: The calculated state of charge
         """
         current_time = time()
 
-        # ### only needed, if the SOC should be reset to 100% after the battery was balanced
-        """
-        voltage_sum = 0
-
-        # calculate battery voltage from cell voltages
-        for i in range(self.cell_count):
-            voltage = self.get_cell_voltage(i)
-            if voltage:
-                voltage_sum += voltage
-        """
         SOC_RESET_TIME = 60
 
         if self.soc_calc_capacity_remain is not None:
@@ -651,7 +665,7 @@ class Battery(ABC):
             self.soc_calc_capacity_remain_last_time = current_time
 
         # calculate the SOC based on remaining capacity
-        self.soc_calc = round(max(min((self.soc_calc_capacity_remain / self.capacity) * 100, 100), 0), 3)
+        return round(max(min((self.soc_calc_capacity_remain / self.capacity) * 100, 100), 0), 3)
 
     def soc_reset_voltage_management(self) -> None:
         """
@@ -836,12 +850,15 @@ class Battery(ABC):
                         # Assume battery SOC ist 100% at this stage
                         self.trigger_soc_reset()
 
+                        # Set timestamp of full charge for history
+                        if "timestamp_last_full_charge" not in self.history.exclude_values_to_calculate:
+                            self.history.timestamp_last_full_charge = int(time())
+
                         if utils.SOC_CALCULATION:
                             logger.info("SOC set to 100%")
                             self.soc_calc_capacity_remain = self.capacity
                             self.soc_calc_reset_start_time = None
 
-                        self.full_charge_last_time = int(time())
                     elif self.charge_mode.startswith("Float Transition"):
                         elapsed_time = current_time - self.transition_start_time
                         # Voltage reduction per second
@@ -1018,6 +1035,10 @@ class Battery(ABC):
                 if self.charge_mode is not None and not self.charge_mode.startswith("Float"):
                     # Assume battery SOC ist 100% at this stage
                     self.trigger_soc_reset()
+
+                    # Set timestamp of full charge for history
+                    if "timestamp_last_full_charge" not in self.history.exclude_values_to_calculate:
+                        self.history.timestamp_last_full_charge = int(time())
 
                     if utils.SOC_CALCULATION:
                         logger.info("SOC set to 100%")
@@ -1378,40 +1399,40 @@ class Battery(ABC):
 
         :return: The maximum charge current
         """
-        if self.get_max_temp() is None or self.get_min_temp() is None:
+        if self.get_max_temperature() is None or self.get_min_temperature() is None:
             logging.warning(
                 "calc_max_charge_current_from_temperature():"
-                + f" get_max_temp() is {self.get_max_temp()} or get_min_temp() is {self.get_min_temp()}"
+                + f" get_max_temperature() is {self.get_max_temperature()} or get_min_temperature() is {self.get_min_temperature()}"
                 + ", using default current instead."
                 + " If you don't see this warning very often, you can ignore it."
             )
             return self.max_battery_charge_current
 
-        temps = {0: self.get_max_temp(), 1: self.get_min_temp()}
+        temperatures = {0: self.get_max_temperature(), 1: self.get_min_temperature()}
 
         try:
-            for key, currentMaxTemperature in temps.items():
+            for key, currentMaxTemperature in temperatures.items():
                 if utils.LINEAR_LIMITATION_ENABLE:
-                    temps[key] = utils.calc_linear_relationship(
+                    temperatures[key] = utils.calc_linear_relationship(
                         currentMaxTemperature,
                         utils.TEMPERATURES_WHILE_CHARGING,
                         utils.MAX_CHARGE_CURRENT_T,
                     )
                 else:
-                    temps[key] = utils.calc_step_relationship(
+                    temperatures[key] = utils.calc_step_relationship(
                         currentMaxTemperature,
                         utils.TEMPERATURES_WHILE_CHARGING,
                         utils.MAX_CHARGE_CURRENT_T,
                         False,
                     )
-            return min(temps[0], temps[1])
+            return min(temperatures[0], temperatures[1])
         except Exception:
             # set error code, to show in the GUI that something is wrong
             self.manage_error_code(8)
 
             logger.error("calc_max_charge_current_from_temperature(): Error while executing," + " using default current instead.")
             logger.error(
-                f"temps: {temps}"
+                f"temperatures: {temperatures}"
                 + f" • TEMPERATURES_WHILE_CHARGING: {utils.TEMPERATURES_WHILE_CHARGING}"
                 + f" • MAX_CHARGE_CURRENT_T: {utils.MAX_CHARGE_CURRENT_T}"
             )
@@ -1428,40 +1449,40 @@ class Battery(ABC):
 
         :return: The maximum discharge current
         """
-        if self.get_max_temp() is None or self.get_min_temp() is None:
+        if self.get_max_temperature() is None or self.get_min_temperature() is None:
             logging.warning(
                 "calc_max_discharge_current_from_temperature():"
-                + f" get_max_temp() is {self.get_max_temp()} or get_min_temp() is {self.get_min_temp()}"
+                + f" get_max_temperature() is {self.get_max_temperature()} or get_min_temperature() is {self.get_min_temperature()}"
                 + ", using default current instead."
                 + " If you don't see this warning very often, you can ignore it."
             )
             return self.max_battery_discharge_current
 
-        temps = {0: self.get_max_temp(), 1: self.get_min_temp()}
+        temperatures = {0: self.get_max_temperature(), 1: self.get_min_temperature()}
 
         try:
-            for key, currentMaxTemperature in temps.items():
+            for key, currentMaxTemperature in temperatures.items():
                 if utils.LINEAR_LIMITATION_ENABLE:
-                    temps[key] = utils.calc_linear_relationship(
+                    temperatures[key] = utils.calc_linear_relationship(
                         currentMaxTemperature,
                         utils.TEMPERATURES_WHILE_DISCHARGING,
                         utils.MAX_DISCHARGE_CURRENT_T,
                     )
                 else:
-                    temps[key] = utils.calc_step_relationship(
+                    temperatures[key] = utils.calc_step_relationship(
                         currentMaxTemperature,
                         utils.TEMPERATURES_WHILE_DISCHARGING,
                         utils.MAX_DISCHARGE_CURRENT_T,
                         True,
                     )
-            return min(temps[0], temps[1])
+            return min(temperatures[0], temperatures[1])
         except Exception:
             # set error code, to show in the GUI that something is wrong
             self.manage_error_code(8)
 
             logger.error("calc_max_discharge_current_from_temperature(): Error while executing," + " using default current instead.")
             logger.error(
-                f"temps: {temps}"
+                f"temperatures: {temperatures}"
                 + f" • TEMPERATURES_WHILE_DISCHARGING: {utils.TEMPERATURES_WHILE_DISCHARGING}"
                 + f" • MAX_DISCHARGE_CURRENT_T: {utils.MAX_DISCHARGE_CURRENT_T}"
             )
@@ -1798,86 +1819,72 @@ class Battery(ABC):
                 return 1
         return 0
 
-    def get_temp(self) -> Union[float, None]:
+    def get_temperature(self) -> Union[float, None]:
         try:
-            if utils.TEMP_BATTERY == 1:
-                return self.temp1
-            elif utils.TEMP_BATTERY == 2:
-                return self.temp2
-            elif utils.TEMP_BATTERY == 3:
-                return self.temp3
-            elif utils.TEMP_BATTERY == 4:
-                return self.temp4
-            else:
-                temps = [t for t in [self.temp1, self.temp2, self.temp3, self.temp4] if t is not None]
-                n = len(temps)
-                if not temps or n == 0:
-                    return None
-                data = sorted(temps)
-                if n % 2 == 1:
-                    return data[n // 2]
-                else:
-                    i = n // 2
-                    return (data[i - 1] + data[i]) / 2
+            temperature_map = {1: self.temperature_1, 2: self.temperature_2, 3: self.temperature_3, 4: self.temperature_4}
+            temperature = temperature_map.get(utils.TEMPERATURE_SOURCE_BATTERY)
+            if temperature is not None:
+                return temperature
+
+            temperatures = [t for t in [self.temperature_1, self.temperature_2, self.temperature_3, self.temperature_4] if t is not None]
+            if not temperatures:
+                return None
+
+            return round(sum(temperatures) / len(temperatures), 1)
+
         except TypeError:
             return None
 
-    def get_min_temp(self) -> Union[float, None]:
+    def get_min_temperature(self) -> Union[float, None]:
         try:
-            temps = [t for t in [self.temp1, self.temp2, self.temp3, self.temp4] if t is not None]
-            if not temps:
+            temperatures = [t for t in [self.temperature_1, self.temperature_2, self.temperature_3, self.temperature_4] if t is not None]
+            if not temperatures:
                 return None
-            return min(temps)
+            return min(temperatures)
         except TypeError:
             return None
 
-    def get_min_temp_id(self) -> Union[str, None]:
+    def get_min_temperature_id(self) -> Union[str, None]:
         try:
-            temps = [(t, i) for i, t in enumerate([self.temp1, self.temp2, self.temp3, self.temp4]) if t is not None]
-            if not temps:
+            temperatures = [(t, i) for i, t in enumerate([self.temperature_1, self.temperature_2, self.temperature_3, self.temperature_4]) if t is not None]
+            if not temperatures:
                 return None
-            index = min(temps)[1]
+            index = min(temperatures)[1]
             if index == 0:
-                return utils.TEMP_1_NAME
+                return utils.TEMPERATURE_1_NAME
             if index == 1:
-                return utils.TEMP_2_NAME
+                return utils.TEMPERATURE_2_NAME
             if index == 2:
-                return utils.TEMP_3_NAME
+                return utils.TEMPERATURE_3_NAME
             if index == 3:
-                return utils.TEMP_4_NAME
+                return utils.TEMPERATURE_4_NAME
         except TypeError:
             return None
 
-    def get_max_temp(self) -> Union[float, None]:
+    def get_max_temperature(self) -> Union[float, None]:
         try:
-            temps = [t for t in [self.temp1, self.temp2, self.temp3, self.temp4] if t is not None]
-            if not temps:
+            temperatures = [t for t in [self.temperature_1, self.temperature_2, self.temperature_3, self.temperature_4] if t is not None]
+            if not temperatures:
                 return None
-            return max(temps)
+            return max(temperatures)
         except TypeError:
             return None
 
-    def get_max_temp_id(self) -> Union[str, None]:
+    def get_max_temperature_id(self) -> Union[str, None]:
         try:
-            temps = [(t, i) for i, t in enumerate([self.temp1, self.temp2, self.temp3, self.temp4]) if t is not None]
-            if not temps:
+            temperatures = [(t, i) for i, t in enumerate([self.temperature_1, self.temperature_2, self.temperature_3, self.temperature_4]) if t is not None]
+            if not temperatures:
                 return None
-            index = max(temps)[1]
+            index = max(temperatures)[1]
             if index == 0:
-                return utils.TEMP_1_NAME
+                return utils.TEMPERATURE_1_NAME
             if index == 1:
-                return utils.TEMP_2_NAME
+                return utils.TEMPERATURE_2_NAME
             if index == 2:
-                return utils.TEMP_3_NAME
+                return utils.TEMPERATURE_3_NAME
             if index == 3:
-                return utils.TEMP_4_NAME
+                return utils.TEMPERATURE_4_NAME
         except TypeError:
-            return None
-
-    def get_mos_temp(self) -> Union[float, None]:
-        if self.temp_mos is not None:
-            return self.temp_mos
-        else:
             return None
 
     def get_allow_to_charge(self) -> bool:
@@ -1910,18 +1917,17 @@ class Battery(ABC):
 
         return True
 
-    def setup_external_current_sensor(self) -> None:
+    def setup_external_sensor(self) -> None:
         """
-        Setup external current sensor and it's dbus items
+        Setup external sensor and it's dbus items
         """
         # TODO: sometimes it happens that the external sensor disconnects, the system switches to native sensor
         # ans after switching back to the external sensor, the system does not update the current values anymore
+        # Rework and do not use the ve_lib library anymore
         import dbus
         import os
         from dbus.mainloop.glib import DBusGMainLoop
         from vedbus import VeDbusItemImport
-
-        logger.info("Monitoring external current using: " + f"{utils.EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE}{utils.EXTERNAL_CURRENT_SENSOR_DBUS_PATH}")
 
         # setup external dbus paths
         try:
@@ -1934,21 +1940,33 @@ class Battery(ABC):
             dbus_objects = {}
 
             # check if the dbus service is available
-            is_present_in_vebus = utils.EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE in dbus_connection.list_names()
+            is_present_in_vebus = utils.EXTERNAL_SENSOR_DBUS_DEVICE in dbus_connection.list_names()
 
             if is_present_in_vebus:
-                dbus_objects["Current"] = VeDbusItemImport(
-                    dbus_connection,
-                    utils.EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE,
-                    utils.EXTERNAL_CURRENT_SENSOR_DBUS_PATH,
-                )
+
+                if utils.EXTERNAL_SENSOR_DBUS_PATH_CURRENT is not None:
+                    logger.info("Using external sensor for current: " + f"{utils.EXTERNAL_SENSOR_DBUS_DEVICE}{utils.EXTERNAL_SENSOR_DBUS_PATH_CURRENT}")
+                    dbus_objects["Current"] = VeDbusItemImport(
+                        dbus_connection,
+                        utils.EXTERNAL_SENSOR_DBUS_DEVICE,
+                        utils.EXTERNAL_SENSOR_DBUS_PATH_CURRENT,
+                    )
+
+                if utils.EXTERNAL_SENSOR_DBUS_PATH_SOC is not None:
+                    logger.info("Using external sensor for SoC: " + f"{utils.EXTERNAL_SENSOR_DBUS_DEVICE}{utils.EXTERNAL_SENSOR_DBUS_PATH_SOC}")
+                    dbus_objects["SoC"] = VeDbusItemImport(
+                        dbus_connection,
+                        utils.EXTERNAL_SENSOR_DBUS_DEVICE,
+                        utils.EXTERNAL_SENSOR_DBUS_PATH_SOC,
+                    )
 
                 self.dbus_external_objects = dbus_objects
 
         except Exception:
             # set to None to avoid crashing, fallback to battery current
-            utils.EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE = None
-            utils.EXTERNAL_CURRENT_SENSOR_DBUS_PATH = None
+            utils.EXTERNAL_SENSOR_DBUS_DEVICE = None
+            utils.EXTERNAL_SENSOR_DBUS_PATH_CURRENT = None
+            utils.EXTERNAL_SENSOR_DBUS_PATH_SOC = None
             self.dbus_external_objects = None
             (
                 exception_type,
@@ -1962,8 +1980,11 @@ class Battery(ABC):
 
     def get_current(self) -> Union[float, None]:
         """
-        Get the current from the battery.
-        If an external current sensor is connected, use that value.
+        Get the current, either from:
+        - the external sensor
+        - the battery
+
+        :return: The current
         """
         current_time = time()
 
@@ -1979,7 +2000,7 @@ class Battery(ABC):
             self.charge_discharged += charge * -1 if charge < 0 else 0
             self.charge_discharged_last += charge * -1 if charge < 0 else 0
 
-        if self.dbus_external_objects is not None:
+        if self.dbus_external_objects is not None and self.dbus_external_objects["Current"] is not None:
             current_external = round(self.dbus_external_objects["Current"].get_value(), 3)
             logger.debug(f"current: {self.current} - current_external: {current_external}")
             current = current_external
@@ -2028,6 +2049,27 @@ class Battery(ABC):
         self.power_calc_last_time = current_time
         return power
 
+    def get_soc(self) -> Union[float, None]:
+        """
+        Get the state of charge, either from:
+        - the external sensor
+        - the calculated value
+        - the battery
+
+        :return: The state of charge
+        """
+        # get external sensor value
+        if utils.EXTERNAL_SENSOR_DBUS_DEVICE is not None and utils.EXTERNAL_SENSOR_DBUS_PATH_SOC is not None:
+            soc_external = round(self.dbus_external_objects["SoC"].get_value(), 3)
+            logger.debug(f"soc: {self.soc} - soc_external: {soc_external}")
+            return soc_external
+        # get calculated value
+        elif utils.SOC_CALCULATION:
+            return self.soc_calculation()
+        # get value from battery
+        else:
+            return self.soc
+
     def set_calculated_data(self) -> None:
         """
         Execute all calculations and set the calculated data.
@@ -2036,6 +2078,7 @@ class Battery(ABC):
         """
         self.current_calc = self.get_current()
         self.power_calc = self.get_power()
+        self.soc_calc = self.get_soc()
 
     def manage_error_code(self, error_code: int = 8) -> None:
         """
@@ -2205,10 +2248,6 @@ class Battery(ABC):
             if self.history.maximum_cell_voltage is None or self.history.maximum_cell_voltage < self.get_max_cell_voltage():
                 self.history.maximum_cell_voltage = self.get_max_cell_voltage()
 
-        if "time_since_last_full_charge" not in self.history.exclude_values_to_calculate:
-            if self.full_charge_last_time is not None:
-                self.history.time_since_last_full_charge = int(time()) - self.full_charge_last_time
-
         if "low_voltage_alarms" not in self.history.exclude_values_to_calculate:
             if self.history.low_voltage_alarms is None:
                 self.history.low_voltage_alarms = 0
@@ -2225,13 +2264,13 @@ class Battery(ABC):
             ):
                 self.history.high_voltage_alarms += 1
 
-        if "minimum_temperature" not in self.history.exclude_values_to_calculate and self.get_min_temp() is not None:
-            if self.history.minimum_temperature is None or self.history.minimum_temperature > self.get_min_temp():
-                self.history.minimum_temperature = self.get_min_temp()
+        if "minimum_temperature" not in self.history.exclude_values_to_calculate and self.get_min_temperature() is not None:
+            if self.history.minimum_temperature is None or self.history.minimum_temperature > self.get_min_temperature():
+                self.history.minimum_temperature = self.get_min_temperature()
 
-        if "maximum_temperature" not in self.history.exclude_values_to_calculate and self.get_max_temp() is not None:
-            if self.history.maximum_temperature is None or self.history.maximum_temperature < self.get_max_temp():
-                self.history.maximum_temperature = self.get_max_temp()
+        if "maximum_temperature" not in self.history.exclude_values_to_calculate and self.get_max_temperature() is not None:
+            if self.history.maximum_temperature is None or self.history.maximum_temperature < self.get_max_temperature():
+                self.history.maximum_temperature = self.get_max_temperature()
 
         if "discharged_energy" not in self.history.exclude_values_to_calculate:
             if self.history.discharged_energy is None:
@@ -2273,7 +2312,7 @@ class Battery(ABC):
             # Reset voltage history values
             3: ["minimum_voltage", "maximum_voltage", "minimum_cell_voltage", "maximum_cell_voltage"],
             # Reset time history values
-            4: ["time_since_last_full_charge"],
+            4: ["timestamp_last_full_charge"],
             # Reset alarm history values
             5: ["low_voltage_alarms", "high_voltage_alarms"],
             # Reset temperature history values

@@ -147,16 +147,16 @@ class LiTime_Ble(Battery):
             self.discharge_fet = False
 
         # temperature sensor 1 in °C (float)
-        temp1 = cell_temp
-        self.to_temp(1, temp1)
+        temperature_1 = cell_temp
+        self.to_temperature(1, temperature_1)
 
         # temperature sensor 2 in °C (float)
-        temp2 = unknown_temp
-        self.to_temp(2, temp2)
+        temperature_2 = unknown_temp
+        self.to_temperature(2, temperature_2)
 
         # temperature sensor MOSFET in °C (float)
-        temp_mos = mosfet_temp
-        self.to_temp(0, temp_mos)
+        temperature_mos = mosfet_temp
+        self.to_temperature(0, temperature_mos)
 
         self.capacity_remaining = remaining_amph
         self.history.total_ah_drawn = discharges_amph_count

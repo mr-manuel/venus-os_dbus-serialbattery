@@ -106,7 +106,7 @@ class Ecs(Battery):
 
         # Uncomment if BMS does not supply capacity
         self.cell_count = LIPRO_CELL_COUNT
-        self.temp_sensors = 2
+        # temperature_sensors = 2
 
         return self.read_status_data()
 
@@ -157,15 +157,15 @@ class Ecs(Battery):
             self.discharge_fet = True if under_voltage == 0 else False
             self.protection.high_voltage = 2 if over_voltage == 1 else 0
             self.protection.low_voltage = 2 if under_voltage == 1 else 0
-            self.protection.high_charge_temp = 1 if over_voltage in range(3, 5) else 0
-            self.protection.low_charge_temp = 1 if over_voltage in range(5, 7) else 0
+            self.protection.high_charge_temperature = 1 if over_voltage in range(3, 5) else 0
+            self.protection.low_charge_temperature = 1 if over_voltage in range(5, 7) else 0
             self.protection.high_temperature = 1 if under_voltage in range(3, 5) else 0
             self.protection.low_temperature = 1 if under_voltage in range(5, 7) else 0
             self.protection.high_charge_current = 1 if over_voltage == 2 else 0
             self.protection.high_discharge_current = 1 if under_voltage == 2 else 0
 
-            self.temp1 = mbdev.read_register(102, 0, 3, True) / 100
-            self.temp2 = mbdev.read_register(103, 0, 3, True) / 100
+            self.temperature_1 = mbdev.read_register(102, 0, 3, True) / 100
+            self.temperature_2 = mbdev.read_register(103, 0, 3, True) / 100
 
             return True
         except IOError:
@@ -179,7 +179,7 @@ class Ecs(Battery):
 
                 self.cells[cell].voltage = mbdev.read_register(100, 0, 3, False) / 1000
                 self.cells[cell].balance = True if mbdev.read_register(102, 0, 3, False) > 50 else False
-                self.cells[cell].temp = mbdev.read_register(101, 0, 3, True) / 100
+                self.cells[cell].temperature = mbdev.read_register(101, 0, 3, True) / 100
 
                 return True
             except IOError:

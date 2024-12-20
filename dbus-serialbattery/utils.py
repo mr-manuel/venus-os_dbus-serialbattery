@@ -14,7 +14,7 @@ import serial
 
 
 # CONSTANTS
-DRIVER_VERSION: str = "2.0.20241211dev"
+DRIVER_VERSION: str = "2.0.20241218dev"
 """
 current version of the driver
 """
@@ -239,9 +239,17 @@ LINEAR_RECALCULATION_EVERY: int = get_int_from_config("DEFAULT", "LINEAR_RECALCU
 LINEAR_RECALCULATION_ON_PERC_CHANGE: int = get_int_from_config("DEFAULT", "LINEAR_RECALCULATION_ON_PERC_CHANGE")
 
 
-# --------- External current sensor ---------
-EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE: Union[str, None] = config["DEFAULT"]["EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE"] or None
-EXTERNAL_CURRENT_SENSOR_DBUS_PATH: Union[str, None] = config["DEFAULT"]["EXTERNAL_CURRENT_SENSOR_DBUS_PATH"] or None
+# --------- External Sensor for Current and/or SoC ---------
+EXTERNAL_SENSOR_DBUS_DEVICE: Union[str, None] = config["DEFAULT"]["EXTERNAL_SENSOR_DBUS_DEVICE"] or None
+EXTERNAL_SENSOR_DBUS_PATH_CURRENT: Union[str, None] = config["DEFAULT"]["EXTERNAL_SENSOR_DBUS_PATH_CURRENT"] or None
+EXTERNAL_SENSOR_DBUS_PATH_SOC: Union[str, None] = config["DEFAULT"]["EXTERNAL_SENSOR_DBUS_PATH_SOC"] or None
+
+
+# Common configuration checks
+check_config_issue(
+    SOC_CALCULATION and EXTERNAL_SENSOR_DBUS_PATH_SOC is not None,
+    "SOC_CALCULATION and EXTERNAL_SENSOR_DBUS_PATH_SOC are both enabled. This will lead to a conflict. Please disable one of them in the configuration.",
+)
 
 
 # --------- Charge Voltage Limitation (affecting CVL) ---------
@@ -400,11 +408,11 @@ Poll interval in milliseconds
 PUBLISH_CONFIG_VALUES: bool = get_bool_from_config("DEFAULT", "PUBLISH_CONFIG_VALUES")
 BATTERY_CELL_DATA_FORMAT: int = get_int_from_config("DEFAULT", "BATTERY_CELL_DATA_FORMAT")
 MIDPOINT_ENABLE: bool = get_bool_from_config("DEFAULT", "MIDPOINT_ENABLE")
-TEMP_BATTERY: int = get_int_from_config("DEFAULT", "TEMP_BATTERY")
-TEMP_1_NAME: str = config["DEFAULT"]["TEMP_1_NAME"]
-TEMP_2_NAME: str = config["DEFAULT"]["TEMP_2_NAME"]
-TEMP_3_NAME: str = config["DEFAULT"]["TEMP_3_NAME"]
-TEMP_4_NAME: str = config["DEFAULT"]["TEMP_4_NAME"]
+TEMPERATURE_SOURCE_BATTERY: int = get_int_from_config("DEFAULT", "TEMPERATURE_SOURCE_BATTERY")
+TEMPERATURE_1_NAME: str = config["DEFAULT"]["TEMPERATURE_1_NAME"]
+TEMPERATURE_2_NAME: str = config["DEFAULT"]["TEMPERATURE_2_NAME"]
+TEMPERATURE_3_NAME: str = config["DEFAULT"]["TEMPERATURE_3_NAME"]
+TEMPERATURE_4_NAME: str = config["DEFAULT"]["TEMPERATURE_4_NAME"]
 GUI_PARAMETERS_SHOW_ADDITIONAL_INFO: bool = get_bool_from_config("DEFAULT", "GUI_PARAMETERS_SHOW_ADDITIONAL_INFO")
 TELEMETRY: bool = get_bool_from_config("DEFAULT", "TELEMETRY")
 
@@ -538,14 +546,14 @@ def is_bit_set(value: Any) -> bool:
     return value != ZERO_CHAR
 
 
-def kelvin_to_celsius(temp: float) -> float:
+def kelvin_to_celsius(temperature: float) -> float:
     """
     Convert Kelvin to Celsius.
 
-    :param temp: Temperature in Kelvin
+    :param temperature: Temperature in Kelvin
     :return: Temperature in Celsius
     """
-    return temp - 273.15
+    return temperature - 273.15
 
 
 def bytearray_to_string(data: bytearray) -> str:

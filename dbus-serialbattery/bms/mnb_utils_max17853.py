@@ -163,16 +163,16 @@ def init_max(self):
     buvs = int((self.min_battery_voltage) / 0.003967)  # max battery volt
     spi_xfer_MAX17(0, 0x2B, buvs << 2)  # block uv set thr 0.9407/0.201mV <<2
     # Aux under temp clear T cell min + 5c - Neg temp coeff!!
-    tovc = xtemp(self.T_C_min + 5)
+    tovc = xtemperature(self.T_C_min + 5)
     # Aux undertemp clear thr V/3.967mV <<2
     spi_xfer_MAX17(0, 0x30, tovc << 2)
-    tovs = xtemp(self.T_C_min)  # Aux under temp set T cell min
+    tovs = xtemperature(self.T_C_min)  # Aux under temp set T cell min
     spi_xfer_MAX17(0, 0x31, tovs)  # Aux under temp set thr V/3.967mV <<2
     # Aux over temp clear T cell max - 5c - Neg temp coeff!!
-    tuvc = xtemp(self.T_C_max - 5)
+    tuvc = xtemperature(self.T_C_max - 5)
     spi_xfer_MAX17(0, 0x32, tuvc << 2)  # Aux uv cl thr V/3.967mV <<2
     # Aux over temp set T cell max  - Neg temp coeff!!
-    tuvs = xtemp(self.T_C_max)
+    tuvs = xtemperature(self.T_C_max)
     spi_xfer_MAX17(0, 0x33, tuvs << 2)  # Aux uv set thr 20.8V/3.967mV <<2
     spi_xfer_MAX17(0, 0x5F, 0x01)  # ADC Polarity
     spi_xfer_MAX17(0, 0x62, 0x4800)  # ADCQ CFG
@@ -190,7 +190,7 @@ def init_max(self):
     return ()
 
 
-def xtemp(temp):
+def xtemperature(temp):
     t = temp + 12.74
     s = math.exp(0.01988 * t)
     r = int(0x3FFF / s)
@@ -238,15 +238,15 @@ def err_dec(st_wd1, st_wd2, fema1, self):
     if st_wd1 & 0x80 > 0:
         err_no = 8
         err_msg = "Battery Over Temp"
-        self.protection.high_charge_temp = True
+        self.protection.high_charge_temperature = True
     else:
-        self.protection.high_charge_temp = False
+        self.protection.high_charge_temperature = False
     if st_wd1 & 0x100 > 0:
         err_no = 7
         err_msg = "Battery Under Temp"
-        self.protection.low_charge_temp
+        self.protection.low_charge_temperature
     else:
-        self.protection.low_charge_temp = False
+        self.protection.low_charge_temperature = False
     if st_wd1 & 0x200 > 0:
         err_no = 6
         err_msg = "Battery Undervoltage"
@@ -425,11 +425,11 @@ def gpio_decode(xdata, adr, self):
             t_min = T_Cells[i]
             imin = i
 
-    self.temp1 = (T_Cells[0] + T_Cells[1]) / 2
-    self.temp2 = (T_Cells[2] + T_Cells[3]) / 2
-    self.temp3 = (T_Cells[5] + T_Cells[6]) / 2
-    self.temp_max_no = imax
-    self.temp_min_no = imin
+    self.temperature_1 = (T_Cells[0] + T_Cells[1]) / 2
+    self.temperature_2 = (T_Cells[2] + T_Cells[3]) / 2
+    self.temperature_3 = (T_Cells[5] + T_Cells[6]) / 2
+    self.temperature_max_no = imax
+    self.temperature_min_no = imin
     return ()
 
 
@@ -509,13 +509,13 @@ def stat_clr():
     return ()
 
 
-def die_temp(self):
+def die_temperature(self):
     global Tj, tmaxp, Fan_run_b
     f = spi_xfer_MAX17(1, 0x57, 0)  # read diag 1 register
     Vptat = f[3] >> 2
     Vptat = Vptat / 0x4000 * 2.3077
     Tj = Vptat / 0.0032 + 8.3 - 273
-    self.temp4 = Tj
+    self.temperature_4 = Tj
     if Tj > 45:
         Fan_run_b = True
     elif Tj < 40:
@@ -564,7 +564,7 @@ def data_cycle(self):
         scn_dn = (f[3] & 0x8000) >> 15
         dat_rdy = (f[3] & 0x2000) >> 13
 
-    Tj = die_temp(self)
+    Tj = die_temperature(self)
     f = spi_xfer_MAX17(1, 0x66, 0x00)  # scan ctrl
     scn_dn = f[3] & 0x8000 >> 15
     dat_rdy = f[3] & 0x2000 >> 13

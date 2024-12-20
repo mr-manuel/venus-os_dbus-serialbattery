@@ -261,14 +261,14 @@ class HeltecModbus(Battery):
                         self.protection.high_charge_current = 2
 
                     if warnings & (1 << 9):
-                        self.protection.high_charge_temp = 2
+                        self.protection.high_charge_temperature = 2
                     else:
-                        self.protection.high_charge_temp = 0
+                        self.protection.high_charge_temperature = 0
 
                     if warnings & (1 << 10):
-                        self.protection.low_charge_temp = 2
+                        self.protection.low_charge_temperature = 2
                     else:
-                        self.protection.low_charge_temp = 0
+                        self.protection.low_charge_temperature = 0
 
                     if warnings & (1 << 11):
                         self.protection.high_temperature = 2
@@ -281,9 +281,9 @@ class HeltecModbus(Battery):
                         self.protection.low_temperature = 0
 
                     if warnings & (1 << 13):  # MOS overtemp
-                        self.protection.high_internal_temp = 2
+                        self.protection.high_internal_temperature = 2
                     else:
-                        self.protection.high_internal_temp = 0
+                        self.protection.high_internal_temperature = 0
 
                     if warnings & (1 << 14):  # SOC low
                         self.protection.low_soc = 2
@@ -306,17 +306,17 @@ class HeltecModbus(Battery):
                     #   nmin = (tminmax & 0xFF)
                     #   nmax = ((tminmax >> 8) & 0xFF)
 
-                    temps = mbdev.read_register(113, 0, 3, False)
-                    self.temp1 = (temps & 0xFF) - 40
-                    self.temp2 = ((temps >> 8) & 0xFF) - 40
+                    temperatures = mbdev.read_register(113, 0, 3, False)
+                    self.temperature_1 = (temperatures & 0xFF) - 40
+                    self.temperature_2 = ((temperatures >> 8) & 0xFF) - 40
                     time.sleep(SLPTIME)
 
-                    temps = mbdev.read_register(112, 0, 3, False)
-                    most = (temps & 0xFF) - 40
-                    balt = ((temps >> 8) & 0xFF) - 40
+                    temperatures = mbdev.read_register(112, 0, 3, False)
+                    most = (temperatures & 0xFF) - 40
+                    balt = ((temperatures >> 8) & 0xFF) - 40
                     # balancer temperature is not handled separately in dbus-serialbattery,
                     # so let's display the max of both temperatures inside the BMS as mos temperature
-                    self.temp_mos = max(most, balt)
+                    self.temperature_mos = max(most, balt)
                     time.sleep(SLPTIME)
 
                     return True

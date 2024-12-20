@@ -22,6 +22,10 @@ class EG4_Lifepower(Battery):
         self.command_firmware_version = b"\x7E" + address + b"\x33\x00" + self.get_command_general_part() + b"\x0D"
         self.history.exclude_values_to_calculate = ["charge_cycles"]
 
+        # polling every second seems to create some error messages
+        # change to 2 seconds
+        self.poll_interval = 2000
+
     balancing = 0
     BATTERYTYPE = "EG4 Lifepower"
     LENGTH_CHECK = 5
@@ -117,9 +121,10 @@ class EG4_Lifepower(Battery):
 
             result_2 = True
 
-        # polling every second seems to create some error messages
-        # change to 2 seconds
-        self.poll_interval = 2000
+        # Set fet status once, because it is not available from the BMS
+        self.charge_fet = True
+        self.discharge_fet = True
+        # self.balance_fet = True  # BMS does not have a balaner?
 
         return result or result_2
 
@@ -170,13 +175,13 @@ class EG4_Lifepower(Battery):
         self.capacity = groups[3][0] / 100
 
         # Temperature
-        self.temp_sensors = 6
-        self.temp1 = (groups[4][0] & 0xFF) - 50
-        self.temp2 = (groups[4][1] & 0xFF) - 50
-        self.temp3 = (groups[4][2] & 0xFF) - 50
-        self.temp4 = (groups[4][3] & 0xFF) - 50
-        self.temp5 = (groups[4][4] & 0xFF) - 50
-        self.temp6 = (groups[4][5] & 0xFF) - 50
+        # temperature_sensors = 6
+        self.temperature_1 = (groups[4][0] & 0xFF) - 50
+        self.temperature_2 = (groups[4][1] & 0xFF) - 50
+        self.temperature_3 = (groups[4][2] & 0xFF) - 50
+        self.temperature_4 = (groups[4][3] & 0xFF) - 50
+        self.temperature_5 = (groups[4][4] & 0xFF) - 50
+        self.temperature_6 = (groups[4][5] & 0xFF) - 50
 
         # Alarms
         # 4th bit: Over Current Protection
@@ -186,9 +191,9 @@ class EG4_Lifepower(Battery):
         # 6th bit: Under voltage protection
         self.protection.low_voltage = 2 if (groups[5][1] & 0b00100000) > 0 else 0
         # 7th bit: Charging over temp protection
-        self.protection.high_charge_temp = 2 if (groups[5][1] & 0b01000000) > 0 else 0
+        self.protection.high_charge_temperature = 2 if (groups[5][1] & 0b01000000) > 0 else 0
         # 8th bit: Charging under temp protection
-        self.protection.low_charge_temp = 2 if (groups[5][1] & 0b10000000) > 0 else 0
+        self.protection.low_charge_temperature = 2 if (groups[5][1] & 0b10000000) > 0 else 0
 
         # Cycle counter
         self.history.charge_cycles = groups[6][0]

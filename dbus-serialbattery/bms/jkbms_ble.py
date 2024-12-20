@@ -176,14 +176,14 @@ class Jkbms_Ble(Battery):
             else:
                 logger.warning(f"Jkbms_Ble: Cell {c} voltage out of range (1 - 5 V): {st['cell_info']['voltages'][c]}")
 
-        temp_mos = st["cell_info"]["temperature_mos"]
-        self.to_temp(0, temp_mos if temp_mos < 32767 else (65535 - temp_mos) * -1)
+        temperature_mos = st["cell_info"]["temperature_mos"]
+        self.to_temperature(0, temperature_mos if temperature_mos < 32767 else (65535 - temperature_mos) * -1)
 
-        temp1 = st["cell_info"]["temperature_sensor_1"]
-        self.to_temp(1, temp1 if temp1 < 32767 else (65535 - temp1) * -1)
+        temperature_1 = st["cell_info"]["temperature_sensor_1"]
+        self.to_temperature(1, temperature_1 if temperature_1 < 32767 else (65535 - temperature_1) * -1)
 
-        temp2 = st["cell_info"]["temperature_sensor_2"]
-        self.to_temp(2, temp2 if temp2 < 32767 else (65535 - temp2) * -1)
+        temperature_2 = st["cell_info"]["temperature_sensor_2"]
+        self.to_temperature(2, temperature_2 if temperature_2 < 32767 else (65535 - temperature_2) * -1)
 
         self.current = round(st["cell_info"]["current"], 1)
         self.voltage = round(st["cell_info"]["total_voltage"], 2)
@@ -224,8 +224,8 @@ class Jkbms_Ble(Battery):
 
         self.protection.high_charge_current = 2 if (st["warnings"]["charge_overcurrent"] or st["warnings"]["discharge_overcurrent"]) else 0
         self.protection.set_IC_inspection = 2 if st["cell_info"]["temperature_mos"] > 80 else 0
-        self.protection.high_charge_temp = 2 if st["warnings"]["charge_overtemp"] else 0
-        self.protection.low_charge_temp = 2 if st["warnings"]["charge_undertemp"] else 0
+        self.protection.high_charge_temperature = 2 if st["warnings"]["charge_overtemp"] else 0
+        self.protection.low_charge_temperature = 2 if st["warnings"]["charge_undertemp"] else 0
         self.protection.high_temperature = 2 if st["warnings"]["discharge_overtemp"] else 0
         return True
 

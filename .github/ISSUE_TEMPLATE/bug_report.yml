@@ -117,15 +117,19 @@ body:
       options:
         - ANT BMS
         - Daly BMS
+        - Daren 485
         - ECS GreenMeter
         - EG4 LiFePower (Revov, Tian Power)
         - EG4 LL
+        - Felicity
         - Hektec Modbus SmartBMS / YanYang BMS
         - HLPdata BMS4S
         - Jiabaida JDB BMS (LLT Power, Overkill Solar, Smart BMS)
         - JKBMS (Heltec BMS)
-        - JKBMS Inverter
+        - JKBMS Inverter (JKBMS PB Model)
+        - LiTime
         - MNB spi BMS
+        - Pace BMS
         - Renogy BMS
         - Seplos
         - Seplos v3
@@ -161,6 +165,7 @@ body:
         - Serial USB adapter to RS485
         - Raspberry Pi RS485 HAT
         - Bluetooth
+        - CAN
     validations:
       required: true
 

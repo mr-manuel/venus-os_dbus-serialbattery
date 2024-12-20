@@ -18,8 +18,9 @@ from utils import (
     bytearray_to_string,
     DRIVER_VERSION,
     EXCLUDED_DEVICES,
-    EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE,
-    EXTERNAL_CURRENT_SENSOR_DBUS_PATH,
+    EXTERNAL_SENSOR_DBUS_DEVICE,
+    EXTERNAL_SENSOR_DBUS_PATH_CURRENT,
+    EXTERNAL_SENSOR_DBUS_PATH_SOC,
     logger,
     BATTERY_ADDRESSES,
     POLL_INTERVAL,
@@ -39,6 +40,7 @@ from bms.hlpdatabms4s import HLPdataBMS4S
 from bms.jkbms import Jkbms
 from bms.jkbms_pb import Jkbms_pb
 from bms.lltjbd import LltJbd
+from bms.pace import Pace
 from bms.renogy import Renogy
 from bms.seplos import Seplos
 from bms.seplosv3 import Seplosv3
@@ -67,6 +69,7 @@ supported_bms_types = [
     {"bms": Jkbms, "baud": 115200},
     {"bms": Jkbms_pb, "baud": 115200, "address": b"\x01"},
     {"bms": LltJbd, "baud": 9600, "address": b"\x00"},
+    {"bms": Pace, "baud": 9600, "address": b"\x00"},
     {"bms": Renogy, "baud": 9600, "address": b"\x30"},
     {"bms": Renogy, "baud": 9600, "address": b"\xF7"},
     {"bms": Seplos, "baud": 19200, "address": b"\x00"},
@@ -462,9 +465,9 @@ def main():
             battery[key_address].error_code = 119
 
     # check, if external current sensor should be used
-    if EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE is not None and EXTERNAL_CURRENT_SENSOR_DBUS_PATH is not None:
+    if EXTERNAL_SENSOR_DBUS_DEVICE is not None and (EXTERNAL_SENSOR_DBUS_PATH_CURRENT is not None or EXTERNAL_SENSOR_DBUS_PATH_SOC is not None):
         for key_address in battery:
-            battery[key_address].setup_external_current_sensor()
+            battery[key_address].setup_external_sensor()
 
     # Run the main loop
     try:
