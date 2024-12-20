@@ -205,7 +205,7 @@ class Daly_Can(Battery):
                     self.load_connected,
                     state,
                     self.history.charge_cycles,
-                ) = unpack_from(">bb??bhx", data)
+                ) = unpack_from(">BB??BHx", data)
 
                 if self.cell_count != 0:
                     # check if all needed data is available
@@ -226,7 +226,10 @@ class Daly_Can(Battery):
                     data_check += 1
 
             # Cell voltage data
-            elif normalized_arbitration_id in self.CAN_FRAMES[self.RESPONSE_CELL_VOLTS]:
+            # as daly sends all frames with the same ID, the receive thread must add the frame id (from the data field) into the
+            # arbitration id to make it unique to be able to store it in a map. here we mask the frame number out so we can
+            # compare it with the original message id
+            elif (normalized_arbitration_id & 0xFFFFFFC0 | 1) in self.CAN_FRAMES[self.RESPONSE_CELL_VOLTS]:
                 if self.cell_count is not None:
 
                     frameCell = [0, 0, 0]
@@ -241,7 +244,7 @@ class Daly_Can(Battery):
                             self.cells.append(Cell(True))
 
                     while bufIdx < len(data):
-                        frame, frameCell[0], frameCell[1], frameCell[2] = unpack_from(">BHHH", data, bufIdx)
+                        frame, frameCell[0], frameCell[1], frameCell[2] = unpack_from(">BHHHx", data, bufIdx)
                         for idx in range(3):
                             cellnum = ((frame - 1) * 3) + idx  # daly is 1 based, driver 0 based
                             if cellnum >= self.cell_count:
