@@ -370,8 +370,22 @@ def main():
         # Slowest message cycle trasmission is every 1 second, wait a bit more for the fist time to fetch all needed data
         sleep(2)
 
+        can_transport_interface = CanTransportInterface()
+        can_transport_interface.can_message_cache_callback = can_thread.get_message_cache
+        can_transport_interface.can_bus = can_thread.can_bus
+
+        # if there are no messages in the cache after sleeping, something is wrong
+        if not can_transport_interface.can_message_cache_callback().items():
+            if can_thread.initial_interface_state is False:
+                logger.info("Found no messages on can bus, trying with 500 kbps")
+                can_thread.setup_can(channel=port, bitrate=500, force=True)
+                sleep(2)
+
+        if not can_transport_interface.can_message_cache_callback().items():
+            logger.error(">>> ERROR: Found no messages on can bus, is it properly configured?")
+
         # check if BATTERY_ADDRESSES is not empty
-        if BATTERY_ADDRESSES:
+        elif BATTERY_ADDRESSES:
             logger.info(">>> CAN multi device mode")
             for address in BATTERY_ADDRESSES:
                 checkbatt = get_battery(port, address, can_transport_interface)

@@ -13,7 +13,7 @@ import signal
 import atexit
 import datetime
 from time import sleep
-from standalone_serialbattery import *
+from standalone_serialbattery import standalone_serialbattery
 import logging
 
 

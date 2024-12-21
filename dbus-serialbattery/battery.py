@@ -414,10 +414,10 @@ class Battery(ABC):
         :return: None
         """
         self.voltage: float = None
-        self.current: float = 0
-        self.current_calc: float = 0
-        self.current_corrected: float = 0
-        self.power_calc: float = 0
+        self.current: float = None
+        self.current_calc: float = None
+        self.current_corrected: float = None
+        self.power_calc: float = None
         self.driver_start_time: int = int(time())
 
     @abstractmethod
@@ -2196,19 +2196,23 @@ class Battery(ABC):
                 self.history.average_discharge = self.history.total_ah_drawn / self.history.charge_cycles
 
         if "minimum_voltage" not in self.history.exclude_values_to_calculate:
-            if self.history.minimum_voltage is None or self.history.minimum_voltage > self.voltage:
+            if self.history.minimum_voltage is None or (self.voltage is not None and self.history.minimum_voltage > self.voltage):
                 self.history.minimum_voltage = self.voltage
 
         if "maximum_voltage" not in self.history.exclude_values_to_calculate:
-            if self.history.maximum_voltage is None or self.history.maximum_voltage < self.voltage:
+            if self.history.maximum_voltage is None or (self.voltage is not None and self.history.maximum_voltage < self.voltage):
                 self.history.maximum_voltage = self.voltage
 
         if "minimum_cell_voltage" not in self.history.exclude_values_to_calculate and self.get_min_cell_voltage() is not None:
-            if self.history.minimum_cell_voltage is None or self.history.minimum_cell_voltage > self.get_min_cell_voltage():
+            if self.history.minimum_cell_voltage is None or (
+                self.get_min_cell_voltage() is not None and self.history.minimum_cell_voltage > self.get_min_cell_voltage()
+            ):
                 self.history.minimum_cell_voltage = self.get_min_cell_voltage()
 
         if "maximum_cell_voltage" not in self.history.exclude_values_to_calculate and self.get_max_cell_voltage() is not None:
-            if self.history.maximum_cell_voltage is None or self.history.maximum_cell_voltage < self.get_max_cell_voltage():
+            if self.history.maximum_cell_voltage is None or (
+                self.get_max_cell_voltage() is not None and self.history.maximum_cell_voltage < self.get_max_cell_voltage()
+            ):
                 self.history.maximum_cell_voltage = self.get_max_cell_voltage()
 
         if "low_voltage_alarms" not in self.history.exclude_values_to_calculate:

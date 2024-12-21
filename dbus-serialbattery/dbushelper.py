@@ -1064,6 +1064,7 @@ class DbusHelper:
 
             if (
                 self.battery.capacity is not None
+                and self.battery.current_avg is not None
                 and (utils.TIME_TO_GO_ENABLE or len(utils.TIME_TO_SOC_POINTS) > 0)
                 and (int(time()) - self.battery.time_to_soc_update >= utils.TIME_TO_SOC_RECALCULATE_EVERY)
             ):

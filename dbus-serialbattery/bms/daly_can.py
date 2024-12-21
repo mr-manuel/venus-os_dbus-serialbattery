@@ -36,7 +36,7 @@ class Daly_Can(Battery):
         self.poll_interval = 1000
         self.poll_step = 0
         self.type = self.BATTERYTYPE
-        # self.can_bus = None
+        self.can_bus = None
         self.device_address = int.from_bytes(address, byteorder="big") if address is not None else 0
         self.error_active = False
         self.last_error_time = 0
@@ -117,11 +117,6 @@ class Daly_Can(Battery):
             # get settings to check if the data is valid and the connection is working
             self.get_settings()
             result = self.refresh_data()
-
-            # if there are no messages in the cache after sleeping, something is wrong
-            if not result:
-                logger.error("Error: found no messages on can bus, is it properly configured?")
-
         except Exception:
             (
                 exception_type,

@@ -13,7 +13,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from battery import Battery, Cell
 from utils import bytearray_to_string, logger
 from struct import unpack_from
-from time import time
+from time import sleep, time
 import sys
 
 
@@ -92,11 +92,6 @@ class Jkbms_Can(Battery):
         try:
             # get settings to check if the data is valid and the connection is working
             result = self.get_settings()
-
-            # if there are no messages in the cache after sleeping, something is wrong
-            if not self.can_transport_interface.can_message_cache_callback().items():
-                logger.error("Error: found no messages on can bus, is it properly configured?")
-                result = False
 
             # get the rest of the data to be sure, that all data is valid and the correct battery type is recognized
             # only read next data if the first one was successful, this saves time when checking multiple battery types
@@ -231,7 +226,7 @@ class Jkbms_Can(Battery):
                     "<L",
                     bytes([data[0], data[1], data[2], data[3]]),
                 )[0]
-                print("alarms %d" % (alarms))
+                logger.debug("alarms %d" % (alarms))
                 self.last_error_time = time()
                 self.error_active = True
                 self.to_protection_bits(alarms)
@@ -348,6 +343,12 @@ class Jkbms_Can(Battery):
         if data_check == 0:
             logger.error(">>> ERROR: No reply - returning")
             return False
+
+        # check if all needed data is available, else wait shortly and proceed with next iteration
+        if data_check < 27:
+            logger.debug(">>> INFO: Not all data available yet - waiting for next iteration")
+            sleep(1)
+            return True
 
         # fetch data from min/max values if protocol is JKBMS CAN V1 (extra frames missing)
         if data_check < 128:
