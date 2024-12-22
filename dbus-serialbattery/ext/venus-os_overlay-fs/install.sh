@@ -109,7 +109,10 @@ echo "Copying new app files..."
 if [ ! -d "${appPath}" ]; then
     mkdir -p "${appPath}"
 fi
-cp -R "${sourcePath}" "${appPath}/${appName}/"
+if [ ! -d "${appPath}/${appName}" ]; then
+    mkdir -p "${appPath}/${appName}"
+fi
+rsync -a "${sourcePath}/" "${appPath}/${appName}/"
 
 # remove temp files
 

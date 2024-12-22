@@ -92,8 +92,8 @@ if [ -z "$1" ]; then
 
     # show current installed version
     # driver >= v2.0.0
-    if [ -f "/data/app/dbus-serialbattery/utils.py" ]; then
-        current_version=$(grep DRIVER_VERSION /data/app/dbus-serialbattery/utils.py | awk -F'"' '{print $2}')
+    if [ -f "/data/apps/dbus-serialbattery/utils.py" ]; then
+        current_version=$(grep DRIVER_VERSION /data/apps/dbus-serialbattery/utils.py | awk -F'"' '{print $2}')
         echo
         echo "** Currently installed version: v$current_version **"
     # driver < v2.0.0
