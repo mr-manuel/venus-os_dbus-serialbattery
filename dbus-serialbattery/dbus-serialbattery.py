@@ -360,9 +360,6 @@ def main():
 
         try:
             can_thread = CanReceiverThread.get_instance(bustype="socketcan", channel=port)
-            can_transport_interface = CanTransportInterface()
-            can_transport_interface.can_message_cache_callback = can_thread.get_message_cache
-            can_transport_interface.can_bus = can_thread.bus
         except Exception as e:
             print(f"Error: {e}")
 
