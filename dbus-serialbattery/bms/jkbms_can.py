@@ -198,9 +198,9 @@ class Jkbms_Can(Battery):
 
             # Frame is send every 20ms
             if normalized_arbitration_id in self.CAN_FRAMES[self.BATT_STAT]:
-                # skip voltage due to 0.1V accuracy only and use update_cell_voltages() instead for calculation
+                # skip voltage due to 0.1V accuracy only and use update_cell_voltages() instead
                 # voltage = unpack_from("<H", bytes([data[0], data[1]]))[0]
-                # self.voltage = voltage / 10                      
+                # self.voltage = voltage / 10
                 current = unpack_from("<H", bytes([data[2], data[3]]))[0]
                 self.current = (current / 10) - 400
 
