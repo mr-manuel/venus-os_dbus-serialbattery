@@ -182,6 +182,7 @@ class Jkbms_Can(Battery):
                     self.cells.insert(i, Cell(False))
                     self.cell_count = len(self.cells)
                 self.cells[i].voltage = cell_voltage
+        self.voltage = self.get_cell_voltage_sum()
 
     def read_jkbms_can(self):
         # reset errors after timeout
@@ -197,9 +198,9 @@ class Jkbms_Can(Battery):
 
             # Frame is send every 20ms
             if normalized_arbitration_id in self.CAN_FRAMES[self.BATT_STAT]:
-                voltage = unpack_from("<H", bytes([data[0], data[1]]))[0]
-                self.voltage = voltage / 10
-
+                # skip voltage due to 0.1V accuracy only and use update_cell_voltages() instead for calculation
+                # voltage = unpack_from("<H", bytes([data[0], data[1]]))[0]
+                # self.voltage = voltage / 10                      
                 current = unpack_from("<H", bytes([data[2], data[3]]))[0]
                 self.current = (current / 10) - 400
 
