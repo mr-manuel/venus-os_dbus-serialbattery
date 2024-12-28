@@ -28,8 +28,9 @@ class DbusHelper:
         self.save_charge_details_last = {
             "allow_max_voltage": self.battery.allow_max_voltage,
             "max_voltage_start_time": self.battery.max_voltage_start_time,
-            "soc_reset_last_reached": self.battery.soc_reset_last_reached,
             "soc_calc": (self.battery.soc_calc if self.battery.soc_calc is not None else ""),
+            "soc_reset_last_reached": self.battery.soc_reset_last_reached,
+            "history_values": "",
         }
 
     def publish_battery(self, loop):

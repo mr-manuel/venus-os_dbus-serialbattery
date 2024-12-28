@@ -101,6 +101,7 @@ from bms.hlpdatabms4s import HLPdataBMS4S
 from bms.jkbms import Jkbms
 from bms.jkbms_pb import Jkbms_pb
 from bms.lltjbd import LltJbd
+from bms.pace import Pace
 from bms.renogy import Renogy
 from bms.seplos import Seplos
 from bms.seplosv3 import Seplosv3
@@ -129,26 +130,26 @@ supported_bms_types = [
     {"bms": Jkbms, "baud": 115200},
     {"bms": Jkbms_pb, "baud": 115200, "address": b"\x01"},
     {"bms": LltJbd, "baud": 9600, "address": b"\x00"},
+    {"bms": Pace, "baud": 9600, "address": b"\x00"},
     {"bms": Renogy, "baud": 9600, "address": b"\x30"},
     {"bms": Renogy, "baud": 9600, "address": b"\xF7"},
     {"bms": Seplos, "baud": 19200, "address": b"\x00"},
     {"bms": Seplosv3, "baud": 19200},
 ]
 
+# enabled only if explicitly set in config under "BMS_TYPE"
+if "ANT" in BMS_TYPE:
+    supported_bms_types.append({"bms": ANT, "baud": 19200})
+if "MNB" in BMS_TYPE:
+    supported_bms_types.append({"bms": MNB, "baud": 9600})
+if "Sinowealth" in BMS_TYPE:
+    supported_bms_types.append({"bms": Sinowealth, "baud": 9600})
+
 
 class standalone_serialbattery:
 
     def init_bms_types(self):
         self.supported_bms_types = supported_bms_types
-
-        # enabled only if explicitly set in config under "BMS_TYPE"
-        if "ANT" in BMS_TYPE:
-            self.supported_bms_types.append({"bms": ANT, "baud": 19200})
-        if "MNB" in BMS_TYPE:
-            self.supported_bms_types.append({"bms": MNB, "baud": 9600})
-        if "Sinowealth" in BMS_TYPE:
-            self.supported_bms_types.append({"bms": Sinowealth, "baud": 9600})
-
         self.expected_bms_types = [battery_type for battery_type in self.supported_bms_types if battery_type["bms"].__name__ in BMS_TYPE or len(BMS_TYPE) == 0]
 
     def __init__(self, devpath, driverOption, devadr, loglevel):
@@ -285,7 +286,7 @@ class standalone_serialbattery:
             logging.error(
                 "ERROR >>> No battery connection at "
                 + self.devpath
-                + (" and this Modbus addresses: " + ", ".join(utils.MODBUS_ADDRESSES) if utils.MODBUS_ADDRESSES else "")
+                + (" and this Modbus addresses: " + ", ".join(BATTERY_ADDRESSES) if BATTERY_ADDRESSES else "")
             )
             raise Exception("BMS DEVICE NOT FOUND")
 
