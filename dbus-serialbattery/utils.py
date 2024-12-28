@@ -14,7 +14,7 @@ import serial
 
 
 # CONSTANTS
-DRIVER_VERSION: str = "2.0.20241221dev"
+DRIVER_VERSION: str = "2.0.20241223dev"
 """
 current version of the driver
 """
@@ -406,6 +406,7 @@ POLL_INTERVAL: Union[float, None] = float(config["DEFAULT"]["POLL_INTERVAL"]) * 
 Poll interval in milliseconds
 """
 PUBLISH_CONFIG_VALUES: bool = get_bool_from_config("DEFAULT", "PUBLISH_CONFIG_VALUES")
+PUBLISH_BATTERY_DATA_AS_JSON: bool = get_bool_from_config("DEFAULT", "PUBLISH_BATTERY_DATA_AS_JSON")
 BATTERY_CELL_DATA_FORMAT: int = get_int_from_config("DEFAULT", "BATTERY_CELL_DATA_FORMAT")
 MIDPOINT_ENABLE: bool = get_bool_from_config("DEFAULT", "MIDPOINT_ENABLE")
 TEMPERATURE_SOURCE_BATTERY: int = get_int_from_config("DEFAULT", "TEMPERATURE_SOURCE_BATTERY")

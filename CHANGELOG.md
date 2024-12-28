@@ -40,6 +40,7 @@
 * Added: Felicity BMS by @versager
 * Added: JKBMS CAN - Extended protocol with version V2 by @Hooorny and @mr-manuel
 * Added: LiTime BMS by @calledit
+* Added: Make battery data available on MQTT under a single topic by enabling `PUBLISH_BATTERY_DATA_AS_JSON` by @mr-manuel
 * Added: Min/Max lifetime temperature to history class and battery template by @mr-manuel
 * Added: Pace BMS by @KoljaWindeler
 * Added: Possibility to add external sensor for SoC by @mr-manuel

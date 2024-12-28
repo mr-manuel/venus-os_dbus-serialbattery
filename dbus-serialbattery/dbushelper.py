@@ -746,6 +746,8 @@ class DbusHelper:
                 onchangecallback=self.battery.reset_soc_callback,
             )
 
+        self._dbusservice.add_path("/JsonData", None, writeable=False)
+
         # register VeDbusService after all paths where added
         # https://github.com/victronenergy/velib_python/commit/494f9aef38f46d6cfcddd8b1242336a0a3a79563
         # https://github.com/victronenergy/velib_python/commit/88a183d099ea5c60139e4d7494f9044e2dedd2d4
@@ -1158,6 +1160,66 @@ class DbusHelper:
 
         if self.battery.has_settings:
             self._dbusservice["/Settings/ResetSoc"] = self.battery.reset_soc
+
+        # get all paths from the dbus service
+        if utils.PUBLISH_BATTERY_DATA_AS_JSON:
+            all_items = self._dbusservice._dbusnodes["/"].GetItems()
+
+            # Convert dbus data types to python native data types
+            all_items = {key: self.dbus_to_python(value["Value"]) for key, value in all_items.items()}
+
+            # Filter out unwanted keys
+            filtered_data = {key: value for key, value in all_items.items() if key not in ["/JsonData", "/Settings/ResetSoc", "/Settings/HasSettings"]}
+
+            # Set empty lists to empty string
+            filtered_data = {key: "" if value == [] else value for key, value in filtered_data.items()}
+
+            cascaded_data_json = json.dumps(self.cascade_data(filtered_data))
+
+            # publish the data to the JsonData path
+            self._dbusservice["/JsonData"] = cascaded_data_json
+
+    def dbus_to_python(self, data) -> any:
+        """
+        convert dbus data types to python native data types
+
+        :param data: The data to convert.
+        :return: The converted data.
+        """
+        if isinstance(data, dbus.String):
+            data = str(data)
+        elif isinstance(data, dbus.Boolean):
+            data = bool(data)
+        elif isinstance(data, dbus.Int64):
+            data = int(data)
+        elif isinstance(data, dbus.Double):
+            data = float(data)
+        elif isinstance(data, dbus.Array):
+            data = [self.dbus_to_python(value) for value in data]
+        elif isinstance(data, dbus.Dictionary):
+            new_data = dict()
+            for key in data.keys():
+                new_data[self.dbus_to_python(key)] = self.dbus_to_python(data[key])
+            data = new_data
+        return data
+
+    def cascade_data(self, data) -> dict:
+        """
+        Cascade the data to a nested dictionary structure.
+
+        :param data: The data to cascade.
+        :return: The cascaded data.
+        """
+        cascaded = {}
+        for key, value in data.items():
+            parts = key.strip("/").split("/")
+            d = cascaded
+            for part in parts[:-1]:
+                if part not in d:
+                    d[part] = {}
+                d = d[part]
+            d[parts[-1]] = value
+        return cascaded
 
     def get_settings_with_values(self, bus, service: str, object_path: str, recursive: bool = True) -> dict:
         """
