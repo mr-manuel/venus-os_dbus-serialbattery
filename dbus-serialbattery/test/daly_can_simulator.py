@@ -29,9 +29,8 @@ import sys
 import os
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), "../ext"))
 
-import can
-import struct
-import time
+import can  # noqa: E402
+import struct  # noqa: E402
 
 
 # -------------------------------------------------------------------------------------
@@ -106,11 +105,7 @@ class DalyCanSimulator:
             if response is not None:
                 # response is a list of (arbitration_id, data_bytes) we want to send
                 for arb_id, data_bytes in response:
-                    out_msg = can.Message(
-                        arbitration_id=arb_id,
-                        data=data_bytes,
-                        is_extended_id=True
-                    )
+                    out_msg = can.Message(arbitration_id=arb_id, data=data_bytes, is_extended_id=True)
                     try:
                         self.bus.send(out_msg)
                         print(f"TX: ID=0x{arb_id:08X}, data={data_bytes.hex().upper()}")
