@@ -27,11 +27,11 @@ Author:
 """
 import sys
 import os
+
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), "../ext"))
 
-import can
-import struct
-import time
+import can  # noqa: E402
+import struct  # noqa: E402
 
 
 # -------------------------------------------------------------------------------------
@@ -70,7 +70,7 @@ TEMP_ZERO_CONSTANT = 40
 
 
 class DalyCanSimulator:
-    def __init__(self, channel='vcan0', bustype='socketcan'):
+    def __init__(self, channel="vcan0", bustype="socketcan"):
         """
         Initialize the simulator with a given CAN interface (defaults to vcan0).
         """
@@ -80,7 +80,7 @@ class DalyCanSimulator:
         # Store any stateful information here if needed, e.g., changing SoC over time.
         # If you want to simulate a different number of cells, adapt this to match your scenario.
         self.simulated_soc = 75.0  # 75%
-        self.simulated_current = 0.0   # 0 A (idle)
+        self.simulated_current = 0.0  # 0 A (idle)
         self.simulated_cycle_count = 123
         self.simulated_cells = [3.25, 3.27, 3.30, 3.28, 3.30, 3.27, 3.26, 3.29]
         self.simulated_voltage = sum(self.simulated_cells)
@@ -89,8 +89,7 @@ class DalyCanSimulator:
         """
         Main loop: read incoming CAN frames and respond if they match known commands.
         """
-        print("Daly CAN Simulator is running. Waiting for request frames...\n"
-              "Press Ctrl+C to quit.\n")
+        print("Daly CAN Simulator is running. Waiting for request frames...\n" "Press Ctrl+C to quit.\n")
         while True:
             # Read a message from the bus (blocking).
             msg = self.bus.recv(timeout=1.0)
@@ -106,11 +105,7 @@ class DalyCanSimulator:
             if response is not None:
                 # response is a list of (arbitration_id, data_bytes) we want to send
                 for arb_id, data_bytes in response:
-                    out_msg = can.Message(
-                        arbitration_id=arb_id,
-                        data=data_bytes,
-                        is_extended_id=True
-                    )
+                    out_msg = can.Message(arbitration_id=arb_id, data=data_bytes, is_extended_id=True)
                     try:
                         self.bus.send(out_msg)
                         print(f"TX: ID=0x{arb_id:08X}, data={data_bytes.hex().upper()}")
@@ -125,8 +120,8 @@ class DalyCanSimulator:
         # We'll match the known command arbitration IDs to produce responses.
         # Some commands in the driver might not be used or might not require immediate response.
         responses = []
-        id = (arbitration_id & 0x0000ff00) >> 8
-        arbitration_id = arbitration_id & 0xffff00ff  # clear out id for simpler matching
+        id = (arbitration_id & 0x0000FF00) >> 8
+        arbitration_id = arbitration_id & 0xFFFF00FF  # clear out id for simpler matching
 
         if arbitration_id == 0x18900040:  # COMMAND_SOC
             # The driver expects an 8-byte response with layout: >HHHH
@@ -140,10 +135,10 @@ class DalyCanSimulator:
             # tmp = 0 (not used by the driver)
             # current = e.g. 30000 means 0 A. If we want -5 A => 29950
             # soc = 750 => 75.0%
-            voltage_int = int(self.simulated_voltage * 10)       # e.g. 52.0 -> 520
+            voltage_int = int(self.simulated_voltage * 10)  # e.g. 52.0 -> 520
             tmp_int = 0
             current_int = CURRENT_ZERO_CONSTANT + int(self.simulated_current * -10)
-            soc_int = int(self.simulated_soc * 10)               # e.g. 75.0 -> 750
+            soc_int = int(self.simulated_soc * 10)  # e.g. 75.0 -> 750
 
             payload = struct.pack(">HHHH", voltage_int, tmp_int, current_int, soc_int)
             responses.append((0x18904000 | id, payload))  # RESPONSE_SOC
@@ -173,11 +168,7 @@ class DalyCanSimulator:
             max_temp_c = 30
             min_no = 1
             max_no = 2
-            payload = struct.pack(">BBBB",
-                                  max_temp_c + TEMP_ZERO_CONSTANT,
-                                  max_no,
-                                  min_temp_c + TEMP_ZERO_CONSTANT,
-                                  min_no)
+            payload = struct.pack(">BBBB", max_temp_c + TEMP_ZERO_CONSTANT, max_no, min_temp_c + TEMP_ZERO_CONSTANT, min_no)
             responses.append((0x18924000 | id, payload))  # RESPONSE_MINMAX_TEMP
 
         elif arbitration_id == 0x18930040:  # COMMAND_FET
@@ -229,13 +220,7 @@ class DalyCanSimulator:
             # B = 8-bit
             # H = 16-bit
             # x = 1 byte padding
-            payload = struct.pack(">BB??BHx",
-                                  cell_count,
-                                  temp_sensors,
-                                  charger_connected,
-                                  load_connected,
-                                  status,
-                                  cycles)
+            payload = struct.pack(">BB??BHx", cell_count, temp_sensors, charger_connected, load_connected, status, cycles)
             responses.append((0x18944000 | id, payload))  # RESPONSE_STATUS
 
         elif arbitration_id == 0x18950040:  # COMMAND_CELL_VOLTS
@@ -266,12 +251,7 @@ class DalyCanSimulator:
                 # BHHHx => 1 + 2 + 2 + 2 + 1 = 8 bytes
                 # We put frame_number in the first byte, then the 3 cell voltages.
                 # The last 'x' is just pad (1 byte).
-                frame_payload = struct.pack(">BHHHx",
-                                            frame_number,
-                                            cell_vals[0],
-                                            cell_vals[1],
-                                            cell_vals[2]
-                                            )
+                frame_payload = struct.pack(">BHHHx", frame_number, cell_vals[0], cell_vals[1], cell_vals[2])
                 frames.append(frame_payload)
                 frame_number += 1
                 idx += cells_per_frame
@@ -304,7 +284,7 @@ class DalyCanSimulator:
 
 
 if __name__ == "__main__":
-    simulator = DalyCanSimulator(channel='vcan0', bustype='socketcan')
+    simulator = DalyCanSimulator(channel="vcan0", bustype="socketcan")
     try:
         simulator.run()
     except KeyboardInterrupt:
