@@ -373,41 +373,22 @@ def main():
         can_transport_interface = CanTransportInterface()
         can_transport_interface.can_message_cache_callback = can_thread.get_message_cache
         can_transport_interface.can_bus = can_thread.can_bus
-        if BMS_TYPE[0] == "Jkbms_Can":
-            logger.debug("Wait shortly to make sure that all needed data is in the cache")
-            # Slowest message cycle transmission is every 1 second, wait a bit more for the first time to fetch all needed data (only jk bms)
+        logger.debug("Wait shortly to make sure that all needed data is in the cache")
+        # Slowest message cycle transmission is every 1 second, wait a bit more for the first time to fetch all needed data (only jk bms)
+        sleep(2)
+        addresses = [None] if len(BATTERY_ADDRESSES) == 0 else BATTERY_ADDRESSES  # use default address, if not configured
+
+        battery = {address: get_battery(port, address, can_transport_interface) for address in addresses}
+        battery = {address: bms for address, bms in battery.items() if bms is not None}  # remove non existent batteries
+        [logger.info(f"Successful battery connection at {port} and device address {str(address)}") for address in battery.keys()]
+
+        if len(battery) == 0:
+            logger.info("Found no devices on can bus, retrying with 500 kbps")
+            can_thread.setup_can(channel=port, bitrate=500, force=True)
             sleep(2)
-
-            # if there are no messages in the cache after sleeping, something is wrong
-            if not can_transport_interface.can_message_cache_callback().items():
-                if can_thread.initial_interface_state is False:
-                    logger.info("Found no messages on can bus, trying with 500 kbps")
-                    can_thread.setup_can(channel=port, bitrate=500, force=True)
-                    sleep(2)
-
-            if not can_transport_interface.can_message_cache_callback().items():
-                logger.error(">>> ERROR: Found no messages on can bus, is it properly configured?")
-
-            # check if BATTERY_ADDRESSES is not empty
-            elif BATTERY_ADDRESSES:
-                logger.info(">>> CAN multi device mode")
-                for address in BATTERY_ADDRESSES:
-                    checkbatt = get_battery(port, address, can_transport_interface)
-                    if checkbatt is not None:
-                        battery[address] = checkbatt
-                        logger.info("Successful battery connection at " + port + " and this device address " + str(address))
-                    else:
-                        logger.warning("No battery connection at " + port + " and this device address " + str(address))
-            # use default address
-            else:
-                battery[0] = get_battery(port, None, can_transport_interface)
-        elif BMS_TYPE[0] == "Daly_Can":
-            addresses = ["0x01"] if len(BATTERY_ADDRESSES) == 0 else BATTERY_ADDRESSES  # use default address, if not configured
-            battery = {key: get_battery(port, address, can_transport_interface) for key, address in enumerate(addresses)}
-            battery = {key: bms for key, bms in battery.items() if bms is not None}  # remove non existent batteries
-        else:
-            logger.warning(f"Unknown CAN BMS type {BMS_TYPE[0]}")
-            return
+            battery = {address: get_battery(port, address, can_transport_interface) for address in addresses}
+            battery = {address: bms for address, bms in battery.items() if bms is not None}  # remove non existent batteries
+            [logger.info(f"Successful battery connection at {port} and device address {str(address)}") for address in battery.keys()]
 
     # SERIAL
     else:
