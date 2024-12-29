@@ -402,11 +402,9 @@ def main():
             else:
                 battery[0] = get_battery(port, None, can_transport_interface)
         elif BMS_TYPE[0] == "Daly_Can":
-            if len(BATTERY_ADDRESSES) == 0:
-                battery[0] = get_battery(port, None, can_transport_interface)
-            else:
-                battery = {key: get_battery(port, address, can_transport_interface) for key, address in enumerate(BATTERY_ADDRESSES)}
-                battery = {key: bms for key, bms in battery.items() if bms is not None}  # remove non existent batteries
+            addresses = ["0x01"] if len(BATTERY_ADDRESSES) == 0 else BATTERY_ADDRESSES  # use default address, if not configured
+            battery = {key: get_battery(port, address, can_transport_interface) for key, address in enumerate(addresses)}
+            battery = {key: bms for key, bms in battery.items() if bms is not None}  # remove non existent batteries
         else:
             logger.warning(f"Unknown CAN BMS type {BMS_TYPE[0]}")
             return
