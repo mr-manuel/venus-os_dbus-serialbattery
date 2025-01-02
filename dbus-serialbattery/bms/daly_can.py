@@ -228,7 +228,7 @@ class Daly_Can(Battery):
                 # arbitration id to make it unique to be able to store it in a map. here we mask the frame number out so we can
                 # compare it with the original message id
                 elif (
-                    normalized_arbitration_id >= self.CAN_FRAMES[self.RESPONSE_CELL_VOLTS][0] + 0x100000
+                    normalized_arbitration_id > self.CAN_FRAMES[self.RESPONSE_CELL_VOLTS][0] + 0x100000
                     and normalized_arbitration_id <= self.CAN_FRAMES[self.RESPONSE_CELL_VOLTS][0] + 0x1D0000
                 ):
                     if self.cell_count is not None:
