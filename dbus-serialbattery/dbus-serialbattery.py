@@ -378,17 +378,22 @@ def main():
         sleep(2)
         addresses = [None] if len(BATTERY_ADDRESSES) == 0 else BATTERY_ADDRESSES  # use default address, if not configured
 
-        battery = {address: get_battery(port, address, can_transport_interface) for address in addresses}
-        battery = {address: bms for address, bms in battery.items() if bms is not None}  # remove non existent batteries
-        [logger.info(f"Successful battery connection at {port} and device address {str(address)}") for address in battery.keys()]
+        for busspeed in [250, 500]:
+            for address in addresses:
+                bat = get_battery(port, address, can_transport_interface)
+                if bat:
+                    battery[address] = bat
+                    logger.info(f"Successful battery connection at {port} and this address {str(address)}")
+                else:
+                    logger.warning(f"No battery connection at {port} and this address {str(address)}")
 
-        if len(battery) == 0:
-            logger.info("Found no devices on can bus, retrying with 500 kbps")
-            can_thread.setup_can(channel=port, bitrate=500, force=True)
+            # if we've found at least 1 battery, stop the search here. otherwise retry with other bus speeds
+            if len(battery) > 0:
+                break
+
+            logger.info(f"Found no devices on can bus, retrying with {busspeed} kbps")
+            can_thread.setup_can(channel=port, bitrate=busspeed, force=True)
             sleep(2)
-            battery = {address: get_battery(port, address, can_transport_interface) for address in addresses}
-            battery = {address: bms for address, bms in battery.items() if bms is not None}  # remove non existent batteries
-            [logger.info(f"Successful battery connection at {port} and device address {str(address)}") for address in battery.keys()]
 
     # SERIAL
     else:
