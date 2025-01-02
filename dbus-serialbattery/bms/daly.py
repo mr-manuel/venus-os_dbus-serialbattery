@@ -676,7 +676,7 @@ class Daly(Battery):
 
     def generate_command(self, command):
         buffer = bytearray(self.command_base)
-        buffer[1] = self.address[0]  # Always serial 40 or 80
+        buffer[1] = self.address[0]  # default: Board No 1 = 0x40; Board No 2 = 0x41, ....
         buffer[2] = command[0]
         buffer[12] = sum(buffer[:12]) & 0xFF  # checksum calc
         return buffer
