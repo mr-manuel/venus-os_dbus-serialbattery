@@ -405,9 +405,9 @@ def main():
                 checkbatt = get_battery(port, address)
                 if checkbatt is not None:
                     battery[address] = checkbatt
-                    logger.info("Successful battery connection at " + port + " and this Modbus address " + str(address))
+                    logger.info("Successful battery connection at " + port + " and this address " + str(address))
                 else:
-                    logger.warning("No battery connection at " + port + " and this Modbus address " + str(address))
+                    logger.warning("No battery connection at " + port + " and this address " + str(address))
         # use default address
         else:
             battery[0] = get_battery(port)
