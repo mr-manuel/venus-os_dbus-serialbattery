@@ -28,7 +28,7 @@ Author:
 import sys
 import os
 
-sys.path.insert(1, os.path.join(os.path.dirname(__file__), "../ext"))
+sys.path.insert(1, os.path.join(os.path.dirname(__file__), "../dbus-serialbattery/ext"))
 
 import can  # noqa: E402
 import struct  # noqa: E402
