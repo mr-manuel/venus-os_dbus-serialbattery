@@ -13,14 +13,15 @@ from utils import (
     bytearray_to_string,
     INVERT_CURRENT_MEASUREMENT,
     logger,
+    AUTO_RESET_SOC,
     MAX_BATTERY_CHARGE_CURRENT,
     MAX_BATTERY_DISCHARGE_CURRENT,
     MIN_CELL_VOLTAGE,
 )
-from struct import unpack_from
+from struct import unpack_from, pack_into
 from time import time
 import sys
-from can import Message
+from can import Message, CanOperationError
 from time import sleep
 
 
@@ -33,9 +34,15 @@ class Daly_Can(Battery):
         self.cell_max_voltage = None
         self.cell_min_no = None
         self.cell_max_no = None
+        # self.cell_count = 0  # init here if testing with bms without battery connected
         self.poll_interval = 1000
         self.poll_step = 0
         self.type = self.BATTERYTYPE
+        self.has_settings = True
+        self.reset_soc = 0
+        self.soc_to_set = None
+        self.last_charge_mode = self.charge_mode
+
         self.can_bus = None
         self.device_address = int.from_bytes(address, byteorder="big") if address is not None else 0x01
         self.error_active = False
@@ -142,38 +149,46 @@ class Daly_Can(Battery):
         # call all functions that will refresh the battery data.
         # This will be called for every iteration (1 second)
         # Return True if success, False for failure
+        self.reset_soc = self.soc if self.soc else 0
+
         self.request_daly_can()
         sleep(0.1)
 
         result = self.read_daly_can()
-        # check if connection success
+        self.write_soc()
+        if AUTO_RESET_SOC:
+            self.update_soc_on_bms()
+
         return result
 
     def request_daly_can(self):
         data = bytearray(b"\x00\x00\x00\x00\x00\x00\x00\x00")
 
         if self.can_transport_interface.can_bus is None:
-            raise RuntimeError("Can Interface not initialised")
+            raise RuntimeError("CAN Interface not initialised")
 
-        message = Message(arbitration_id=(self.CAN_FRAMES[self.COMMAND_SOC][0] & 0xFFFF00FF) | (self.device_address << 8), data=data)
-        self.can_transport_interface.can_bus.send(message, timeout=0.2)
-        message = Message(arbitration_id=(self.CAN_FRAMES[self.COMMAND_MINMAX_CELL_VOLTS][0] & 0xFFFF00FF) | (self.device_address << 8), data=data)
-        self.can_transport_interface.can_bus.send(message, timeout=0.2)
-        message = Message(arbitration_id=(self.CAN_FRAMES[self.COMMAND_MINMAX_TEMP][0] & 0xFFFF00FF) | (self.device_address << 8), data=data)
-        self.can_transport_interface.can_bus.send(message, timeout=0.2)
-        message = Message(arbitration_id=(self.CAN_FRAMES[self.COMMAND_FET][0] & 0xFFFF00FF) | (self.device_address << 8), data=data)
-        self.can_transport_interface.can_bus.send(message, timeout=0.2)
-        message = Message(arbitration_id=(self.CAN_FRAMES[self.COMMAND_STATUS][0] & 0xFFFF00FF) | (self.device_address << 8), data=data)
-        self.can_transport_interface.can_bus.send(message, timeout=0.2)
-        message = Message(arbitration_id=(self.CAN_FRAMES[self.COMMAND_CELL_VOLTS][0] & 0xFFFF00FF) | (self.device_address << 8), data=data)
-        self.can_transport_interface.can_bus.send(message, timeout=0.2)
-        # unused
-        # message = Message(arbitration_id=(self.CAN_FRAMES[self.COMMAND_TEMP][0] & 0xffff00ff) | (self.device_address << 8), data=data)
-        # self.can_transport_interface.can_bus.send(message, timeout=0.2)
-        message = Message(arbitration_id=(self.CAN_FRAMES[self.COMMAND_CELL_BALANCE][0] & 0xFFFF00FF) | (self.device_address << 8), data=data)
-        self.can_transport_interface.can_bus.send(message, timeout=0.2)
-        message = Message(arbitration_id=(self.CAN_FRAMES[self.COMMAND_ALARM][0] & 0xFFFF00FF) | (self.device_address << 8), data=data)
-        self.can_transport_interface.can_bus.send(message, timeout=0.2)
+        try:
+            message = Message(arbitration_id=(self.CAN_FRAMES[self.COMMAND_SOC][0] & 0xFFFF00FF) | (self.device_address << 8), data=data)
+            self.can_transport_interface.can_bus.send(message, timeout=0.2)
+            message = Message(arbitration_id=(self.CAN_FRAMES[self.COMMAND_MINMAX_CELL_VOLTS][0] & 0xFFFF00FF) | (self.device_address << 8), data=data)
+            self.can_transport_interface.can_bus.send(message, timeout=0.2)
+            message = Message(arbitration_id=(self.CAN_FRAMES[self.COMMAND_MINMAX_TEMP][0] & 0xFFFF00FF) | (self.device_address << 8), data=data)
+            self.can_transport_interface.can_bus.send(message, timeout=0.2)
+            message = Message(arbitration_id=(self.CAN_FRAMES[self.COMMAND_FET][0] & 0xFFFF00FF) | (self.device_address << 8), data=data)
+            self.can_transport_interface.can_bus.send(message, timeout=0.2)
+            message = Message(arbitration_id=(self.CAN_FRAMES[self.COMMAND_STATUS][0] & 0xFFFF00FF) | (self.device_address << 8), data=data)
+            self.can_transport_interface.can_bus.send(message, timeout=0.2)
+            message = Message(arbitration_id=(self.CAN_FRAMES[self.COMMAND_CELL_VOLTS][0] & 0xFFFF00FF) | (self.device_address << 8), data=data)
+            self.can_transport_interface.can_bus.send(message, timeout=0.2)
+            # unused
+            # message = Message(arbitration_id=(self.CAN_FRAMES[self.COMMAND_TEMP][0] & 0xffff00ff) | (self.device_address << 8), data=data)
+            # self.can_transport_interface.can_bus.send(message, timeout=0.2)
+            message = Message(arbitration_id=(self.CAN_FRAMES[self.COMMAND_CELL_BALANCE][0] & 0xFFFF00FF) | (self.device_address << 8), data=data)
+            self.can_transport_interface.can_bus.send(message, timeout=0.2)
+            message = Message(arbitration_id=(self.CAN_FRAMES[self.COMMAND_ALARM][0] & 0xFFFF00FF) | (self.device_address << 8), data=data)
+            self.can_transport_interface.can_bus.send(message, timeout=0.2)
+        except CanOperationError:
+            logger.error("CAN Bus Error while sending data. Check cabeling")
 
     def read_daly_can(self):
         try:
@@ -430,3 +445,35 @@ class Daly_Can(Battery):
             line = exception_traceback.tb_lineno
             logger.error(f"Exception occurred: {repr(exception_object)} of type {exception_type} in {file} line #{line}")
             return False
+
+    def reset_soc_callback(self, path, value):
+        if value is None:
+            return False
+
+        if value < 0 or value > 100:
+            return False
+
+        self.reset_soc = value
+        self.soc_to_set = value
+        return True
+
+    def write_soc(self):
+        if self.soc_to_set is None:
+            return False
+
+        data = bytearray(8)
+        pack_into(">Hxxxxxx", data, 0, self.soc_to_set * 10)
+
+        message = Message(arbitration_id=(0x161E0080 | (self.device_address << 8)), data=data)
+        self.can_transport_interface.can_bus.send(message, timeout=0.2)
+
+        logger.info(f"write soc {self.soc_to_set}%")
+        self.soc_to_set = None  # Reset value, so we will set it only once
+
+    def update_soc_on_bms(self):
+        if self.last_charge_mode is not None and self.charge_mode is not None:
+            if not self.last_charge_mode.startswith("Float") and self.charge_mode.startswith("Float"):
+                # we just entered float mode, so the battery must be full
+                self.soc_to_set = 100
+                self.write_soc()
+        self.last_charge_mode = self.charge_mode
