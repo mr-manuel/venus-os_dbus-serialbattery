@@ -31,6 +31,7 @@ class CanReceiverThread(threading.Thread):
         self._running = True  # flag to control the running state
         self.can_bus = None
         self.initial_interface_state = self.get_link_status(self.channel)
+        self.can_initialised = threading.Event()
 
     @classmethod
     def get_instance(cls, channel, bustype) -> "CanReceiverThread":
@@ -62,6 +63,7 @@ class CanReceiverThread(threading.Thread):
 
         # timestamp of last received message
         last_message_time_stamp = 0
+        self.can_initialised.set()
 
         while self._running:
             link_status = self.get_link_status(self.channel)
@@ -73,9 +75,11 @@ class CanReceiverThread(threading.Thread):
                         last_message_time_stamp = int(time())
                         with self.cache_lock:
 
-                            # daly hack: cell voltage messages are sent with same id, so use frame id additionally
-                            if message.arbitration_id == 0x18954001:
-                                message.arbitration_id = message.arbitration_id + message.data[0]
+                            # daly hack: cell voltage messages are sent with same id, so use frame id additionally as offset for cmd byte
+                            if message.arbitration_id & 0xFFFFFF00 == 0x18954000:
+                                message.arbitration_id = message.arbitration_id + 0x100000 + (message.data[0] << 16)
+                                # 18954001 -> 18A64001  frame 1
+                                # 18954001 -> 18A74001  frame 2...
 
                             # cache data with arbitration id as key
                             self.message_cache[message.arbitration_id] = message.data
@@ -146,10 +150,12 @@ class CanReceiverThread(threading.Thread):
     def get_bitrate(channel: str) -> int:
         """
         Fetch the bitrate of the CAN interface
-
         :param channel: CAN interface name
         :return: bitrate in bps
         """
+        # vcan doesn't support bitrate, so return static value
+        if channel.startswith("vcan"):
+            return 250000
         try:
             result = subprocess.run(["ip", "-details", "link", "show", channel], capture_output=True, text=True, check=True)
             for line in result.stdout.split("\n"):

@@ -703,13 +703,23 @@ class Battery(ABC):
                     and self.allow_max_voltage
                 ):
                     self.max_voltage_start_time = current_time
-                # allow max voltage again, if cells are unbalanced or SoC threshold is reached
+
+                # allow max voltage again, if:
+                # - SoC threshold is reached
+                # - Cells are unbalanced
+                # - SoC reset was requested
                 elif (
-                    utils.SOC_LEVEL_TO_RESET_VOLTAGE_LIMIT > self.soc_calc or voltage_cell_diff >= utils.CELL_VOLTAGE_DIFF_TO_RESET_VOLTAGE_LIMIT
+                    utils.SWITCH_TO_BULK_SOC_THRESHOLD > self.soc_calc
+                    or voltage_cell_diff >= utils.CELL_VOLTAGE_DIFF_TO_RESET_VOLTAGE_LIMIT
+                    or self.soc_reset_requested
                 ) and not self.allow_max_voltage:
                     self.allow_max_voltage = True
+
+                # do nothing (only for readability)
                 else:
                     pass
+
+            # timer started
             else:
                 if voltage_cell_diff > utils.CELL_VOLTAGE_DIFF_KEEP_MAX_VOLTAGE_TIME_RESTART:
                     self.max_voltage_start_time = current_time
@@ -720,15 +730,15 @@ class Battery(ABC):
                     self.allow_max_voltage = False
                     self.max_voltage_start_time = None
 
-                    if self.soc_calc <= utils.SOC_LEVEL_TO_RESET_VOLTAGE_LIMIT:
+                    if self.soc_calc <= utils.SWITCH_TO_BULK_SOC_THRESHOLD:
                         # set error code, to show in the GUI that something is wrong
                         self.manage_error_code(8)
 
                         # write to log, that reset to float was not possible
                         logger.error(
                             f"Could not change to float voltage. Battery SoC ({self.soc_calc}%) is lower"
-                            + f" than SOC_LEVEL_TO_RESET_VOLTAGE_LIMIT ({utils.SOC_LEVEL_TO_RESET_VOLTAGE_LIMIT}%)."
-                            + " Please reset SoC manually or lower the SOC_LEVEL_TO_RESET_VOLTAGE_LIMIT in the"
+                            + f" than SWITCH_TO_BULK_SOC_THRESHOLD ({utils.SWITCH_TO_BULK_SOC_THRESHOLD}%)."
+                            + " Please reset SoC manually or lower the SWITCH_TO_BULK_SOC_THRESHOLD in the"
                             + ' "config.ini".'
                         )
 
@@ -794,6 +804,7 @@ class Battery(ABC):
 
                 if self.get_balancing() and voltage_cell_diff >= utils.CELL_VOLTAGE_DIFF_TO_RESET_VOLTAGE_LIMIT:
                     self.charge_mode += " + Balancing"
+
             # Float mode
             else:
                 float_voltage = round((utils.FLOAT_CELL_VOLTAGE * self.cell_count), 2)
@@ -901,8 +912,8 @@ class Battery(ABC):
 
                 self.charge_mode_debug_bulk = (
                     "-- switch to bulk requirements (Linear Mode) --\n"
-                    + "a) SOC_LEVEL_TO_RESET_VOLTAGE_LIMIT: "
-                    + f"{utils.SOC_LEVEL_TO_RESET_VOLTAGE_LIMIT} > {self.soc_calc} :soc_calc\n"
+                    + "a) SWITCH_TO_BULK_SOC_THRESHOLD: "
+                    + f"{utils.SWITCH_TO_BULK_SOC_THRESHOLD} > {self.soc_calc} :soc_calc\n"
                     + "OR\n"
                     + f"b) voltage_cell_diff: {voltage_cell_diff:.3f} >= "
                     + f"{utils.CELL_VOLTAGE_DIFF_TO_RESET_VOLTAGE_LIMIT:.3f} "
@@ -964,17 +975,17 @@ class Battery(ABC):
             voltage_cell_diff = self.get_max_cell_voltage() - self.get_min_cell_voltage()
 
             if self.max_voltage_start_time is None:
-                # check if max voltage is reached and start timer to keep max voltage
+                # start timer, if max voltage is reached
                 if (self.max_battery_voltage - utils.VOLTAGE_DROP) <= voltage_sum and self.allow_max_voltage:
-                    # example 2
                     self.max_voltage_start_time = current_time
 
-                # check if reset soc is greater than battery soc
-                # this prevents flapping between max and float voltage
-                elif utils.SOC_LEVEL_TO_RESET_VOLTAGE_LIMIT > self.soc_calc and not self.allow_max_voltage:
+                # allow max voltage again, if:
+                # - SoC threshold is reached
+                # - SoC reset was requested
+                elif (utils.SWITCH_TO_BULK_SOC_THRESHOLD > self.soc_calc or self.soc_reset_requested) and not self.allow_max_voltage:
                     self.allow_max_voltage = True
 
-                # do nothing
+                # do nothing (only for readability)
                 else:
                     pass
 
@@ -985,9 +996,7 @@ class Battery(ABC):
                     self.allow_max_voltage = False
                     self.max_voltage_start_time = None
 
-                else:
-                    pass
-
+            # Bulk or Absorption mode
             if self.allow_max_voltage:
                 self.control_voltage = self.max_battery_voltage
                 self.charge_mode = "Bulk" if self.max_voltage_start_time is None else "Absorption"
@@ -995,6 +1004,7 @@ class Battery(ABC):
                 if self.max_battery_voltage == self.soc_reset_battery_voltage:
                     self.charge_mode += " & SoC Reset"
 
+            # Float mode
             else:
                 # check if battery changed from bulk/absoprtion to float
                 if self.charge_mode is not None and not self.charge_mode.startswith("Float"):
@@ -1071,8 +1081,8 @@ class Battery(ABC):
 
                 self.charge_mode_debug_bulk = (
                     "-- switch to bulk requirements (Step Mode) --\n"
-                    + "SOC_LEVEL_TO_RESET_VOLTAGE_LIMIT: "
-                    + f"{utils.SOC_LEVEL_TO_RESET_VOLTAGE_LIMIT} > {self.soc_calc} :soc_calc\n"
+                    + "SWITCH_TO_BULK_SOC_THRESHOLD: "
+                    + f"{utils.SWITCH_TO_BULK_SOC_THRESHOLD} > {self.soc_calc} :soc_calc\n"
                     + "AND\n"
                     + f"allow_max_voltage: {self.allow_max_voltage} == False"
                 )

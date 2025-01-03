@@ -965,6 +965,7 @@ class DbusHelper:
         self._dbusservice["/System/Temperature4Name"] = utils.TEMPERATURE_4_NAME
 
         # Voltage control
+        self._dbusservice["/Info/BatteryLowVoltage"] = self.battery.min_battery_voltage
         self._dbusservice["/Info/MaxChargeVoltage"] = (
             round(self.battery.control_voltage + utils.VOLTAGE_DROP, 2) if self.battery.control_voltage is not None else None
         )

@@ -5,7 +5,6 @@
 
 from battery import Battery, Cell
 from utils import read_serial_data, logger
-import utils
 import sys
 
 
@@ -80,9 +79,6 @@ class Pace(Battery):
 
         # capacity
         self.capacity_remain = int(status_data[117:121], 16) / 100
-
-        self.max_battery_voltage = utils.MAX_CELL_VOLTAGE * self.cell_count
-        self.min_battery_voltage = utils.MIN_CELL_VOLTAGE * self.cell_count
 
         # ######################### SOFTWARE VERSION #############################
         logger.debug("requesting software version")

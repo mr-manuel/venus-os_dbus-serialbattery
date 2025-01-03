@@ -13,8 +13,10 @@
 
 ### Breaking Changes
 
-* Driver version greater or equal to `v2.0.20241202dev`
+* Driver version greater or equal to `v2.0.20250103dev`
+  * Changes to `config.default.ini`: `SOC_LEVEL_TO_RESET_VOLTAGE_LIMIT` was replaced by `SWITCH_TO_BULK_SOC_THRESHOLD`
 
+* Driver version greater or equal to `v2.0.20241202dev`
   * The driver path changed from `/data/etc/dbus-serialbattery` to `/data/apps/dbus-serialbattery`
   * Changes to `config.default.ini`: `MODBUS_ADDRESSES` was replaced by `BATTERY_ADDRESSES`
   * Changes to `config.default.ini`: `SEPLOS_USE_BMS_VALUES` was replaced by `USE_BMS_DVCC_VALUES`
@@ -46,10 +48,12 @@
 * Added: Possibility to add external sensor for SoC by @mr-manuel
 * Added: Signal handler for clean service restart/shutdown by @mr-manuel
 * Changed: A lot of under the hood optimizations by @mr-manuel
+* Changed: Apply `SOC_RESET_VOLTAGE` after `SOC_RESET_AFTER_DAYS` regardless of whether the battery is in absorption, bulk, or float mode https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/123 by @mr-manuel
 * Changed: Consumed capacity must be negative values by @mr-manuel
 * Changed: Daly CAN - Refactored driver to match new CAN standard by @mr-manuel and @transistorgit
 * Changed: Dependencies are now shipped with the driver and not downloaded anymore which allows a complete offline installation by @mr-manuel
 * Changed: Driver was moved from `/data/etc/dbus-serialbattery` to `/data/apps/dbus-serialbattery` by @mr-manuel
+* Changed: Fix `/Info/BatteryLowVoltage` remaining `None` https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/145 by @mr-manuel
 * Changed: Fix missing charge/discharge fet status for EG4 LifePower, EG4 LL and Renogy. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/129 by @mr-manuel
 * Changed: Fixed issue, when calculated SOC is restored from dbus and BMS SOC is 0 by @mr-manuel
 * Changed: Improved driver and `config.default.ini` descriptions by @mr-manuel
@@ -64,11 +68,12 @@
 * Changed: The setting `SEPLOS_USE_BMS_VALUES` was replaced by `USE_BMS_DVCC_VALUES` in the `config.default.ini` by @mr-manuel
 * Changed: The setting `SOC_CALC_CURRENT_MEASURED_BY_USER` was replaced by `CURRENT_MEASURED_BY_USER` in the `config.default.ini` by @mr-manuel
 * Changed: The setting `SOC_CALC_CURRENT_REPORTED_BY_BMS` was replaced by `CURRENT_REPORTED_BY_BMS` in the `config.default.ini` by @mr-manuel
-* Changed: The setting `TEMP_BATTERY` was replaced by `TEMPERATURE_SOURCE_BATTERY` in the `config.default.ini` by @mr-manuel
+* Changed: The setting `SOC_LEVEL_TO_RESET_VOLTAGE_LIMIT` was replaced by `SWITCH_TO_BULK_SOC_THRESHOLD` in the `config.default.ini` by @mr-manuel
 * Changed: The setting `TEMP_1_NAME` was replaced by `TEMPERATURE_1_NAME` in the `config.default.ini` by @mr-manuel
 * Changed: The setting `TEMP_2_NAME` was replaced by `TEMPERATURE_2_NAME` in the `config.default.ini` by @mr-manuel
 * Changed: The setting `TEMP_3_NAME` was replaced by `TEMPERATURE_3_NAME` in the `config.default.ini` by @mr-manuel
 * Changed: The setting `TEMP_4_NAME` was replaced by `TEMPERATURE_4_NAME` in the `config.default.ini` by @mr-manuel
+* Changed: The setting `TEMP_BATTERY` was replaced by `TEMPERATURE_SOURCE_BATTERY` in the `config.default.ini` by @mr-manuel
 * Changed: Use corrected current for both normal current and SOC calculation if `SOC_CALCULATION` is enabled by @mr-manuel
 * Changed: When `SOC_CALCULATION` is enabled, the SoC is reset to 100%, if the battery switches to float. Old options were removed by @mr-manuel
 * Removed: The setting `SOC_RESET_CURRENT` was removed in the `config.default.ini` by @mr-manuel
