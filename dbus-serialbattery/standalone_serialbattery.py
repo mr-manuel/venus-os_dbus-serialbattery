@@ -197,7 +197,9 @@ class standalone_serialbattery:
                     else:
                         _bms_address = None
 
-                    logging.info("Testing " + test["bms"].__name__ + (' at address "' + bytearray_to_string(_bms_address) + '"' if _bms_address is not None else ""))
+                    logging.info(
+                        "Testing " + test["bms"].__name__ + (' at address "' + bytearray_to_string(_bms_address) + '"' if _bms_address is not None else "")
+                    )
                     batteryClass = test["bms"]
                     baud = test["baud"] if "baud" in test else None
                     battery: Battery = batteryClass(port=_port, baud=baud, address=_bms_address)
@@ -309,7 +311,9 @@ class standalone_serialbattery:
                     {"bms": Jkbms_Can},
                 ]
 
-                self.expected_bms_types = [battery_type for battery_type in self.supported_bms_types if battery_type["bms"].__name__ in BMS_TYPE or len(BMS_TYPE) == 0]
+                self.expected_bms_types = [
+                    battery_type for battery_type in self.supported_bms_types if battery_type["bms"].__name__ in BMS_TYPE or len(BMS_TYPE) == 0
+                ]
 
                 # If no BMS type is supported, use all supported BMS types
 
@@ -387,7 +391,9 @@ class standalone_serialbattery:
 
         if not battery_found:
             logging.error(
-                "ERROR >>> No battery connection at " + self.devpath + (" and this Modbus addresses: " + ", ".join(BATTERY_ADDRESSES) if BATTERY_ADDRESSES else "")
+                "ERROR >>> No battery connection at " 
+                + self.devpath 
+                + (" and this Modbus addresses: " + ", ".join(BATTERY_ADDRESSES) if BATTERY_ADDRESSES else "")
             )
             raise Exception("BMS DEVICE NOT FOUND")
 
