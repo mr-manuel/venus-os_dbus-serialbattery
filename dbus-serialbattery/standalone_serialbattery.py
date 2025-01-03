@@ -79,7 +79,6 @@ from typing import Union
 from time import sleep
 
 from standalone_helper import DbusHelper
-import utils
 from battery import Battery
 
 from utils import (
@@ -317,9 +316,9 @@ class standalone_serialbattery:
 
                 # If no BMS type is supported, use all supported BMS types
 
-                if len(expected_bms_types) == 0:
+                if len(self.expected_bms_types) == 0:
                     logging.warning(f"No supported CAN BMS type found in BMS_TYPE: {', '.join(BMS_TYPE)}. Using all supported BMS types.")
-                    expected_bms_types = supported_bms_types
+                    self.expected_bms_types = supported_bms_types
 
                 # start the corresponding CanReceiverThread if BMS for this type found
                 from utils_can import CanReceiverThread, CanTransportInterface
@@ -333,7 +332,6 @@ class standalone_serialbattery:
                 if not can_thread.can_initialised.wait(2):
                     logger.error("Timeout while accessing CAN interface")
                     sleep(60)
-                    exit_driver(None, None, 1)
 
                 can_transport_interface = CanTransportInterface()
                 can_transport_interface.can_message_cache_callback = can_thread.get_message_cache
@@ -345,7 +343,7 @@ class standalone_serialbattery:
 
                 for busspeed in [250, 500]:
                     for address in addresses:
-                        bat = self.get_battery(port, address, can_transport_interface)
+                        bat = self.get_battery(self.devpath, address, can_transport_interface)
                         if bat:
                             self.battery[address] = bat
                             logger.info(f"Successful battery connection at {self.devpath} and this address {str(address)}")
