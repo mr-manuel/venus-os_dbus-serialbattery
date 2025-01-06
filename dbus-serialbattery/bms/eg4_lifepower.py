@@ -168,8 +168,8 @@ class EG4_Lifepower(Battery):
             # https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/155
 
             # Mask out the high bits
-            # 0x3fff = 16383 = 0b0011_1111_1111_1111
-            cell.voltage = (groups[0][i] & 0x3fff) / 1000
+            # 0x3FFF = 16383 = 0b0011_1111_1111_1111
+            cell.voltage = (groups[0][i] & 0x3FFF) / 1000
 
         # Current
         self.current = (30000 - groups[1][0]) / 100
