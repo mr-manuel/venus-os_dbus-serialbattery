@@ -160,10 +160,16 @@ class EG4_Lifepower(Battery):
 
         self.cells = [Cell(True) for _ in range(0, self.cell_count)]
         for i, cell in enumerate(self.cells):
-            # there is a situation where the MSB bit of the high byte may come set
-            # I got that when I got a high voltage alarm from the unit.
-            # make sure that bit is 0, by doing an AND with 32767 (01111111 1111111)
-            cell.voltage = (groups[0][i] & 32767) / 1000
+            # There is a situation where the two highest bits of the high byte
+            # may come set, possibly relating to a high voltage alarm.
+            # See the EG4 protocol:
+            # https://github.com/slim-bean/powermon?tab=readme-ov-file#group-1
+            # Related issue:
+            # https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/155
+
+            # Mask out the high bits
+            # 0x3fff = 16383 = 0b0011_1111_1111_1111
+            cell.voltage = (groups[0][i] & 0x3fff) / 1000
 
         # Current
         self.current = (30000 - groups[1][0]) / 100
