@@ -42,6 +42,7 @@ from bms.heltecmodbus import HeltecModbus
 from bms.hlpdatabms4s import HLPdataBMS4S
 from bms.jkbms import Jkbms
 from bms.jkbms_pb import Jkbms_pb
+from bms.ks48100 import KS48100
 from bms.lltjbd import LltJbd
 from bms.pace import Pace
 from bms.renogy import Renogy
@@ -71,6 +72,7 @@ supported_bms_types = [
     {"bms": HLPdataBMS4S, "baud": 9600},
     {"bms": Jkbms, "baud": 115200},
     {"bms": Jkbms_pb, "baud": 115200, "address": b"\x01"},
+    {"bms": KS48100, "baud": 9600, "address": b"\x01"},
     {"bms": LltJbd, "baud": 9600, "address": b"\x00"},
     {"bms": Pace, "baud": 9600, "address": b"\x00"},
     {"bms": Renogy, "baud": 9600, "address": b"\x30"},

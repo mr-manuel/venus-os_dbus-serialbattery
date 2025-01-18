@@ -66,6 +66,7 @@
 * Added: GUIv2 - New page where you see all important data in one place for easy troubleshooting by @mr-manuel
 * Added: JKBMS CAN - Extended protocol with version V2 by @Hooorny and @mr-manuel
 * Added: Kilovault HLX+ BMS by @alexphredorg
+* Added: KS48100 (PAPool, Bemory, CERRNSS, VoltPolska, ...) BMS with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/168 by @JoshuaDodds
 * Added: LiTime BMS by @calledit
 * Added: Make battery data available on MQTT under a single topic by enabling `PUBLISH_BATTERY_DATA_AS_JSON` by @mr-manuel
 * Added: Min/Max lifetime temperature to history class and battery template by @mr-manuel
