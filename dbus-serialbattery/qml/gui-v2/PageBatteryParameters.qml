@@ -17,7 +17,7 @@ Page {
 			ListText {
 				text: "Charge Mode"
 				dataItem.uid: root.bindPrefix + "/Info/ChargeMode"
-				allowed: defaultAllowed && dataItem.isValid
+				preferredVisible: dataItem.isValid
 			}
 
 			ListQuantity {
@@ -30,7 +30,7 @@ Page {
 			ListText {
 				text: "Charge Limitation"
 				dataItem.uid: root.bindPrefix + "/Info/ChargeLimitation"
-				allowed: defaultAllowed && dataItem.isValid
+				preferredVisible: dataItem.isValid
 			}
 
 			ListQuantity {
@@ -43,7 +43,7 @@ Page {
 			ListText {
 				text: "Discharge Limitation"
 				dataItem.uid: root.bindPrefix + "/Info/DischargeLimitation"
-				allowed: defaultAllowed && dataItem.isValid
+				preferredVisible: dataItem.isValid
 			}
 
 			ListQuantity {
@@ -79,7 +79,7 @@ Page {
 					}
 				]
 
-				allowed: chargeModeDebug.value !== undefined && chargeModeDebug.value !== ""
+				preferredVisible: chargeModeDebug.value !== undefined && chargeModeDebug.value !== ""
 			}
 
 			ListItem {
@@ -100,7 +100,7 @@ Page {
 					}
 				]
 
-				allowed: chargeModeDebugFloat.value !== undefined && chargeModeDebugFloat.value !== ""
+				preferredVisible: chargeModeDebugFloat.value !== undefined && chargeModeDebugFloat.value !== ""
 			}
 
 			ListItem {
@@ -121,7 +121,7 @@ Page {
 					}
 				]
 
-				allowed: chargeModeDebugBulk.value !== undefined && chargeModeDebugBulk.value !== ""
+				preferredVisible: chargeModeDebugBulk.value !== undefined && chargeModeDebugBulk.value !== ""
 			}
 
 		}
