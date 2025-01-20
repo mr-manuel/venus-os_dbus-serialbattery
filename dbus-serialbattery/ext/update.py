@@ -19,6 +19,7 @@ modules = [
     {"name": "aenum", "user/repository": "ethanfurman/aenum", "extract": "/aenum"},
     {"name": "bleak", "user/repository": "hbldh/bleak", "extract": "/bleak"},
     {"name": "can", "user/repository": "hardbyte/python-can", "extract": "/can"},
+    {"name": "simple_pid", "user/repository": "m-lundberg/simple-pid", "extract": "/simple_pid"},
     {"name": "velib_python", "user/repository": "victronenergy/velib_python", "extract": ""},
     {"name": "venus-os_dbus-serialbattery_gui-v2", "user/repository": "mr-manuel/venus-os_dbus-serialbattery_gui-v2", "extract": ""},
     {"name": "venus-os_overlay-fs", "user/repository": "mr-manuel/venus-os_overlay-fs", "extract": ""},

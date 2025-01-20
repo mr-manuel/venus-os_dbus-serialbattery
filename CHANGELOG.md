@@ -17,6 +17,7 @@
   * Changes to `config.default.ini`: `CELL_VOLTAGE_DIFF_KEEP_MAX_VOLTAGE_TIME_RESTART` was superseeded by `SWITCH_TO_FLOAT_CELL_VOLTAGE_DEVIATION`, which has a different behavior
   * Changes to `config.default.ini`: `CELL_VOLTAGE_DIFF_KEEP_MAX_VOLTAGE_UNTIL` was replaced by `SWITCH_TO_FLOAT_CELL_VOLTAGE_DIFF`
   * Changes to `config.default.ini`: `CELL_VOLTAGE_DIFF_TO_RESET_VOLTAGE_LIMIT` was replaced by `SWITCH_TO_BULK_CELL_VOLTAGE_DIFF`
+  * Changes to `config.default.ini`: `CVL_ICONTROLLER_FACTOR` was replaced by `CVL_CONTROLLER_KI`
   * Changes to `config.default.ini`: `CVL_ICONTROLLER_MODE` was superseeded by `CVL_CONTROLLER_MODE`, which has a different behavior
   * Changes to `config.default.ini`: `LINEAR_LIMITATION_ENABLE` was superseeded by `CHARGE_MODE`, which has a different behavior
   * Changes to `config.default.ini`: `LINEAR_RECALCULATION_EVERY` was replaced by `CVL_RECALCULATION_EVERY`
@@ -52,9 +53,11 @@
 * Added: Felicity BMS by @versager
 * Added: JKBMS CAN - Extended protocol with version V2 by @Hooorny and @mr-manuel
 * Added: LiTime BMS by @calledit
+* Added: D-Controller for managing CVL on high cell voltage by @mr-manuel
 * Added: Make battery data available on MQTT under a single topic by enabling `PUBLISH_BATTERY_DATA_AS_JSON` by @mr-manuel
 * Added: Min/Max lifetime temperature to history class and battery template by @mr-manuel
 * Added: Pace BMS by @KoljaWindeler
+* Added: PID-Controller for managing CVL on high cell voltage by @mr-manuel
 * Added: Possibility to add external sensor for SoC by @mr-manuel
 * Added: Signal handler for clean service restart/shutdown by @mr-manuel
 * Changed: A lot of under the hood optimizations by @mr-manuel
@@ -77,6 +80,7 @@
 * Changed: The setting `CELL_VOLTAGE_DIFF_KEEP_MAX_VOLTAGE_TIME_RESTART` was superseeded by `SWITCH_TO_FLOAT_CELL_VOLTAGE_DEVIATION`, which has a different behavior by @mr-manuel
 * Changed: The setting `CELL_VOLTAGE_DIFF_KEEP_MAX_VOLTAGE_UNTIL` was replaced by `SWITCH_TO_FLOAT_CELL_VOLTAGE_DIFF` by @mr-manuel
 * Changed: The setting `CELL_VOLTAGE_DIFF_TO_RESET_VOLTAGE_LIMIT` was replaced by `SWITCH_TO_BULK_CELL_VOLTAGE_DIFF` by @mr-manuel
+* Changed: The setting `CVL_ICONTROLLER_FACTOR` was replaced by `CVL_CONTROLLER_KI` in the `config.default.ini` by @mr-manuel
 * Changed: The setting `CVL_ICONTROLLER_MODE` was superseeded by `CVL_CONTROLLER_MODE`, which has a different behavior by @mr-manuel
 * Changed: The setting `EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE` was replaced by `EXTERNAL_SENSOR_DBUS_DEVICE` in the `config.default.ini` by @mr-manuel
 * Changed: The setting `EXTERNAL_CURRENT_SENSOR_DBUS_PATH` was replaced by `EXTERNAL_SENSOR_DBUS_PATH_CURRENT` in the `config.default.ini` by @mr-manuel

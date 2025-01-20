@@ -10,6 +10,9 @@ from time import time
 from abc import ABC, abstractmethod
 import sys
 
+if utils.CHARGE_MODE == 4:
+    from simple_pid import PID
+
 
 class Protection(object):
     """
@@ -664,6 +667,7 @@ class Battery(ABC):
         time_diff = 0
         control_voltage = 0
         current_time = int(time())
+        debug = None
 
         try:
             voltage_sum = self.get_cell_voltage_sum()
@@ -748,51 +752,88 @@ class Battery(ABC):
 
                     if found_high_cell_voltage:
                         # reduce voltage by penalty sum
-                        # keep penalty above min battery voltage and below max battery voltage
-                        control_voltage = min(
-                            max(
-                                voltage_sum - penalty_sum,
-                                self.min_battery_voltage,
-                            ),
-                            self.max_battery_voltage,
-                        )
+                        control_voltage = voltage_sum - (penalty_sum * utils.CVL_CONTROLLER_KP)
                     else:
                         control_voltage = self.max_battery_voltage
 
-                # use I-Controller
+                # use I-Controller (is the current code really an I-Controller?)
                 elif utils.CVL_CONTROLLER_MODE == 2:
                     if self.control_voltage:
                         control_voltage = self.control_voltage - (
-                            (self.get_max_cell_voltage() - cell_voltage_max_allowed - utils.SWITCH_TO_FLOAT_CELL_VOLTAGE_DIFF) * utils.CVL_ICONTROLLER_FACTOR
+                            # (self.get_max_cell_voltage() - cell_voltage_max_allowed - utils.SWITCH_TO_FLOAT_CELL_VOLTAGE_DIFF) * utils.CVL_CONTROLLER_KI
+                            (self.get_max_cell_voltage() - cell_voltage_max_allowed)
+                            * utils.CVL_CONTROLLER_KI
                         )
                     else:
                         control_voltage = self.max_battery_voltage
 
-                    control_voltage = min(
-                        max(control_voltage, self.min_battery_voltage),
-                        self.max_battery_voltage,
-                    )
+                    """
+                    # New untested I-Controller from GitHub Copilot
+                    # Initialize integral term
+                    self.integral_term = 0
+
+                    if self.control_voltage:
+                        # Calculate the error
+                        error = self.get_max_cell_voltage() - cell_voltage_max_allowed - utils.SWITCH_TO_FLOAT_CELL_VOLTAGE_DIFF
+
+                        # Accumulate the error to the integral term
+                        self.integral_term += error
+
+                        # Adjust the control voltage using the integral term
+                        control_voltage = self.control_voltage - (self.integral_term * utils.CVL_CONTROLLER_KI)
+                    else:
+                        control_voltage = self.max_battery_voltage
+                    """
+
+                # use D-Controller (untested)
+                elif utils.CVL_CONTROLLER_MODE == 3:
+                    if not hasattr(self, "previous_error"):
+                        self.previous_error = 0
+
+                    # Calculate the error
+                    error = self.get_max_cell_voltage() - cell_voltage_max_allowed
+
+                    # Calculate the derivative of the error
+                    derivative = error - self.previous_error
+
+                    # Adjust the control voltage using the derivative term
+                    control_voltage = self.control_voltage - (derivative * utils.CVL_CONTROLLER_KD)
+
+                    # Update previous error
+                    self.previous_error = error
+
+                # use PID-Controller (untested)
+                elif utils.CVL_CONTROLLER_MODE == 4:
+                    pid_controller = PID(Kp=utils.CVL_CONTROLLER_KP, Ki=utils.CVL_CONTROLLER_KI, Kd=utils.CVL_CONTROLLER_KD, setpoint=self.max_battery_voltage)
+                    control_voltage = pid_controller(voltage_sum)
 
                 # use no controller
                 else:
                     control_voltage = self.max_battery_voltage
 
                 # set control voltage
+                # keep control voltage above min battery voltage and below max battery voltage
                 # 6 decimals are needed for a proper controller working
                 # https://github.com/Louisvdw/dbus-serialbattery/issues/1041
-                self.control_voltage = round(control_voltage, 6)
+                self.control_voltage = round(
+                    min(
+                        max(control_voltage, self.min_battery_voltage),
+                        self.max_battery_voltage,
+                    ),
+                    6,
+                )
 
                 self.charge_mode = "Bulk" if self.max_voltage_start_time is None else "Absorption"
 
                 # If control voltage is not equal to max battery voltage, then a high cell voltage was detected
                 if control_voltage != self.max_battery_voltage:
-                    self.charge_mode += " (Cell OVP)"  # Cell over voltage protection
+                    self.charge_mode += ", Cell OVP "  # Cell over voltage protection
 
                 if self.max_battery_voltage == self.soc_reset_battery_voltage:
-                    self.charge_mode += " & SoC Reset"
+                    self.charge_mode += ", SoC Reset"
 
                 if self.get_balancing() and voltage_cell_diff >= utils.SWITCH_TO_BULK_CELL_VOLTAGE_DIFF:
-                    self.charge_mode += " + Balancing"
+                    self.charge_mode += ", Balancing"
 
             # Float mode
             else:
@@ -860,6 +901,7 @@ class Battery(ABC):
 
                 self.charge_mode_debug = (
                     f"driver started: {formatted_time} • running since: {self.get_seconds_to_string(int(time()) - self.driver_start_time)}\n"
+                    + (f"{debug}\n" if debug else "")
                     + f"max_battery_voltage: {(self.max_battery_voltage):.2f} V • "
                     + f"control_voltage: {self.control_voltage:.2f} V\n"
                     + f"voltage: {self.voltage:.2f} V • "
