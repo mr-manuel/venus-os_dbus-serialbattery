@@ -9,6 +9,13 @@
 * 🚨 The Bluetooth connection is still not stable on some systems. If you want to have a stable connection use the serial connection.
 
 
+## v1.6.20250123
+
+### What's Changed
+
+* Changed: GUIv1 updated QtQuick from 1.1 to 2 with Venus OS v3.60~20. Make sure to update to this driver version before you update Venus OS to v3.60~20 or later by @mr-manuel
+
+
 ## v1.5.20241215
 
 ### What's Changed

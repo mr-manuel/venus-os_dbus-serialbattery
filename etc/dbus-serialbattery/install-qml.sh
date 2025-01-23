@@ -109,6 +109,24 @@ if [ -d /opt/victronenergy/gui ]; then
     versionStringToNumber $(head -n 1 /opt/victronenergy/version)
     ((venusVersionNumber = $versionNumber))
 
+    # QtQick version changed with this Venus OS version
+    versionStringToNumber "v3.60~20"
+
+    # change in Victron directory, else the files are "broken" if upgrading from v2 to v3
+    qmlDir="/opt/victronenergy/gui/qml"
+
+    if (( $venusVersionNumber < $versionNumber )); then
+        echo -n "Venus OS $(head -n 1 /opt/victronenergy/version) is older than v3.60~20. Fixing QtQuick version... "
+        fileList="$qmlDir/PageBattery.qml"
+        fileList+=" $qmlDir/PageBatteryCellVoltages.qml"
+        fileList+=" $qmlDir/PageBatteryParameters.qml"
+        fileList+=" $qmlDir/PageBatterySettings.qml"
+        fileList+=" $qmlDir/PageLynxIonIo.qml"
+        for file in $fileList ; do
+            sed -i -e 's/QtQuick 2/QtQuick 1.1/' "$file"
+        done
+    fi
+
     # revert to VisualItemModel, if Venus OS older than v3.00~14 (v3.00~14 uses VisibleItemModel)
     versionStringToNumber "v3.00~14"
 

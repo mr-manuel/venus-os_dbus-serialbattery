@@ -1,4 +1,4 @@
-import QtQuick 1.1
+import QtQuick 2
 import com.victron.velib 1.0
 import "utils.js" as Utils
 
@@ -57,7 +57,7 @@ MbPage {
                         show: valid
                 }
 
-        
+
                 MbSpinBox {
                         description: "Reset SoC to"
                         item.bind: Utils.path(bindPrefix, "/Settings/ResetSoc")

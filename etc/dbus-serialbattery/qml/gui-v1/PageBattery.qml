@@ -1,4 +1,4 @@
-import QtQuick 1.1
+import QtQuick 2
 import com.victron.velib 1.0
 
 MbPage {
