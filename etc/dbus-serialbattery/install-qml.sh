@@ -110,13 +110,13 @@ if [ -d /opt/victronenergy/gui ]; then
     ((venusVersionNumber = $versionNumber))
 
     # QtQick version changed with this Venus OS version
-    versionStringToNumber "v3.60~20"
+    versionStringToNumber "v3.60~18"
 
     # change in Victron directory, else the files are "broken" if upgrading from v2 to v3
     qmlDir="/opt/victronenergy/gui/qml"
 
     if (( $venusVersionNumber < $versionNumber )); then
-        echo -n "Venus OS $(head -n 1 /opt/victronenergy/version) is older than v3.60~20. Fixing QtQuick version... "
+        echo -n "Venus OS $(head -n 1 /opt/victronenergy/version) is older than v3.60~18. Fixing QtQuick version... "
         fileList="$qmlDir/PageBattery.qml"
         fileList+=" $qmlDir/PageBatteryCellVoltages.qml"
         fileList+=" $qmlDir/PageBatteryParameters.qml"
@@ -244,6 +244,28 @@ if [ -d /opt/victronenergy/gui-v2 ]; then
             sed -i -e 's/PrimaryListLabel {/ListLabel {/' "$file"
             sed -i -e 's/ListText {/ListTextItem {/' "$file"
         done
+    fi
+
+    # Some property names changed with this Venus OS version
+    versionStringToNumber "v3.60~18"
+
+    # change files in the destination folder, else the files are "broken" if upgrading to a the newer Venus OS version
+    qmlDir="/opt/victronenergy/gui-v2/Victron/VenusOS/pages/settings/devicelist/battery"
+
+    if (( $venusVersionNumber < $versionNumber )); then
+        echo "Venus OS $(head -n 1 /opt/victronenergy/version) is older than v3.60~18. Fixing property names... "
+        fileList="$qmlDir/PageBattery.qml"
+        fileList+=" $qmlDir/PageBatteryCellVoltages.qml"
+        fileList+=" $qmlDir/PageBatteryParameters.qml"
+        fileList+=" $qmlDir/PageBatterySettings.qml"
+        fileList+=" $qmlDir/PageLynxIonIo.qml"
+        for file in $fileList ; do
+            sed -i -e 's/preferredVisible:/allowed: defaultAllowed \&\&/' "$file"
+        done
+
+        echo "Venus OS $(head -n 1 /opt/victronenergy/version) is older than v3.60~18. Fixing battery object... "
+        sed -i -e 's/required property string bindPrefix/property string bindPrefix: battery.serviceUid/' "$qmlDir/PageBattery.qml"
+        sed -i -e '/Device {/{N;N;N;s/Device {\n\t\tid: battery\n\t\tserviceUid: root.bindPrefix\n\t}/property var battery/}' "$qmlDir/PageBattery.qml"
     fi
 
     echo "done."
