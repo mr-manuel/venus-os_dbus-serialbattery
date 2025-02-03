@@ -760,17 +760,30 @@ class DbusHelper:
                 if time_since_first_error >= 60 * utils.BLOCK_ON_DISCONNECT_TIMEOUT_MINUTES and not utils.BLOCK_ON_DISCONNECT:
                     loop.quit()
 
-            # Check if external current sensor is still connected
-            if utils.EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE is not None and utils.EXTERNAL_CURRENT_SENSOR_DBUS_PATH is not None:
-                # Check if external current sensor was and is still connected
-                if self.battery.dbus_external_objects is not None and utils.EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE not in get_bus().list_names():
-                    logger.error("External current sensor was disconnected, falling back to internal sensor")
-                    self.battery.dbus_external_objects = None
+            # Check if external current or SoC sensor is still connected
+            shouldReadExternalCurrent = utils.EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE is not None and utils.EXTERNAL_CURRENT_SENSOR_DBUS_PATH is not None
+            shouldReadExternalSoc = utils.EXTERNAL_SOC_SENSOR_DBUS_DEVICE is not None and utils.EXTERNAL_SOC_SENSOR_DBUS_PATH is not None
+            if shouldReadExternalCurrent or shouldReadExternalSoc:
+                connectedDevices = get_bus().list_names()
+                isCurrentSensorConnected = utils.EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE is not None and utils.EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE in connectedDevices
+                isSoCSensorConnected = utils.EXTERNAL_SOC_SENSOR_DBUS_DEVICE is not None and utils.EXTERNAL_SOC_SENSOR_DBUS_DEVICE in connectedDevices
 
-                # Check if external current sensor was not connected and is now connected
-                elif self.battery.dbus_external_objects is None and utils.EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE in get_bus().list_names():
-                    logger.info("External current sensor was connected, switching to external sensor")
-                    self.battery.setup_external_current_sensor()
+                # Check if external current sensor has been disconnected
+                if isCurrentSensorConnected == False:
+                    if self.battery.current_external is not None:
+                        logger.error("External current sensor was disconnected, falling back to internal sensor")
+                    self.battery.current_external = None
+                    shouldReadExternalCurrent = False
+
+                # Check if external SoC sensor has been disconnected
+                if isSoCSensorConnected == False:
+                    if self.battery.soc_external is not None:
+                        logger.error("External SoC sensor was disconnected, falling back to internal sensor")
+                    self.battery.soc_external = None
+                    shouldReadExternalSoc = True
+
+                if shouldReadExternalCurrent or shouldReadExternalSoc:
+                    self.battery.setup_external_sensors()
 
             # This is to manage CVCL
             self.battery.manage_charge_voltage()
@@ -815,9 +828,9 @@ class DbusHelper:
         if utils.SOC_CALCULATION:
             self._dbusservice["/Soc"] = round(self.battery.soc_calc, 2) if self.battery.soc_calc is not None else None
             # add original SOC for comparing
-            self._dbusservice["/SocBms"] = round(self.battery.soc, 2) if self.battery.soc is not None else None
+            self._dbusservice["/SocBms"] = round(self.battery.get_soc(), 2) if self.battery.get_soc() is not None else None
         else:
-            self._dbusservice["/Soc"] = round(self.battery.soc, 2) if self.battery.soc is not None else None
+            self._dbusservice["/Soc"] = round(self.battery.get_soc(), 2) if self.battery.get_soc() is not None else None
         self._dbusservice["/Dc/0/Voltage"] = round(self.battery.voltage, 2) if self.battery.voltage is not None else None
         self._dbusservice["/Dc/0/Current"] = round(self.battery.get_current(), 2) if self.battery.get_current() is not None else None
         self._dbusservice["/Dc/0/Power"] = (
@@ -1060,8 +1073,8 @@ class DbusHelper:
         if int(time()) % 15:
             self.save_current_battery_state()
 
-        if self.battery.soc is not None:
-            logger.debug("logged to dbus [%s]" % str(round(self.battery.soc, 2)))
+        if self.battery.get_soc() is not None:
+            logger.debug("logged to dbus [%s]" % str(round(self.battery.get_soc(), 2)))
             self.battery.log_cell_data()
 
         if self.battery.has_settings:

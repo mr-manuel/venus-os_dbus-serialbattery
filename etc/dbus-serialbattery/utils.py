@@ -244,6 +244,11 @@ EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE: Union[str, None] = config["DEFAULT"]["EXTER
 EXTERNAL_CURRENT_SENSOR_DBUS_PATH: Union[str, None] = config["DEFAULT"]["EXTERNAL_CURRENT_SENSOR_DBUS_PATH"] or None
 
 
+# --------- External SoC sensor ---------
+EXTERNAL_SOC_SENSOR_DBUS_DEVICE: Union[str, None] = config["DEFAULT"]["EXTERNAL_SOC_SENSOR_DBUS_DEVICE"] or None
+EXTERNAL_SOC_SENSOR_DBUS_PATH: Union[str, None] = config["DEFAULT"]["EXTERNAL_SOC_SENSOR_DBUS_PATH"] or None
+
+
 # --------- Charge Voltage Limitation (affecting CVL) ---------
 CVCM_ENABLE: bool = get_bool_from_config("DEFAULT", "CVCM_ENABLE")
 """

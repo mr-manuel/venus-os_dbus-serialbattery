@@ -162,7 +162,6 @@ class Battery(ABC):
         self.role: str = "battery"
         self.type: str = "Generic"
         self.poll_interval: int = 1000
-        self.dbus_external_objects: dict = None
         self.online: bool = True
         self.connection_info: str = "Initializing..."
         self.hardware_version: str = None
@@ -183,6 +182,7 @@ class Battery(ABC):
         self.soc_calc_reset_starttime: int = None
         self.soc_calc: float = None  # save soc_calc to preserve on restart
         self.soc: float = None
+        self.soc_external: float = None
         self.charge_fet: bool = None
         self.discharge_fet: bool = None
         self.balance_fet: bool = None
@@ -394,7 +394,7 @@ class Battery(ABC):
         if utils.SOC_CALCULATION:
             self.soc_calculation()
         else:
-            self.soc_calc = self.soc
+            self.soc_calc = self.get_soc()
 
         # set min and max battery voltage if cell count is known
         if self.cell_count is not None:
@@ -508,9 +508,9 @@ class Battery(ABC):
             # if soc_calc is not available initialize it from the BMS
             if self.soc_calc is None:
                 # if there is a SOC from the BMS then use it
-                if self.soc is not None:
-                    self.soc_calc_capacity_remain = self.capacity * self.soc / 100
-                    logger.debug("SOC initialized from BMS and set to " + str(self.soc) + "%")
+                if self.get_soc() is not None:
+                    self.soc_calc_capacity_remain = self.capacity * self.get_soc() / 100
+                    logger.debug("SOC initialized from BMS and set to " + str(self.get_soc()) + "%")
                 # else set it to 100%
                 # this is currently (2024.04.13) not possible, since then the driver won't start, if there is no SOC
                 # but leave it in case a BMS without SOC should be added
@@ -519,7 +519,7 @@ class Battery(ABC):
                     logger.debug("SOC initialized and set to 100%")
             # else initialize it from dbus
             else:
-                self.soc_calc_capacity_remain = self.capacity * self.soc_calc / 100 if self.soc > 0 else 0
+                self.soc_calc_capacity_remain = self.capacity * self.soc_calc / 100 if self.get_soc() > 0 else 0
                 logger.debug("SOC initialized from dbus and set to " + str(self.soc_calc) + "%")
 
             self.soc_calc_capacity_remain_lasttime = current_time
@@ -745,8 +745,9 @@ class Battery(ABC):
                     + f"voltage_cell_diff: {voltage_cell_diff:.3f} V\n"
                     + f"max_cell_voltage: {self.get_max_cell_voltage()} V • penalty_sum: {penalty_sum:.3f} V\n"
                     + f"soc: {self.soc}% • soc_calc: {self.soc_calc}%\n"
+                    + (f"soc_external: {self.soc_external:.2f} A\n" if self.soc_external is not None else "")
                     + f"current: {self.current:.2f}A"
-                    + (f" • current_corrected: {self.current_corrected:.2f} A • " if self.current_corrected is not None else "")
+                    + (f" • current_corrected: {self.current_corrected:.2f} A\n" if self.current_corrected is not None else "\n")
                     + (f"current_external: {self.current_external:.2f} A\n" if self.current_external is not None else "\n")
                     + f"current_time: {current_time}\n"
                     + f"linear_cvl_last_set: {self.linear_cvl_last_set}\n"
@@ -906,8 +907,9 @@ class Battery(ABC):
                     + f"voltage_cell_diff: {voltage_cell_diff:.3f} V\n"
                     + f"max_cell_voltage: {self.get_max_cell_voltage()} V\n"
                     + f"soc: {self.soc}% • soc_calc: {self.soc_calc}%\n"
+                    + (f"soc_external: {self.soc_external:.2f} A\n" if self.soc_external is not None else "")
                     + f"current: {self.current:.2f}A"
-                    + (f" • current_corrected: {self.current_corrected:.2f} A • " if self.current_corrected is not None else "")
+                    + (f" • current_corrected: {self.current_corrected:.2f} A\n" if self.current_corrected is not None else "\n")
                     + (f"current_external: {self.current_external:.2f} A\n" if self.current_external is not None else "\n")
                     + f"current_time: {current_time}\n"
                     + f"linear_cvl_last_set: {self.linear_cvl_last_set}\n"
@@ -1747,22 +1749,21 @@ class Battery(ABC):
         if self.voltage is not None and (self.voltage < 0 or self.voltage > 100):
             logger.debug("Voltage outside of thresholds (form 0 to 100): " + str(self.voltage))
             return False
-        if self.soc is not None and (self.soc < 0 or self.soc > 100):
-            logger.debug("SoC outside of thresholds (from 0 to 100): " + str(self.soc))
+        if self.get_soc() is not None and (self.get_soc() < 0 or self.get_soc() > 100):
+            logger.debug("SoC outside of thresholds (from 0 to 100): " + str(self.get_soc()))
             return False
 
         return True
 
-    def setup_external_current_sensor(self) -> None:
+    def setup_external_sensors(self) -> None:
         """
-        Setup external current sensor and it's dbus items
+        Setup external sensors and it's dbus items
         """
         import dbus
         import os
         from dbus.mainloop.glib import DBusGMainLoop
-        from vedbus import VeDbusItemImport
-
-        logger.info("Monitoring external current using: " + f"{utils.EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE}{utils.EXTERNAL_CURRENT_SENSOR_DBUS_PATH}")
+        
+        logger.debug("Monitoring external sensors.")
 
         # setup external dbus paths
         try:
@@ -1771,26 +1772,18 @@ class Battery(ABC):
             # connect to the sessionbus, on a CC GX the systembus is used
             dbus_connection = dbus.SessionBus() if "DBUS_SESSION_BUS_ADDRESS" in os.environ else dbus.SystemBus()
 
-            # dictionary containing the different items
-            dbus_objects = {}
-
-            # check if the dbus service is available
-            is_present_in_vebus = utils.EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE in dbus_connection.list_names()
-
-            if is_present_in_vebus:
-                dbus_objects["Current"] = VeDbusItemImport(
-                    dbus_connection,
-                    utils.EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE,
-                    utils.EXTERNAL_CURRENT_SENSOR_DBUS_PATH,
-                )
-
-                self.dbus_external_objects = dbus_objects
+            self.setup_external_current_sensor(dbus_connection)
+            self.setup_external_soc_sensor(dbus_connection)
 
         except Exception:
-            # set to None to avoid crashing, fallback to battery current
+            # set to None to avoid crashing, fallback to battery SoC
             utils.EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE = None
             utils.EXTERNAL_CURRENT_SENSOR_DBUS_PATH = None
-            self.dbus_external_objects = None
+            self.current_external = None
+
+            utils.EXTERNAL_SOC_SENSOR_DBUS_DEVICE = None
+            utils.EXTERNAL_SOC_SENSOR_DBUS_PATH = None
+            self.soc_external = None
             (
                 exception_type,
                 exception_object,
@@ -1799,18 +1792,97 @@ class Battery(ABC):
             file = exception_traceback.tb_frame.f_code.co_filename
             line = exception_traceback.tb_lineno
             logger.error("Exception occurred: " + f"{repr(exception_object)} of type {exception_type} in {file} line #{line}")
-            logger.error("External current sensor setup failed, fallback to internal sensor")
+            logger.error("External current / SoC sensor setup failed, fallback to internal sensor")
+
+    def setup_external_current_sensor(self, dbus_connection) -> None:
+        from vedbus import VeDbusItemImport
+
+        if utils.EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE is not None and utils.EXTERNAL_CURRENT_SENSOR_DBUS_PATH is not None:
+            try:
+                logger.debug("Monitoring external current using: " + f"{utils.EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE}{utils.EXTERNAL_CURRENT_SENSOR_DBUS_PATH}")
+
+                # check if the dbus service is available
+                is_present_in_vebus = utils.EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE in dbus_connection.list_names()
+
+                if is_present_in_vebus:
+                    dbus_external_current = VeDbusItemImport(
+                        dbus_connection,
+                        utils.EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE,
+                        utils.EXTERNAL_CURRENT_SENSOR_DBUS_PATH,
+                    )
+                    self.current_external = round(dbus_external_current.get_value(), 3)
+                else:
+                    logger.debug("External current device not present on dbus. Can't read external current.")
+
+            except Exception:
+                # set to None to avoid crashing, fallback to battery current
+                utils.EXTERNAL_CURRENT_SENSOR_DBUS_DEVICE = None
+                utils.EXTERNAL_CURRENT_SENSOR_DBUS_PATH = None
+                self.current_external = None
+                (
+                    exception_type,
+                    exception_object,
+                    exception_traceback,
+                ) = sys.exc_info()
+                file = exception_traceback.tb_frame.f_code.co_filename
+                line = exception_traceback.tb_lineno
+                logger.error("Exception occurred: " + f"{repr(exception_object)} of type {exception_type} in {file} line #{line}")
+                logger.error("External current sensor setup failed, fallback to internal sensor")
+
+    def setup_external_soc_sensor(self, dbus_connection) -> None:
+        from vedbus import VeDbusItemImport
+
+        if utils.EXTERNAL_SOC_SENSOR_DBUS_DEVICE is not None and utils.EXTERNAL_SOC_SENSOR_DBUS_PATH is not None:
+            try:
+                logger.debug("Monitoring external SoC: " + f"{utils.EXTERNAL_SOC_SENSOR_DBUS_DEVICE}{utils.EXTERNAL_SOC_SENSOR_DBUS_PATH}")
+
+                # check if the dbus service is available
+                is_present_in_vebus = utils.EXTERNAL_SOC_SENSOR_DBUS_DEVICE in dbus_connection.list_names()
+
+                if is_present_in_vebus:
+                    dbus_external_soc = VeDbusItemImport(
+                        dbus_connection,
+                        utils.EXTERNAL_SOC_SENSOR_DBUS_DEVICE,
+                        utils.EXTERNAL_SOC_SENSOR_DBUS_PATH,
+                    )
+                    self.soc_external = round(dbus_external_soc.get_value(), 3)
+                else:
+                    logger.debug("External SoC device not present on dbus. Can't read external SoC.")
+
+            except Exception:
+                # set to None to avoid crashing, fallback to battery SoC
+                utils.EXTERNAL_SOC_SENSOR_DBUS_DEVICE = None
+                utils.EXTERNAL_SOC_SENSOR_DBUS_PATH = None
+                self.soc_external = None
+                (
+                    exception_type,
+                    exception_object,
+                    exception_traceback,
+                ) = sys.exc_info()
+                file = exception_traceback.tb_frame.f_code.co_filename
+                line = exception_traceback.tb_lineno
+                logger.error("Exception occurred: " + f"{repr(exception_object)} of type {exception_type} in {file} line #{line}")
+                logger.error("External SoC sensor setup failed, fallback to internal sensor")
 
     def get_current(self) -> Union[float, None]:
         """
         Get the current from the battery.
         If an external current sensor is connected, use that value.
         """
-        if self.dbus_external_objects is not None:
-            current_external = round(self.dbus_external_objects["Current"].get_value(), 3)
-            logger.debug(f"current: {self.current} - current_external: {current_external}")
-            return current_external
+        if self.current_external is not None:
+            logger.debug(f"current: {self.current} - current_external: {self.current_external}")
+            return self.current_external
         return self.current
+
+    def get_soc(self) -> Union[float, None]:
+        """
+        Get the current from the battery.
+        If an external current sensor is connected, use that value.
+        """
+        if self.soc_external is not None:
+            logger.debug(f"soc: {self.soc} - soc_external: {self.soc_external}")
+            return self.soc_external
+        return self.soc
 
     def manage_error_code(self, error_code: int = 8) -> None:
         """
@@ -1862,7 +1934,7 @@ class Battery(ABC):
         logger.info(f"Battery {self.type} connected to dbus from {self.port}")
         logger.info("========== Settings ==========")
         logger.info(
-            f"> Connection voltage: {self.voltage} V | Current: {self.get_current()} A | SoC: {self.soc}%"
+            f"> Connection voltage: {self.voltage} V | Current: {self.get_current()} A | SoC: {self.get_soc()}%"
             + (f" | SoC calc: {self.soc_calc:.0f}%" if self.soc_calc is not None else "")
         )
         logger.info(f"> Cell count: {self.cell_count} | Cells populated: {cell_counter}")
