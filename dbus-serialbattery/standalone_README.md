@@ -21,6 +21,7 @@ driverOption:
 1 : JKBMS bluettooth - Jkbms_Ble<br>
 2 : JDB bluetooth    - LltJbd_Ble<br>
 3 : LiTime bluetooth - LiTime_Ble<br>
+4 : Kilovault bluetooth - Kilovault-Ble<br>
 10: CAN devices for JKBAMS and DALY<br>
 
 devadr: bluetooth address as string or "" empty for all non bluetooth devices
