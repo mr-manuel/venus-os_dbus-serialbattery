@@ -8,6 +8,7 @@ import asyncio
 from bleak import BleakClient
 import time
 from utils import logger
+from typing import Optional
 
 
 class Kilovault_Ble(Battery):

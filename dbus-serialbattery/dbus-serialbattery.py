@@ -71,7 +71,7 @@ supported_bms_types = [
     {"bms": LltJbd, "baud": 9600, "address": b"\x00"},
     {"bms": Pace, "baud": 9600, "address": b"\x00"},
     {"bms": Renogy, "baud": 9600, "address": b"\x30"},
-    {"bms": Renogy, "baud": 9600, "address": b"\xF7"},
+    {"bms": Renogy, "baud": 9600, "address": b"\xf7"},
     {"bms": Seplos, "baud": 19200, "address": b"\x00"},
     {"bms": Seplosv3, "baud": 19200},
 ]
@@ -329,7 +329,7 @@ def main():
 
             if port == "Kilovault_Ble":
                 # noqa: F401 --> ignore flake "imported but unused" error
-                from bms.kilovault_ble import Kilovault_Ble
+                from bms.kilovault_ble import Kilovault_Ble  # noqa: F401
 
             class_ = eval(port)
 
