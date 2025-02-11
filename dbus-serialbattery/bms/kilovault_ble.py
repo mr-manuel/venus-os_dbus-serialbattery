@@ -1,25 +1,16 @@
-# -*- coding: utf-8 -*-
-
-# NOTES
-# Please see "Add/Request a new BMS" https://mr-manuel.github.io/venus-os_dbus-serialbattery_docs/general/supported-bms#add-by-opening-a-pull-request
-# in the documentation for a checklist what you have to do, when adding a new BMS
-
-# avoid importing wildcards, remove unused imports
 from battery import Battery, Cell
-from utils import read_serial_data, logger
-from struct import unpack_from
 import struct
 import binascii
 import atexit
 import threading
-
-
 import sys
 import asyncio
 from bleak import BleakClient
 import time
 
+
 class Kilovault_Ble(Battery):
+
     MODEL_NBR_UUID = "2A24"
     KILOVAULT_BMS_SERVICE_UUID = "FFE0"
     KILOVAULT_BMS_NOTIFY_CHARACTERISTIC_UUID = "FFE4"
@@ -74,7 +65,7 @@ class Kilovault_Ble(Battery):
     async def connection_thread(self):
         logger.info(f"Starting connection to {self.address}")
         try:
-            
+
             async with BleakClient(self.address) as client:
                 self.client = client
                 # register a callback to stop notifications
@@ -89,12 +80,12 @@ class Kilovault_Ble(Battery):
                 # turn on notifications.  Data is sent to notifyCallback
                 await self.client.start_notify(self.notifyService, self.notifyCallback)
                 logger.info(f"Connected to {self.address}")
-                while (self.run and self.main_thread.is_alive() and time.time() - self.lastUpdateTime < 10):
+                while self.run and self.main_thread.is_alive() and time.time() - self.lastUpdateTime < 10:
                     await asyncio.sleep(0.1)
             logger.info(f"Disconnected from {self.address}")
             logger.info(f"self.run: {self.run}")
             return True
-        except Exception as e:
+        except Exception:
             (
                 exception_type,
                 exception_object,
@@ -113,19 +104,19 @@ class Kilovault_Ble(Battery):
     # this is the body of the worker thread loop.  It just tries to stay connected to the battery
     def background_loop(self):
         while self.run and self.main_thread.is_alive():
-            asyncio.run(self.connection_thread())   
-    
+            asyncio.run(self.connection_thread())
+
     # this is called for each frame from the BMS.  We assemble
     # the frames until we get a full status block.  Status
     # starts and ends with 0xB0
     def notifyCallback(self, sender, data):
         self.lastUpdateTime = time.time()
-        #logger.debug(f"Received notification from {sender}: {data}")
+        # logger.debug(f"Received notification from {sender}: {data}")
         if data[0] == self.KILOVAULT_START_END_BYTE:
             if len(self.status_buffer) > 0 and self.status_buffer[0] == self.KILOVAULT_START_END_BYTE:
                 decode_buffer = self.status_buffer[1:]
                 self.status_buffer = data
-                #logger.info(f"Decoding KV BLE status buffer: {decode_buffer}")
+                # logger.info(f"Decoding KV BLE status buffer: {decode_buffer}")
                 self.decode_status_buffer(decode_buffer)
             else:
                 self.status_buffer = data
@@ -135,12 +126,12 @@ class Kilovault_Ble(Battery):
     # This function decodes status
     #
     # This is gross.  The buffer contains a hex string, except for the first
-    # byte which is b0.  We have to manually process that back to useful 
+    # byte which is b0.  We have to manually process that back to useful
     # numbers and that is what this function does.
     #
     # offsets in here are nibbles (4 bits)
     def decode_status_buffer(self, data):
-        x = data.find(bytearray('RR', 'ascii'));
+        x = data.find(bytearray("RR", "ascii"))
         # convert the hex string back into binary
         try:
             bindata = binascii.unhexlify(data[0:x])
@@ -151,21 +142,21 @@ class Kilovault_Ble(Battery):
         logger.debug(f"Decoding KV BLE status buffer: {data}")
 
         # unpack the binary data
-        if (len(bindata) < 56):
+        if len(bindata) < 56:
             logger.warning(f"Incomplete buffer length: {len(bindata)}")
             return False
-        unpacked_data = struct.unpack('<hhiIhhhIhhhhhhhhhhhhhhhhh', bindata[0:56])
+        unpacked_data = struct.unpack("<hhiIhhhIhhhhhhhhhhhhhhhhh", bindata[0:56])
 
         # process into output values
         i = (x for x in range(len(unpacked_data)))
-        self.voltage = float(unpacked_data[next(i)]) * 0.001                      # offset 0
-        unpacked_data[next(i)]              # unknown value at unpacked_data[1]   # offset 2
-        self.current = float(unpacked_data[next(i)]) * 0.001                      # offset 4
-        self.capacity = float(unpacked_data[next(i)]) * 0.001                     # offset 8
-        self._charge_cycles = unpacked_data[next(i)]                              # offset 12
-        self.soc = unpacked_data[next(i)]                                         # offset 14
-        self._temperature = float(unpacked_data[next(i)] * 0.1) - 273.15          # offset 16
-        self._status = unpacked_data[next(i)]                                     # offset 18
+        self.voltage = float(unpacked_data[next(i)]) * 0.001
+        unpacked_data[next(i)]  # unknown value at unpacked_data[1]
+        self.current = float(unpacked_data[next(i)]) * 0.001
+        self.capacity = float(unpacked_data[next(i)]) * 0.001
+        self._charge_cycles = unpacked_data[next(i)]
+        self.soc = unpacked_data[next(i)]
+        self._temperature = float(unpacked_data[next(i)] * 0.1) - 273.15
+        self._status = unpacked_data[next(i)]
 
         # decode the cell voltages.  The encoded data supports up to 16 cells, but sets non-existant
         # cells to 0.
@@ -177,24 +168,24 @@ class Kilovault_Ble(Battery):
             for cell in range(16):
                 if self._cellvoltage[cell] > 0:
                     self.cells.append(Cell(False))
-                else: # voltage is 0
+                else:  # voltage is 0
                     self.cell_count = cell
                     break
 
             if self.cell_count == 0:
                 self.cell_count = 16
 
-        # This can only be run once we've figured out cell_count    
+        # This can only be run once we've figured out cell_count
         for b in range(self.cell_count):
             self.cells[b].voltage = self._cellvoltage[b]
 
-        checksum = unpacked_data[next(i)]     
+        # checksum = unpacked_data[next(i)]
 
-        logger.debug("decode complete")        
-            
+        logger.debug("decode complete")
+
         self.valid_data_event.set()
         return True
-    
+
     async def async_test_connection(self):
         if not self.bt_thread.is_alive():
             self.bt_thread.start()
@@ -247,7 +238,7 @@ class Kilovault_Ble(Battery):
             self.to_temperature(1, self._temperature)
 
         # any of these errors will shutdown the BMS
-        if (self._status & 0xff) > 0:
+        if (self._status & 0xFF) > 0:
             self.charge_fet = False
             self.discharge_fet = False
             self.balance_fet = False
@@ -283,4 +274,3 @@ class Kilovault_Ble(Battery):
         self.protection.low_temperature = 2 if (self._status & 0x8 > 0) else 0
 
         return True
-

@@ -148,7 +148,6 @@ if "Sinowealth" in BMS_TYPE:
 
 
 class standalone_serialbattery:
-
     def init_bms_types(self):
         self.supported_bms_types = supported_bms_types
         self.expected_bms_types = [battery_type for battery_type in self.supported_bms_types if battery_type["bms"].__name__ in BMS_TYPE or len(BMS_TYPE) == 0]

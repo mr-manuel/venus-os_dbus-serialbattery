@@ -329,7 +329,7 @@ def main():
 
             if port == "Kilovault_Ble":
                 # noqa: F401 --> ignore flake "imported but unused" error
-                from bms.kilovault_ble import Kilovault_Ble  
+                from bms.kilovault_ble import Kilovault_Ble
 
             class_ = eval(port)
 
