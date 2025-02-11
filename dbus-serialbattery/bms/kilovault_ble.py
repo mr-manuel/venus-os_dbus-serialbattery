@@ -6,7 +6,7 @@ import threading
 import sys
 import asyncio
 from bleak import BleakClient
-import time
+from time import time
 from utils import logger
 from typing import Optional
 
@@ -45,7 +45,7 @@ class Kilovault_Ble(Battery):
         self.notifyService = None
 
         # last notification update time
-        self.lastUpdateTime = time.time()
+        self.lastUpdateTime = time()
 
         self._charge_cycles = 0
         self._temperature = None
@@ -82,7 +82,7 @@ class Kilovault_Ble(Battery):
                 # turn on notifications.  Data is sent to notifyCallback
                 await self.client.start_notify(self.notifyService, self.notifyCallback)
                 logger.info(f"Connected to {self.address}")
-                while self.run and self.main_thread.is_alive() and time.time() - self.lastUpdateTime < 10:
+                while self.run and self.main_thread.is_alive() and time() - self.lastUpdateTime < 10:
                     await asyncio.sleep(0.1)
             logger.info(f"Disconnected from {self.address}")
             logger.info(f"self.run: {self.run}")
@@ -112,7 +112,7 @@ class Kilovault_Ble(Battery):
     # the frames until we get a full status block.  Status
     # starts and ends with 0xB0
     def notifyCallback(self, sender, data):
-        self.lastUpdateTime = time.time()
+        self.lastUpdateTime = time()
         # logger.debug(f"Received notification from {sender}: {data}")
         if data[0] == self.KILOVAULT_START_END_BYTE:
             if len(self.status_buffer) > 0 and self.status_buffer[0] == self.KILOVAULT_START_END_BYTE:

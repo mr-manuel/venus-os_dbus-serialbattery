@@ -51,6 +51,7 @@
   * Changes to `config.default.ini`: `TEMP_4_NAME` was replaced by `TEMPERATURE_4_NAME`
 
 ### What's Changed
+* Added: Kilovault HLX+ BMS by @alexphredorg
 * Added: Calculation of history values not provided by the battery by @mr-manuel
 * Added: Felicity BMS by @versager
 * Added: JKBMS CAN - Extended protocol with version V2 by @Hooorny and @mr-manuel
