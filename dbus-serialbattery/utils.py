@@ -279,7 +279,9 @@ if SWITCH_TO_BULK_SOC_THRESHOLD <= 0 and SWITCH_TO_BULK_CELL_VOLTAGE_DIFF >= 0.1
 
 # --------- Cell Voltage Limitation (affecting CVL) ---------
 CVL_CONTROLLER_MODE: int = get_int_from_config("DEFAULT", "CVL_CONTROLLER_MODE")
-CVL_ICONTROLLER_FACTOR: float = get_float_from_config("DEFAULT", "CVL_ICONTROLLER_FACTOR")
+CVL_CONTROLLER_KP: float = get_float_from_config("DEFAULT", "CVL_CONTROLLER_KP")
+CVL_CONTROLLER_KI: float = get_float_from_config("DEFAULT", "CVL_CONTROLLER_KI")
+CVL_CONTROLLER_KD: float = get_float_from_config("DEFAULT", "CVL_CONTROLLER_KD")
 
 
 # --------- Cell Voltage Current Limitation (affecting CCL/DCL) ---------
