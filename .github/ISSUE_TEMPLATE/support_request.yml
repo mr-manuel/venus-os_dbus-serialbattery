@@ -17,7 +17,11 @@ body:
 
         * Please try the `nightly` build first, if you are not already using it. It's very likely that the bug is already fixed. See [here](https://mr-manuel.github.io/venus-os_dbus-serialbattery_docs/general/install#nightly-build) how to install it.
 
+        * Did you reboot at least once after you saw the issue? If not, reboot and check if the issue still exists.
+
         * Please read the complete [changelog](https://github.com/mr-manuel/dbus-serialbattery/blob/master/CHANGELOG.md).
+
+        * Make sure to provide the logfiles in the correct format with a READABLE timestamp.
 
   - type: textarea
     id: description
@@ -28,6 +32,20 @@ body:
         NOTE: Paste the logfields in the appropriate field below.
     validations:
       required: true
+
+  - dropdown:
+      id: install_method
+      attributes:
+        label: Installation method
+        description: Select how you installed the driver.
+        multiple: false
+        options:
+          - ⚠️ Choose your option ⚠️
+          - Install script from the documentation
+          - Install script present in the driver folder
+          - SFTP upload
+          - USB stick
+          - Other (please describe in the last textfield how you installed the driver)
 
   - type: input
     id: driver_version_installed
@@ -59,13 +77,18 @@ body:
       multiple: false
       # https://github.com/victronenergy/venus/wiki/machines
       options:
-        - Please select
+        - ⚠️ Choose your option ⚠️
         - CCGX
         - Cerbo GX
         - Ekrano GX
-        - GX Card (integrated in Victron device)
+        - GX Card (integrated in the Victron device)
         - Octo GX
-        - Raspberry Pi
+        - Raspberry Pi 2
+        - Raspberry Pi 3
+        - Raspberry Pi 4
+        - Raspberry Pi 5
+        - Raspberry Pi Zero 2W
+        - Raspberry Pi Zero
         - VANcu GX
         - Venus_GX
     validations:
@@ -79,7 +102,7 @@ body:
         Visible in the remote console/GUI under `Settings` -> `Firmware` -> `Firmware version`
 
         ⚠️ **IMPORTANT:** Do not write `latest` and specify the exact version number, else we cannot help you.
-      placeholder: e.g. v2.94
+      placeholder: e.g. v3.60
     validations:
       required: true
 
@@ -103,6 +126,7 @@ body:
         - Jiabaida JDB BMS (LLT Power, Overkill Solar, Smart BMS)
         - JKBMS (Heltec BMS)
         - JKBMS Inverter (JKBMS PB Model)
+        - Kilovault
         - LiTime
         - MNB spi BMS
         - Pace BMS
@@ -136,12 +160,29 @@ body:
       description: Select how you connected your battery to the Venus OS device.
       multiple: false
       options:
-        - Please select
+        - ⚠️ Choose your option ⚠️
         - Serial USB adapter to TTL
         - Serial USB adapter to RS485
         - Raspberry Pi RS485 HAT
         - Bluetooth
         - CAN
+    validations:
+      required: true
+
+  - type: dropdown
+    id: usb_hub
+    attributes:
+      label: USB hub
+      description: |
+        Select if you use a USB hub to connect the Serial USB adapter to the Venus OS device.
+
+        ⚠️ **IMPORTANT:** If you use a USB hub, try to connect the Serial USB adapter directly to the Venus OS device to see if the issue still exists.
+      multiple: false
+      options:
+        - ⚠️ Choose your option ⚠️
+        - No
+        - Yes, no external power supply
+        - Yes, with external power supply
     validations:
       required: true
 
@@ -170,4 +211,4 @@ body:
     id: other
     attributes:
       label: Any other information that may be helpful
-      description: Leave empty, if you already said all
+      description: If you are using a USB hub, paste a link to it here. Leave empty, if you already said all.
