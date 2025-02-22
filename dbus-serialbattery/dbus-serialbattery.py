@@ -363,12 +363,14 @@ def main():
         vecan: Newer Venus GX devices
         vcan: Virtual CAN interface for testing
         """
+        from bms.rv_c_can import RV_C_Can
         from bms.daly_can import Daly_Can
         from bms.jkbms_can import Jkbms_Can
         from bms.ubms_can import Ubms_Can
 
         # only try CAN BMS on CAN port
         supported_bms_types = [
+            {"bms": RV_C_Can},
             {"bms": Daly_Can},
             {"bms": Jkbms_Can},
             {"bms": Ubms_Can},
