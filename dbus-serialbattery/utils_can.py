@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+# modified by DaniBubu15 to clear chache for not randomly recieved arbitration IDs
+
 import threading
 import can
 import subprocess
@@ -26,6 +28,7 @@ class CanReceiverThread(threading.Thread):
         self.bustype = bustype
         self.message_cache = {}  # cache can frames here
         self.cache_lock = threading.Lock()  # lock for thread safety
+        self.last_received_time = {}  # track last received time for each arbitration ID
         CanReceiverThread._instances[(channel, bustype)] = self
         self.daemon = True
         self._running = True  # flag to control the running state
@@ -84,27 +87,41 @@ class CanReceiverThread(threading.Thread):
 
                             # cache data with arbitration id as key
                             self.message_cache[message.arbitration_id] = message.data
-                            # message_cache_temp[message.arbitration_id] = message.data
+                            self.last_received_time[message.arbitration_id] = time()  # update last received time
 
                         logger.debug(f"[{self.channel}] Received: ID={hex(message.arbitration_id)}, Daten={message.data}")
 
                 except can.exceptions.CanOperationError as e:
                     logger.debug(f"CAN Bus {self.channel}: {e}")
                     self.message_cache = {}
+                    self.last_received_time = {}
                     sleep(1)
             else:
                 logger.error(">>> ERROR: CAN Bus interface is down")
                 self.message_cache = {}
+                self.last_received_time = {}
                 sleep(1)
 
-            # self.message_cache.update(message_cache_temp)
+            # Check if any defined arbitration IDs have not been received for 2 seconds
+            self.clear_old_cache_entries()
 
             if int(time()) - last_message_time_stamp > 2 and self.message_cache:
                 logger.debug(f"CAN Bus {self.channel} has not received any messages in the last 2 seconds")
                 self.message_cache = {}
+                self.last_received_time = {}
                 sleep(2)
 
         self.stop()
+
+    # Clear cache entries for defined arbitration IDs if they have not been received for 10 seconds.
+    def clear_old_cache_entries(self):
+        current_time = time()
+        with self.cache_lock:
+            for arb_id in list(self.message_cache.keys()):
+                if arb_id in [0x7F4, 0x18F328F4] and (current_time - self.last_received_time.get(arb_id, 0) > 10):
+                    del self.message_cache[arb_id]
+                    del self.last_received_time[arb_id]
+                    logger.debug(f"[{self.channel}] Cleared cache for arbitration ID {hex(arb_id)} due to timeout")
 
     def stop(self) -> None:
         """
