@@ -1,9 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # NOTES
-# Added by https://github.com/IrisCrimson
-# Reworked by https://github.com/Hooorny and https://github.com/mr-manuel
-# https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/108
+# Added by https://github.com/rogergrant99
 
 # TODO
 # - Implement controlling of BMS, see protocol documentation 7.1 (Ctrl_INFO)
