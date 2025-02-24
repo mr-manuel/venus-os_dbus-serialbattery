@@ -2,55 +2,99 @@
 
 # NOTES
 # Added by https://github.com/IrisCrimson
+# Reworked by https://github.com/Hooorny and https://github.com/mr-manuel
+# https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/108
+
+# TODO
+# - Implement controlling of BMS, see protocol documentation 7.1 (Ctrl_INFO)
 
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 from battery import Battery, Cell
-from utils import (
-    is_bit_set,
-    logger,
-    ZERO_CHAR,
-)
+from utils import bytearray_to_string, logger
 from struct import unpack_from
-import can
+from time import sleep, time
 import sys
-import time
+
 
 class RV_C_Can(Battery):
     def __init__(self, port, baud, address):
         super(RV_C_Can, self).__init__(port, baud, address)
-        self.can_bus = False
-        self.cell_count = 4
-        self.poll_interval = 1500
-        self.type = "RV-C"
-        self.last_error_time = time.time()
+        self.cell_count = 0
+        self.type = self.BATTERYTYPE
+        self.history.exclude_values_to_calculate = ["charge_cycles", "total_ah_drawn"]
+
+        # If multiple BMS are used simultaneously, the device address can be set via the dip switches on the BMS
+        # (default address is 0, all switches down) to change the CAN frame ID sent by the BMS
+        self.device_address = int.from_bytes(address, byteorder="big") if address is not None else 0
+        self.last_error_time = 0
         self.error_active = False
+        self.protocol_version = None
 
-    def __del__(self):
-        if self.can_bus:
-            self.can_bus.shutdown()
-            self.can_bus = False
-            logger.debug("bus shutdown")
+    BATTERYTYPE = "RV-C CAN"
 
-    BATTERYTYPE = "RV-C"
-    CAN_BUS_TYPE = "socketcan"
-
-    CURRENT_ZERO_CONSTANT = 400
     BATT_STAT = "BATT_STAT"
+    CELL_VOLT = "CELL_VOLT"
+    CELL_TEMP = "CELL_TEMP"
+    ALM_INFO = "ALM_INFO"
+
+    BATT_STAT_EXT = "BATT_STAT_EXT"
+    ALL_TEMP = "ALL_TEMP"
+    BMSERR_INFO = "BMSERR_INFO"
+    BMS_INFO = "BMS_INFO"
+    BMS_SWITCH_STATE = "BMS_SWITCH_STATE"
+    CELL_VOLT_EXT1 = "CELL_VOLT_EXT1"
+    CELL_VOLT_EXT2 = "CELL_VOLT_EXT2"
+    CELL_VOLT_EXT3 = "CELL_VOLT_EXT3"
+    CELL_VOLT_EXT4 = "CELL_VOLT_EXT4"
+    CELL_VOLT_EXT5 = "CELL_VOLT_EXT5"
+    CELL_VOLT_EXT6 = "CELL_VOLT_EXT6"
+    BMS_CHG_INFO = "BMS_CHG_INFO"
+    BATT_STAT1 = "BATT_STAT1"
     BATT_STAT2 = "BATT_STAT2"
+    BATT_STAT3 = "BATT_STAT3"
+    BATT_STAT4 = "BATT_STAT4"
+    BATT_STAT6 = "BATT_STAT6"
+    BATT_STAT11 = "BATT_STAT11"
+    DM_RV = "DM_RV"
 
-    MESSAGES_TO_READ = 100
-
-    # B2A... Black is using 0x0XF4
-    # B2A... Silver is using 0x0XF5
-    # See https://github.com/Louisvdw/dbus-serialbattery/issues/950
     CAN_FRAMES = {
-        BATT_STAT: [0x19FFFD8F],
+        BATT_STAT: [0x02F4],
+        CELL_VOLT: [0x04F4],
+        CELL_TEMP: [0x05F4],
+        ALM_INFO: [0x07F4],
+        BATT_STAT_EXT: [0x18F128F4],
+        ALL_TEMP: [0x18F228F4],
+        BMSERR_INFO: [0x18F328F4],
+        BMS_INFO: [0x18F428F4],
+        BMS_SWITCH_STATE: [0x18F528F4],
+        CELL_VOLT_EXT1: [0x18E028F4],
+        CELL_VOLT_EXT2: [0x18E128F4],
+        CELL_VOLT_EXT3: [0x18E228F4],
+        CELL_VOLT_EXT4: [0x18E328F4],
+        CELL_VOLT_EXT5: [0x18E428F4],
+        CELL_VOLT_EXT6: [0x18E528F4],
+        BMS_CHG_INFO: [0x1806E5F4],
+        BATT_STAT1: [0x19FFFD8F],
         BATT_STAT2: [0x19FFFC8F],
+        BATT_STAT3: [0x19FFFB8F],
+        BATT_STAT4: [0x19FEC98F],
+        BATT_STAT6: [0x19FEC78F],
+        BATT_STAT11: [0x19FEA58F],
+        DM_RV: [0x19FECA8F],
     }
 
     def connection_name(self) -> str:
-        return "CAN " + self.port
+        return f"CAN socketcan:{self.port}" + (f"__{self.device_address}" if self.device_address != 0 else "")
+
+    def unique_identifier(self) -> str:
+        """
+        Used to identify a BMS when multiple BMS are connected
+        Provide a unique identifier from the BMS to identify a BMS, if multiple same BMS are connected
+        e.g. the serial number
+        If there is no such value, please remove this function
+        """
+        return self.port + ("__" + bytearray_to_string(self.address).replace("\\", "0") if self.address is not None else "")
 
     def test_connection(self):
         """
@@ -62,6 +106,7 @@ class RV_C_Can(Battery):
         try:
             # get settings to check if the data is valid and the connection is working
             result = self.get_settings()
+
             # get the rest of the data to be sure, that all data is valid and the correct battery type is recognized
             # only read next data if the first one was successful, this saves time when checking multiple battery types
             result = result and self.refresh_data()
@@ -82,117 +127,166 @@ class RV_C_Can(Battery):
         # After successful connection get_settings() will be called to set up the battery
         # Set the current limits, populate cell count, etc
         # Return True if success, False for failure
-        self.cell_count = 4
-        self.max_battery_charge_current = 100
-        # self.max_battery_voltage =  14.6
-        self.control_charge_current = 100
-        self.control_discharge_current = 100
-        self.control_allow_discharge = True
-        self.control_allow_charge = True
-        self.max_battery_discharge_current = 100
-        #self.min_cell_voltage = 12.1
-        #self.max_cell_voltage = 14.6
-        self.capacity = 400
+        self.cell_count = 1
         self.charge_fet = 1
         self.discharge_fet = 1
-        VolSOC_full = 100
-        VolSOC_empty = 5
-        # init the cell array add only missing Cell instances
-        missing_instances = self.cell_count - len(self.cells)
-        if missing_instances > 0:
-            for c in range(missing_instances):
-                self.cells.append(Cell(False))
-
-        self.hardware_version = "RV-C CAN " + str(self.cell_count) + "S"
+        self.balancing = 0
+        self.control_allow_discharge = True
+        self.control_allow_charge = True
         return True
 
     def refresh_data(self):
         # call all functions that will refresh the battery data.
         # This will be called for every iteration (1 second)
         # Return True if success, False for failure
-        return self.read_status_data()
-
-    def read_status_data(self):
-        status_data = self.read_serial_data_rv_c_CAN()
+        result = self.read_rv_c_can()
         # check if connection success
-        if status_data is False:
+        if result is False:
             return False
 
         return True
 
-    def to_fet_bits(self, byte_data):
-        tmp = bin(byte_data)[2:].rjust(2, ZERO_CHAR)
-        # self.charge_fet = is_bit_set(tmp[1])
-        # self.discharge_fet = is_bit_set(tmp[0])
+    def to_protection_bits(self, byte_data):
+        tmp = bin(byte_data | 0xFF00000000)
+        # Still have to map alarms....
+        pos = len(tmp)
+        logger.debug(tmp)
+        #self.protection.high_cell_voltage = 2 if int(tmp[pos - 2 : pos], 2) > 0 else 0
+        #elf.protection.low_cell_voltage = 2 if int(tmp[pos - 4 : pos - 2], 2) > 0 else 0
+        #self.protection.high_voltage = 2 if int(tmp[pos - 6 : pos - 4], 4) > 0 else 0
+        #self.protection.low_voltage = 2 if int(tmp[pos - 8 : pos - 6], 2) > 0 else 0
+        #self.protection.high_discharge_current = 2 if int(tmp[pos - 12 : pos - 10], 2) > 0 else 0
+        #self.protection.high_charge_current = 2 if int(tmp[pos - 14 : pos - 12], 2) > 0 else 0
 
+        # there is just a BMS and Battery temperature_ alarm (not for charge and discharge)
+        #self.protection.high_charge_temperature = 2 if int(tmp[pos - 16 : pos - 14], 2) > 0 else 0
+        #self.protection.high_temperature = 2 if int(tmp[pos - 16 : pos - 14], 2) > 0 else 0
+        #self.protection.low_charge_temperature = 2 if int(tmp[pos - 18 : pos - 16], 2) > 0 else 0
+        #self.protection.low_temperature = 2 if int(tmp[pos - 18 : pos - 16], 2) > 0 else 0
+        #self.protection.high_charge_temperature = 2 if int(tmp[pos - 20 : pos - 18], 2) > 0 else 0
+        #self.protection.high_temperature = 2 if int(tmp[pos - 20 : pos - 18], 2) > 0 else 0
+        #self.protection.low_soc = 2 if int(tmp[pos - 22 : pos - 20], 2) > 0 else 0
 
-    def read_serial_data_rv_c_CAN(self):
-        if self.can_bus is False:
-            logger.debug("Can bus init")
-            # intit the can interface
-            try:
-                self.can_bus = can.interface.Bus(bustype=self.CAN_BUS_TYPE, channel=self.port)
-                logger.debug(f"bustype: {self.CAN_BUS_TYPE}, channel: {self.port}, bitrate: {self.baud_rate}")
-            except can.CanError as e:
-                logger.error(e)
+    def reset_protection_bits(self):
+        self.protection.high_cell_voltage = 0
+        self.protection.low_cell_voltage = 0
+        self.protection.high_voltage = 0
+        self.protection.low_voltage = 0
+        self.protection.cell_imbalance = 0
+        self.protection.high_discharge_current = 0
+        self.protection.high_charge_current = 0
 
-            if self.can_bus is None:
-                logger.error("Can bus init failed")
-                return False
+        # there is just a BMS and Battery temperature_ alarm (not for charge and discharge)
+        self.protection.high_charge_temperature = 0
+        self.protection.high_temperature = 0
+        self.protection.low_charge_temperature = 0
+        self.protection.low_temperature = 0
+        self.protection.high_charge_temperature = 0
+        self.protection.high_temperature = 0
+        self.protection.low_soc = 0
+        self.protection.internal_failure = 0
+        self.protection.internal_failure = 0
+        self.protection.internal_failure = 0
+        self.protection.internal_failure = 0
 
-            logger.debug("Can bus init done")
+    def update_cell_voltages(self, start_index, end_index, data):
+        for i in range(start_index, end_index + 1):
+            cell_voltage = unpack_from("<H", bytes([data[2], data[3]]))[0] / 80
+            if cell_voltage > 0:
+                if len(self.cells) <= i:
+                    self.cells.insert(i, Cell(False))
+                    self.cell_count = len(self.cells)
+                self.cells[i].voltage = cell_voltage
+        self.voltage = self.get_cell_voltage_sum()
 
-        try:
+    def read_rv_c_can(self):
+        # reset errors after timeout
+        if ((time() - self.last_error_time) > 120.0) and self.error_active is True:
+            self.error_active = False
+            self.reset_protection_bits()
 
-            # reset errors after timeout
-            if ((time.time() - self.last_error_time) > 120.0) and self.error_active is True:
-                self.error_active = False
-                self.reset_protection_bits()
+        # check if all needed data is available
+        data_check = 0
 
-            # read msgs until we get one we want
-            messages_to_read = self.MESSAGES_TO_READ
-            while messages_to_read > 0:
-                msg = self.can_bus.recv(1)
-                if msg is None:
-                    logger.info("No CAN Message received")
-                    return False
+        for frame_id, data in self.can_transport_interface.can_message_cache_callback().items():
+            normalized_arbitration_id = frame_id + self.device_address
 
-                if msg is not None:
-                    # print("message received")
-                    messages_to_read -= 1
-                    # print(messages_to_read)
-                    if msg.arbitration_id in self.CAN_FRAMES[self.BATT_STAT]:
-                        voltage = unpack_from("<H", bytes([msg.data[2], msg.data[3]]))[0]
-                        self.voltage = voltage / 20
-                        self.cells[0].voltage  = (voltage / 20) / 4
-                        self.cells[1].voltage  = (voltage / 20)	/ 4
-                        self.cells[2].voltage  = (voltage / 20)	/ 4
-                        self.cells[3].voltage  = (voltage / 20)	/ 4
-                        current = unpack_from("<L", bytes([msg.data[4], msg.data[5],msg.data[6], msg.data[7] ]))[0]
-                        self.current = (2000000000 - current) / 1000
-                        # logger.debug("Current: %d" % (current))
-                        # print(self.voltage)
-                        # print(self.current)
+            # BATT_STAT1 Voltage
+            if normalized_arbitration_id in self.CAN_FRAMES[self.BATT_STAT1]:
+                self.update_cell_voltages(0, 3, data)
+                current = unpack_from("<L", bytes([data[4], data[5],data[6], data[7] ]))[0] 
+                self.current = (2000000000 - current) / 1000
+                logger.debug("Voltage: %d" % (self.voltage))
+                logger.debug("Current: %d" % (self.current))
 
-                    elif msg.arbitration_id in self.CAN_FRAMES[self.BATT_STAT2]:
-                        soc = unpack_from("<B", bytes([msg.data[4]]))[0]
-                        self.soc = soc / 2
-                        temperature_1 = unpack_from("<H", bytes([msg.data[2], msg.data[3]]))[0]
-                        temp = (temperature_1 * .03125) - 273
-                        self.to_temperature(1, temp)
-                        # print(self.soc)
-                        # print(self.time_to_go)
+                # check if all needed data is available
+                data_check += 2
 
+            # BATT_STAT2 SOC and Temp
+            elif normalized_arbitration_id in self.CAN_FRAMES[self.BATT_STAT2]:
+                soc = unpack_from("<B", bytes([data[4]]))[0]
+                self.soc = soc / 2
+                temperature_1 = unpack_from("<H", bytes([data[2], data[3]]))[0]
+                temp = (temperature_1 * .03125) - 273
+                self.to_temperature(1, temp)
+                logger.debug("SOC: %d" % (self.soc))
+                logger.debug("Temperature: %d" % (temp))
 
-            return True
+                # check if all needed data is available
+                data_check += 2
 
-        except Exception:
-            (
-                exception_type,
-                exception_object,
-                exception_traceback,
-            ) = sys.exc_info()
-            file = exception_traceback.tb_frame.f_code.co_filename
-            line = exception_traceback.tb_lineno
-            logger.error(f"Exception occurred: {repr(exception_object)} of type {exception_type} in {file} line #{line}")
+            # BATT_STAT3 Capacity Remaining
+            elif normalized_arbitration_id in self.CAN_FRAMES[self.BATT_STAT3]:
+                self.capacity_remain = unpack_from("<H", bytes([data[3], data[4]]))[0]
+                logger.debug("Capacity remaining: %d" % (self.capacity_remain))
+
+                # check if all needed data is available
+                data_check += 2
+
+            # BATT_STAT4 Target charge current and voltage
+            elif normalized_arbitration_id in self.CAN_FRAMES[self.BATT_STAT4]:
+                self.max_battery_voltage = unpack_from("<H", bytes([data[3], data[4]]))[0] /20
+                logger.debug("Traget voltage: %d" % (self.max_battery_voltage))
+                self.max_battery_charge_current = unpack_from("<H", bytes([data[5], data[6]]))[0] / 100
+                logger.debug("Traget current: %d" % (self.max_battery_charge_current))
+
+                # check if all needed data is available
+                data_check += 4
+
+            # BATT_STAT6 Alarms
+            elif normalized_arbitration_id in self.CAN_FRAMES[self.BATT_STAT6]:
+                alarms = unpack_from(
+                    "<L",
+                    bytes([data[1], data[2], data[3], data[4]]),
+                )[0]
+                logger.debug("alarms %x" % (alarms))
+                self.last_error_time = time()
+                self.error_active = True
+                self.to_protection_bits(alarms)
+
+                # check if all needed data is available
+                data_check += 4
+
+            # BATT_STAT11 Capacity 
+            elif normalized_arbitration_id in self.CAN_FRAMES[self.BATT_STAT11]:
+                self.capacity = unpack_from("<H", bytes([data[3], data[4]]))[0]
+                logger.debug("Capacity: %d" % (self.capacity))
+
+                # check if all needed data is available
+                data_check += 2
+
+        # check if all needed data is available
+        logger.debug("Data check: %d" % (data_check))
+        if data_check == 0:
+            logger.error(">>> ERROR: No reply - returning")
             return False
+
+        # check if all needed data is available, else wait shortly and proceed with next iteration
+        if data_check < 16:
+            logger.debug(">>> INFO: Not all data available yet - waiting for next iteration")
+            sleep(1)
+            return True
+        
+        self.hardware_version = "RV-C CAN" + ("V1" + str(self.cell_count) + "S" if self.protocol_version == 2 else "")
+
+        return True
