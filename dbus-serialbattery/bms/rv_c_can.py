@@ -2,9 +2,11 @@
 
 # NOTES
 # Added by https://github.com/rogergrant99
+# Reworked by https://github.com/Hooorny and https://github.com/mr-manuel
+# https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/108
 
 # TODO
-# 
+# - Implement controlling of BMS, see protocol documentation 7.1 (Ctrl_INFO)
 
 
 from __future__ import absolute_import, division, print_function, unicode_literals
