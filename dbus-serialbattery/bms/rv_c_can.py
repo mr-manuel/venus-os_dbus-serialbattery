@@ -104,17 +104,17 @@ class RV_C_Can(Battery):
         return True
 
     def to_protection_bits(self, byte_data):
-        tmp = bin(byte_data | 0xFF00000000 )
+        tmp = bin(byte_data | 0xFF00000000)
         # High volts D2 bit 1
         self.protection.high_voltage = 2 if int(tmp[16:17]) > 0 else 0
         # Low volts D2 bit 5
         self.protection.low_voltage = 2 if int(tmp[12:13]) > 0 else 0
         # Low SOC D3 bit 1
         self.protection.low_soc = 2 if int(tmp[24:25]) > 0 else 0
-         # LowTemp D3 bit 5
+        # LowTemp D3 bit 5
         self.protection.low_temperature = 2 if int(tmp[20:21]) > 0 else 0
         # OverTemp D4 bit 1
-        self.protection.high_temperature = 2 if int(tmp[32:33]) > 0 else 0 
+        self.protection.high_temperature = 2 if int(tmp[32:33]) > 0 else 0
         # OverCurrent D4 bit 5
         self.protection.high_discharge_current = 2 if int(tmp[28:29]) > 0 else 0
         self.protection.high_charge_current = 2 if int(tmp[28:29]) > 0 else 0
@@ -166,7 +166,7 @@ class RV_C_Can(Battery):
             # BATT_STAT1 Voltage
             if normalized_arbitration_id in self.CAN_FRAMES[self.BATT_STAT1]:
                 self.update_cell_voltages(0, 3, data)
-                current = unpack_from("<L", bytes([data[4], data[5],data[6], data[7] ]))[0] 
+                current = unpack_from("<L", bytes([data[4], data[5], data[6], data[7] ]))[0] 
                 self.current = (2000000000 - current) / 1000
                 # check if all needed data is available
                 data_check += 2
@@ -176,7 +176,7 @@ class RV_C_Can(Battery):
                 soc = unpack_from("<B", bytes([data[4]]))[0]
                 self.soc = soc / 2
                 temperature_1 = unpack_from("<H", bytes([data[2], data[3]]))[0]
-                temp = (temperature_1 * .03125) - 273
+                temp = (temperature_1 * 0.03125) - 273
                 self.to_temperature(1, temp)
                 # check if all needed data is available
                 data_check += 2
@@ -190,7 +190,7 @@ class RV_C_Can(Battery):
 
             # BATT_STAT4 Target charge current and voltage
             elif normalized_arbitration_id in self.CAN_FRAMES[self.BATT_STAT4]:
-                self.max_battery_voltage = unpack_from("<H", bytes([data[3], data[4]]))[0] /20
+                self.max_battery_voltage = unpack_from("<H", bytes([data[3], data[4]]))[0] / 20
                 self.max_battery_charge_current = unpack_from("<H", bytes([data[5], data[6]]))[0] / 100
 
                 # check if all needed data is available
@@ -213,9 +213,9 @@ class RV_C_Can(Battery):
             elif normalized_arbitration_id in self.CAN_FRAMES[self.BATT_STAT11]:
                 self.capacity = unpack_from("<H", bytes([data[3], data[4]]))[0]
                 fet = unpack_from("<B", bytes([data[2]]))[0]
-                self.charge_fet = 1 if int(bin(fet | 0x100)[8:9]) > 0 else 0 
-                self.discharge_fet = 1 if int(bin(fet | 0x100)[10:11]) > 0 else 0 
-                self.control_allow_discharge = self.charge_fet 
+                self.charge_fet = 1 if int(bin(fet | 0x100)[8:9]) > 0 else 0
+                self.discharge_fet = 1 if int(bin(fet | 0x100)[10:11]) > 0 else 0
+                self.control_allow_discharge = self.charge_fet
                 self.control_allow_charge = self.discharge_fet
                 # check if all needed data is available
                 data_check += 2
