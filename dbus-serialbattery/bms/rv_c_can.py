@@ -4,7 +4,7 @@
 # Added by https://github.com/rogergrant99
 
 # TODO
-# - Implement controlling of BMS, see protocol documentation 7.1 (Ctrl_INFO)
+# 
 
 
 from __future__ import absolute_import, division, print_function, unicode_literals
@@ -31,55 +31,20 @@ class RV_C_Can(Battery):
 
     BATTERYTYPE = "RV-C CAN"
 
-    BATT_STAT = "BATT_STAT"
-    CELL_VOLT = "CELL_VOLT"
-    CELL_TEMP = "CELL_TEMP"
-    ALM_INFO = "ALM_INFO"
-
-    BATT_STAT_EXT = "BATT_STAT_EXT"
-    ALL_TEMP = "ALL_TEMP"
-    BMSERR_INFO = "BMSERR_INFO"
-    BMS_INFO = "BMS_INFO"
-    BMS_SWITCH_STATE = "BMS_SWITCH_STATE"
-    CELL_VOLT_EXT1 = "CELL_VOLT_EXT1"
-    CELL_VOLT_EXT2 = "CELL_VOLT_EXT2"
-    CELL_VOLT_EXT3 = "CELL_VOLT_EXT3"
-    CELL_VOLT_EXT4 = "CELL_VOLT_EXT4"
-    CELL_VOLT_EXT5 = "CELL_VOLT_EXT5"
-    CELL_VOLT_EXT6 = "CELL_VOLT_EXT6"
-    BMS_CHG_INFO = "BMS_CHG_INFO"
     BATT_STAT1 = "BATT_STAT1"
     BATT_STAT2 = "BATT_STAT2"
     BATT_STAT3 = "BATT_STAT3"
     BATT_STAT4 = "BATT_STAT4"
     BATT_STAT6 = "BATT_STAT6"
     BATT_STAT11 = "BATT_STAT11"
-    DM_RV = "DM_RV"
 
     CAN_FRAMES = {
-        BATT_STAT: [0x02F4],
-        CELL_VOLT: [0x04F4],
-        CELL_TEMP: [0x05F4],
-        ALM_INFO: [0x07F4],
-        BATT_STAT_EXT: [0x18F128F4],
-        ALL_TEMP: [0x18F228F4],
-        BMSERR_INFO: [0x18F328F4],
-        BMS_INFO: [0x18F428F4],
-        BMS_SWITCH_STATE: [0x18F528F4],
-        CELL_VOLT_EXT1: [0x18E028F4],
-        CELL_VOLT_EXT2: [0x18E128F4],
-        CELL_VOLT_EXT3: [0x18E228F4],
-        CELL_VOLT_EXT4: [0x18E328F4],
-        CELL_VOLT_EXT5: [0x18E428F4],
-        CELL_VOLT_EXT6: [0x18E528F4],
-        BMS_CHG_INFO: [0x1806E5F4],
         BATT_STAT1: [0x19FFFD8F],
         BATT_STAT2: [0x19FFFC8F],
         BATT_STAT3: [0x19FFFB8F],
         BATT_STAT4: [0x19FEC98F],
         BATT_STAT6: [0x19FEC78F],
         BATT_STAT11: [0x19FEA58F],
-        DM_RV: [0x19FECA8F],
     }
 
     def connection_name(self) -> str:
@@ -125,12 +90,6 @@ class RV_C_Can(Battery):
         # After successful connection get_settings() will be called to set up the battery
         # Set the current limits, populate cell count, etc
         # Return True if success, False for failure
-        self.cell_count = 1
-        self.charge_fet = 1
-        self.discharge_fet = 1
-        self.balancing = 0
-        self.control_allow_discharge = True
-        self.control_allow_charge = True
         return True
 
     def refresh_data(self):
@@ -145,25 +104,20 @@ class RV_C_Can(Battery):
         return True
 
     def to_protection_bits(self, byte_data):
-        tmp = bin(byte_data | 0xFF00000000)
-        # Still have to map alarms....
-        pos = len(tmp)
-        logger.debug(tmp)
-        #self.protection.high_cell_voltage = 2 if int(tmp[pos - 2 : pos], 2) > 0 else 0
-        #elf.protection.low_cell_voltage = 2 if int(tmp[pos - 4 : pos - 2], 2) > 0 else 0
-        #self.protection.high_voltage = 2 if int(tmp[pos - 6 : pos - 4], 4) > 0 else 0
-        #self.protection.low_voltage = 2 if int(tmp[pos - 8 : pos - 6], 2) > 0 else 0
-        #self.protection.high_discharge_current = 2 if int(tmp[pos - 12 : pos - 10], 2) > 0 else 0
-        #self.protection.high_charge_current = 2 if int(tmp[pos - 14 : pos - 12], 2) > 0 else 0
-
-        # there is just a BMS and Battery temperature_ alarm (not for charge and discharge)
-        #self.protection.high_charge_temperature = 2 if int(tmp[pos - 16 : pos - 14], 2) > 0 else 0
-        #self.protection.high_temperature = 2 if int(tmp[pos - 16 : pos - 14], 2) > 0 else 0
-        #self.protection.low_charge_temperature = 2 if int(tmp[pos - 18 : pos - 16], 2) > 0 else 0
-        #self.protection.low_temperature = 2 if int(tmp[pos - 18 : pos - 16], 2) > 0 else 0
-        #self.protection.high_charge_temperature = 2 if int(tmp[pos - 20 : pos - 18], 2) > 0 else 0
-        #self.protection.high_temperature = 2 if int(tmp[pos - 20 : pos - 18], 2) > 0 else 0
-        #self.protection.low_soc = 2 if int(tmp[pos - 22 : pos - 20], 2) > 0 else 0
+        tmp = bin(byte_data | 0xFF00000000 )
+        # High volts D2 bit 1
+        self.protection.high_voltage = 2 if int(tmp[16:17]) > 0 else 0
+        # Low volts D2 bit 5
+        self.protection.low_voltage = 2 if int(tmp[12:13]) > 0 else 0
+        # Low SOC D3 bit 1
+        self.protection.low_soc = 2 if int(tmp[24:25]) > 0 else 0
+         # LowTemp D3 bit 5
+        self.protection.low_temperature = 2 if int(tmp[20:21]) > 0 else 0
+        # OverTemp D4 bit 1
+        self.protection.high_temperature = 2 if int(tmp[32:33]) > 0 else 0 
+        # OverCurrent D4 bit 5
+        self.protection.high_discharge_current = 2 if int(tmp[28:29]) > 0 else 0
+        self.protection.high_charge_current = 2 if int(tmp[28:29]) > 0 else 0
 
     def reset_protection_bits(self):
         self.protection.high_cell_voltage = 0
@@ -214,9 +168,6 @@ class RV_C_Can(Battery):
                 self.update_cell_voltages(0, 3, data)
                 current = unpack_from("<L", bytes([data[4], data[5],data[6], data[7] ]))[0] 
                 self.current = (2000000000 - current) / 1000
-                logger.debug("Voltage: %d" % (self.voltage))
-                logger.debug("Current: %d" % (self.current))
-
                 # check if all needed data is available
                 data_check += 2
 
@@ -227,26 +178,20 @@ class RV_C_Can(Battery):
                 temperature_1 = unpack_from("<H", bytes([data[2], data[3]]))[0]
                 temp = (temperature_1 * .03125) - 273
                 self.to_temperature(1, temp)
-                logger.debug("SOC: %d" % (self.soc))
-                logger.debug("Temperature: %d" % (temp))
-
                 # check if all needed data is available
                 data_check += 2
 
-            # BATT_STAT3 Capacity Remaining
+            # BATT_STAT3 Capacity Remaining and State of Health
             elif normalized_arbitration_id in self.CAN_FRAMES[self.BATT_STAT3]:
                 self.capacity_remain = unpack_from("<H", bytes([data[3], data[4]]))[0]
-                logger.debug("Capacity remaining: %d" % (self.capacity_remain))
-
+                self.soh = unpack_from("<B", bytes([data[2]]))[0] / 2
                 # check if all needed data is available
                 data_check += 2
 
             # BATT_STAT4 Target charge current and voltage
             elif normalized_arbitration_id in self.CAN_FRAMES[self.BATT_STAT4]:
                 self.max_battery_voltage = unpack_from("<H", bytes([data[3], data[4]]))[0] /20
-                logger.debug("Traget voltage: %d" % (self.max_battery_voltage))
                 self.max_battery_charge_current = unpack_from("<H", bytes([data[5], data[6]]))[0] / 100
-                logger.debug("Traget current: %d" % (self.max_battery_charge_current))
 
                 # check if all needed data is available
                 data_check += 4
@@ -255,9 +200,8 @@ class RV_C_Can(Battery):
             elif normalized_arbitration_id in self.CAN_FRAMES[self.BATT_STAT6]:
                 alarms = unpack_from(
                     "<L",
-                    bytes([data[1], data[2], data[3], data[4]]),
+                    bytes([data[0], data[4], data[3], data[2]]),
                 )[0]
-                logger.debug("alarms %x" % (alarms))
                 self.last_error_time = time()
                 self.error_active = True
                 self.to_protection_bits(alarms)
@@ -265,16 +209,18 @@ class RV_C_Can(Battery):
                 # check if all needed data is available
                 data_check += 4
 
-            # BATT_STAT11 Capacity 
+            # BATT_STAT11 Capacity and MOSFET state
             elif normalized_arbitration_id in self.CAN_FRAMES[self.BATT_STAT11]:
                 self.capacity = unpack_from("<H", bytes([data[3], data[4]]))[0]
-                logger.debug("Capacity: %d" % (self.capacity))
-
+                fet = unpack_from("<B", bytes([data[2]]))[0]
+                self.charge_fet = 1 if int(bin(fet | 0x100)[8:9]) > 0 else 0 
+                self.discharge_fet = 1 if int(bin(fet | 0x100)[10:11]) > 0 else 0 
+                self.control_allow_discharge = self.charge_fet 
+                self.control_allow_charge = self.discharge_fet
                 # check if all needed data is available
                 data_check += 2
 
         # check if all needed data is available
-        logger.debug("Data check: %d" % (data_check))
         if data_check == 0:
             logger.error(">>> ERROR: No reply - returning")
             return False
@@ -284,7 +230,5 @@ class RV_C_Can(Battery):
             logger.debug(">>> INFO: Not all data available yet - waiting for next iteration")
             sleep(1)
             return True
-        
         self.hardware_version = "RV-C CAN" + ("V1" + str(self.cell_count) + "S" if self.protocol_version == 2 else "")
-
         return True
