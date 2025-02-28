@@ -1641,6 +1641,8 @@ class Battery(ABC):
             extra = 0 if self.cell_count % 2 == 0 else self.cells[halfcount].voltage / 2
             # get the midpoint of the battery
             midpoint = half1voltage + extra
+            if (half2voltage + half1voltage) == 0:
+                return None, None
             return (
                 abs(midpoint),
                 abs((half2voltage - half1voltage) / (half2voltage + half1voltage) * 100),
