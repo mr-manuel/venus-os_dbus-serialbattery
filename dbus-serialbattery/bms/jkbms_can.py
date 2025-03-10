@@ -186,7 +186,7 @@ class Jkbms_Can(Battery):
 
     def read_jkbms_can(self):
         # reset errors after timeout
-        if ((time() - self.last_error_time) > 120.0) and self.error_active is True:
+        if ((time() - self.last_error_time) > 15.0) and self.error_active is True:
             self.error_active = False
             self.reset_protection_bits()
 
