@@ -304,7 +304,7 @@ if [ "$version" = "nightly" ] || [ "$version" = "specific_branch" ]; then
     if [ "$version" = "specific_branch" ]; then
 
         # fetch branches from Github
-        branches=$(curl -s https://api.github.com/repos/mr-manuel/venus-os_dbus-serialbattery/branches | grep "name" | cut -d : -f 2,3 | tr -d \" | tr -d \,)
+        branches=$(curl -s https://api.github.com/repos/mr-manuel/venus-os_dbus-serialbattery/branches | grep "name" | cut -d : -f 2 | tr -d \" | tr -d \,)
 
         # create a select menu
         echo
