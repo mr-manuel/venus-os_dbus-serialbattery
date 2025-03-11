@@ -1,6 +1,4 @@
 # -*- coding: utf-8 -*-
-# modified by DaniBubu15 to clear chache for not randomly recieved arbitration IDs
-
 import threading
 import can
 import subprocess
@@ -9,11 +7,18 @@ from time import sleep, time
 
 
 class CanTransportInterface:
+    """
+    Class to manage the CAN transport interface
+    """
+
     can_message_cache_callback: callable = None
     can_bus = None
 
 
 class CanReceiverThread(threading.Thread):
+    """
+    Class to receive CAN messages on a separate thread
+    """
 
     _instances = {}
 
@@ -56,6 +61,8 @@ class CanReceiverThread(threading.Thread):
     def run(self) -> None:
         """
         Start the CAN receiver thread
+
+        :return: None
         """
         # setup up the CAN interface, if not already UP
         self.setup_can(self.channel)
@@ -87,7 +94,7 @@ class CanReceiverThread(threading.Thread):
 
                             # cache data with arbitration id as key
                             self.message_cache[message.arbitration_id] = message.data
-                            self.last_received_time[message.arbitration_id] = time()  # update last received time
+                            self.last_received_time[message.arbitration_id] = int(time())  # update last received time
 
                         logger.debug(f"[{self.channel}] Received: ID={hex(message.arbitration_id)}, Daten={message.data}")
 
@@ -114,11 +121,20 @@ class CanReceiverThread(threading.Thread):
         self.stop()
 
     # Clear cache entries for defined arbitration IDs if they have not been received for 10 seconds.
-    def clear_old_cache_entries(self):
+    def clear_old_cache_entries(self, arb_id_list: list = []) -> None:
+        """
+        Clear cache entries for defined arbitration IDs if they have not been received for 10 seconds.
+
+        :param arb_id_list: list of arbitration IDs to clear cache for
+        :return: None
+        """
+        if not arb_id_list:
+            return
+
         current_time = time()
         with self.cache_lock:
             for arb_id in list(self.message_cache.keys()):
-                if arb_id in [0x7F4, 0x18F328F4] and (current_time - self.last_received_time.get(arb_id, 0) > 10):
+                if arb_id in arb_id_list and (current_time - self.last_received_time.get(arb_id, 0) > 10):
                     del self.message_cache[arb_id]
                     del self.last_received_time[arb_id]
                     logger.debug(f"[{self.channel}] Cleared cache for arbitration ID {hex(arb_id)} due to timeout")
@@ -126,6 +142,8 @@ class CanReceiverThread(threading.Thread):
     def stop(self) -> None:
         """
         Stop the CAN receiver thread
+
+        :return: None
         """
         self._running = False
         # shutdown the CAN bus
