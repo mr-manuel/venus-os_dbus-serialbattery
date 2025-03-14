@@ -1656,17 +1656,21 @@ class Battery(ABC):
                 return 1
         return 0
 
+    def get_filtered_temperature_map(self) -> dict[int, float]:
+        """
+        Get the temperature map with only the sensors that are in the TEMPERATURE_SOURCE_BATTERY list.
+
+        :return: The filtered temperature map
+        """
+        temperature_map = {1: self.temperature_1, 2: self.temperature_2, 3: self.temperature_3, 4: self.temperature_4}
+        return {sensor: temperature_map[sensor] for sensor in utils.TEMPERATURE_SOURCE_BATTERY if temperature_map.get(sensor) is not None}
+
     def get_temperature(self) -> Union[float, None]:
         try:
-            temperature_map = {1: self.temperature_1, 2: self.temperature_2, 3: self.temperature_3, 4: self.temperature_4}
+            temperature_map = self.get_filtered_temperature_map()
 
             # Calculate the average temperature from the sensors given in the list
-            temperatures = [temperature_map.get(sensor) for sensor in utils.TEMPERATURE_SOURCE_BATTERY if temperature_map.get(sensor) is not None]
-            if temperatures:
-                return round(sum(temperatures) / len(temperatures), 1)
-
-            # Calculate the average temperature from all sensors
-            temperatures = [t for t in [self.temperature_1, self.temperature_2, self.temperature_3, self.temperature_4] if t is not None]
+            temperatures = list(temperature_map.values())
             if temperatures:
                 return round(sum(temperatures) / len(temperatures), 1)
 
@@ -1677,7 +1681,8 @@ class Battery(ABC):
 
     def get_min_temperature(self) -> Union[float, None]:
         try:
-            temperatures = [t for t in [self.temperature_1, self.temperature_2, self.temperature_3, self.temperature_4] if t is not None]
+            temperature_map = self.get_filtered_temperature_map()
+            temperatures = list(temperature_map.values())
             if not temperatures:
                 return None
             return min(temperatures)
@@ -1686,24 +1691,19 @@ class Battery(ABC):
 
     def get_min_temperature_id(self) -> Union[str, None]:
         try:
-            temperatures = [(t, i) for i, t in enumerate([self.temperature_1, self.temperature_2, self.temperature_3, self.temperature_4]) if t is not None]
+            temperature_map = self.get_filtered_temperature_map()
+            temperatures = [(temperature, sensor) for sensor, temperature in temperature_map.items()]
             if not temperatures:
                 return None
             index = min(temperatures)[1]
-            if index == 0:
-                return utils.TEMPERATURE_1_NAME
-            if index == 1:
-                return utils.TEMPERATURE_2_NAME
-            if index == 2:
-                return utils.TEMPERATURE_3_NAME
-            if index == 3:
-                return utils.TEMPERATURE_4_NAME
+            return utils.TEMPERATURE_NAMES.get(index)
         except TypeError:
             return None
 
     def get_max_temperature(self) -> Union[float, None]:
         try:
-            temperatures = [t for t in [self.temperature_1, self.temperature_2, self.temperature_3, self.temperature_4] if t is not None]
+            temperature_map = self.get_filtered_temperature_map()
+            temperatures = list(temperature_map.values())
             if not temperatures:
                 return None
             return max(temperatures)
@@ -1712,18 +1712,12 @@ class Battery(ABC):
 
     def get_max_temperature_id(self) -> Union[str, None]:
         try:
-            temperatures = [(t, i) for i, t in enumerate([self.temperature_1, self.temperature_2, self.temperature_3, self.temperature_4]) if t is not None]
+            temperature_map = self.get_filtered_temperature_map()
+            temperatures = [(temperature, sensor) for sensor, temperature in temperature_map.items()]
             if not temperatures:
                 return None
             index = max(temperatures)[1]
-            if index == 0:
-                return utils.TEMPERATURE_1_NAME
-            if index == 1:
-                return utils.TEMPERATURE_2_NAME
-            if index == 2:
-                return utils.TEMPERATURE_3_NAME
-            if index == 3:
-                return utils.TEMPERATURE_4_NAME
+            return utils.TEMPERATURE_NAMES.get(index)
         except TypeError:
             return None
 

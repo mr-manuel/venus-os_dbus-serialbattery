@@ -14,7 +14,7 @@ import serial
 
 
 # CONSTANTS
-DRIVER_VERSION: str = "2.0.20250312dev"
+DRIVER_VERSION: str = "2.0.20250314dev"
 """
 current version of the driver
 """
@@ -442,6 +442,12 @@ TEMPERATURE_1_NAME: str = config["DEFAULT"]["TEMPERATURE_1_NAME"]
 TEMPERATURE_2_NAME: str = config["DEFAULT"]["TEMPERATURE_2_NAME"]
 TEMPERATURE_3_NAME: str = config["DEFAULT"]["TEMPERATURE_3_NAME"]
 TEMPERATURE_4_NAME: str = config["DEFAULT"]["TEMPERATURE_4_NAME"]
+TEMPERATURE_NAMES: dict = {
+    1: config["DEFAULT"]["TEMPERATURE_1_NAME"],
+    2: config["DEFAULT"]["TEMPERATURE_2_NAME"],
+    3: config["DEFAULT"]["TEMPERATURE_3_NAME"],
+    4: config["DEFAULT"]["TEMPERATURE_4_NAME"],
+}
 GUI_PARAMETERS_SHOW_ADDITIONAL_INFO: bool = get_bool_from_config("DEFAULT", "GUI_PARAMETERS_SHOW_ADDITIONAL_INFO")
 TELEMETRY: bool = get_bool_from_config("DEFAULT", "TELEMETRY")
 
