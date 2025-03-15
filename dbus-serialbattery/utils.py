@@ -724,14 +724,20 @@ def read_serial_data(
     :param length_size: Size of the length byte, can be "B", "H", "I" or "L"
     :return: Data read from the serial port
     """
+    ser = None  # Initialize ser to None
     try:
         with serial.Serial(port, baudrate=baud, timeout=0.1) as ser:
             return read_serialport_data(ser, command, length_pos, length_check, length_fixed, length_size)
 
     except serial.SerialException as e:
         logger.error(e)
-        # close the serial port
-        ser.close()
+        if ser is not None:
+            # close the serial port if it was opened
+            ser.close()
+            logger.error("Serial port closed")
+        else:
+            logger.error("Serial port could not be opened")
+
         return False
 
     except Exception:
