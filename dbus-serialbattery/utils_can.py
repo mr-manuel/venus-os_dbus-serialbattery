@@ -135,7 +135,7 @@ class CanReceiverThread(threading.Thread):
             return
 
         # update time
-        _last_cache_clean_time = self.current_time
+        self._last_cache_clean_time = self.current_time
 
         with self.cache_lock:
             for arb_id in list(self._last_received_time.keys()):
