@@ -34,7 +34,7 @@ class CanReceiverThread(threading.Thread):
         self.message_cache = {}  # cache can frames here
         self.cache_lock = threading.Lock()  # lock for thread safety
         self._last_received_time = {}  # track last received time for each arbitration ID
-        self._last_cache_clean_time = 0 # last time the cached was cleaned (deleted too old values)
+        self._last_cache_clean_time = 0  # last time the cached was cleaned (deleted too old values)
         CanReceiverThread._instances[(channel, bustype)] = self
         self.daemon = True
         self._running = True  # flag to control the running state
