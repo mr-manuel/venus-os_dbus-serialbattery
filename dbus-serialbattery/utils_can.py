@@ -130,9 +130,12 @@ class CanReceiverThread(threading.Thread):
 
         :return: None
         """
-        # do this once 1 second to reduce load
+        # do this once a second to reduce load
         if self._last_cache_clean_time + 1 > self.current_time:
             return
+
+        # update time
+        _last_cache_clean_time = self.current_time
 
         with self.cache_lock:
             for arb_id in list(self._last_received_time.keys()):
