@@ -70,9 +70,6 @@ class Jkbms_Can(Battery):
         BMS_CHG_INFO: [0x1806E5F4],
     }
 
-    # Frames that are only send when an error occurs, but not reset after the error is gone
-    FRAMES_TO_CLEAR = CAN_FRAMES[ALM_INFO] + CAN_FRAMES[BMSERR_INFO]
-
     def connection_name(self) -> str:
         return f"CAN socketcan:{self.port}" + (f"__{self.device_address}" if self.device_address != 0 else "")
 
@@ -192,7 +189,6 @@ class Jkbms_Can(Battery):
         # timeout is 300 seconds, to prevent notification spam
         if ((int(time()) - self.last_error_time) > 300) and self.error_active is True:
             self.error_active = False
-            self.can_transport_interface.can_message_cache_clear_old_entries(self.FRAMES_TO_CLEAR)
             self.reset_protection_bits()
 
         # check if all needed data is available

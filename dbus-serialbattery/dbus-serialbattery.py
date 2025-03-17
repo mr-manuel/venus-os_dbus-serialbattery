@@ -387,7 +387,6 @@ def main():
 
         can_transport_interface = CanTransportInterface()
         can_transport_interface.can_message_cache_callback = can_thread.get_message_cache
-        can_transport_interface.can_message_cache_clear_old_entries = can_thread.clear_old_cache_entries
         can_transport_interface.can_bus = can_thread.can_bus
         logger.debug("Wait shortly to make sure that all needed data is in the cache")
         # Slowest message cycle transmission is every 1 second, wait a bit more for the first time to fetch all needed data (only jk bms)
