@@ -14,6 +14,7 @@ from gi.repository import GLib as gobject
 from battery import Battery
 from dbushelper import DbusHelper
 from utils import (
+    BATTERY_ADDRESSES,
     BMS_TYPE,
     bytearray_to_string,
     DRIVER_VERSION,
@@ -22,7 +23,6 @@ from utils import (
     EXTERNAL_SENSOR_DBUS_PATH_CURRENT,
     EXTERNAL_SENSOR_DBUS_PATH_SOC,
     logger,
-    BATTERY_ADDRESSES,
     POLL_INTERVAL,
     validate_config_values,
 )
@@ -139,7 +139,8 @@ def main():
     def poll_battery(loop) -> bool:
         """
         Polls the battery for data and updates it on the dbus.
-        Calls `publish_battery` from DbusHelper for each battery instance.
+        Calls `publish_battery` from DbusHelper for each battery instance which
+        then calls `refresh_data` from the battery instance to update the data.
 
         :param loop: The main event loop
         :return: Always returns True
@@ -311,7 +312,9 @@ def main():
         """
 
         if len(sys.argv) <= 2:
-            logger.error("Bluetooth address is missing in the command line arguments")
+            logger.error("ERROR >>> Bluetooth address is missing in the command line arguments")
+            sleep(60)
+            exit_driver(None, None, 1)
         else:
             ble_address = sys.argv[2]
 
@@ -319,17 +322,23 @@ def main():
                 # noqa: F401 --> ignore flake "imported but unused" error
                 from bms.jkbms_ble import Jkbms_Ble  # noqa: F401
 
-            if port == "Kilovault_Ble":
+            elif port == "Kilovault_Ble":
                 # noqa: F401 --> ignore flake "imported but unused" error
                 from bms.kilovault_ble import Kilovault_Ble  # noqa: F401
 
-            if port == "LiTime_Ble":
+            elif port == "LiTime_Ble":
                 # noqa: F401 --> ignore flake "imported but unused" error
                 from bms.litime_ble import LiTime_Ble  # noqa: F401
 
-            if port == "LltJbd_Ble":
+            elif port == "LltJbd_Ble":
                 # noqa: F401 --> ignore flake "imported but unused" error
                 from bms.lltjbd_ble import LltJbd_Ble  # noqa: F401
+
+            else:
+                logger.error("ERROR >>> Unknown Bluetooth BMS type: " + port)
+                logger.error("Supported Bluetooth BMS types (CASE SENSITIVE!): Jkbms_Ble, Kilovault_Ble, LiTime_Ble, LltJbd_Ble")
+                sleep(60)
+                exit_driver(None, None, 1)
 
             class_ = eval(port)
 
@@ -440,7 +449,11 @@ def main():
             battery_found = True
 
     if not battery_found:
-        logger.error("ERROR >>> No battery connection at " + port + (" and this bus addresses: " + ", ".join(BATTERY_ADDRESSES) if BATTERY_ADDRESSES else ""))
+        logger.error(
+            f"ERROR >>> No battery connection at {port}"
+            + (" and this bus addresses: " + ", ".join(BATTERY_ADDRESSES) if BATTERY_ADDRESSES else "")
+            + (f" {ble_address}" if port.endswith("_Ble") else "")
+        )
         exit_driver(None, None, 1)
 
     # Have a mainloop, so we can send/receive asynchronous calls to and from dbus
@@ -456,7 +469,9 @@ def main():
         helper[key_address] = DbusHelper(battery[key_address], key_address)
         if not helper[key_address].setup_vedbus():
             logger.error(
-                "ERROR >>> Problem with battery set up at " + port + (" and this Modbus address: " + ", ".join(BATTERY_ADDRESSES) if BATTERY_ADDRESSES else "")
+                f"ERROR >>> Problem with battery set up at {port}"
+                + (" and this bus address: " + ", ".join(BATTERY_ADDRESSES) if BATTERY_ADDRESSES else "")
+                + (f" {ble_address}" if port.endswith("_Ble") else "")
             )
             exit_driver(None, None, 1)
 
@@ -479,6 +494,8 @@ def main():
             battery[first_key].poll_interval,
             lambda: poll_battery(mainloop),
         )
+    else:
+        logger.info("Polling interval: active callback used")
 
     # print log at this point, else not all data is correctly populated
     for key_address in battery:

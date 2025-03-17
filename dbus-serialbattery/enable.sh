@@ -115,6 +115,7 @@ if [ ! -f "$filename" ]; then
         echo
         echo "; If you want to add custom values/settings, then check the values/settings you want to change in \"config.default.ini\""
         echo "; and insert them below to persist future driver updates."
+        echo "; NOTICE: Do not copy the whole file, but only the values/settings you want to change."
         echo
         echo "; Example (remove the semicolon \";\" to uncomment and activate the value/setting):"
         echo "; MAX_BATTERY_CHARGE_CURRENT = 50.0"
@@ -149,19 +150,40 @@ bluetooth_use_usb=$(awk -F "=" '/^BLUETOOTH_USE_USB/ {print $2}' /data/apps/dbus
 
 # works only for Raspberry Pi, since GX devices don't have a /u-boot/config.txt
 # replace dtoverlay in /u-boot/config.txt this needs a reboot!
+# Check if /u-boot/config.txt exists
 if [ -f "/u-boot/config.txt" ]; then
     if [[ $bluetooth_use_usb == *"True"* ]]; then
-        if grep -q -r "miniuart-bt" /u-boot/config.txt; then
-            sed -i 's/miniuart-bt/disable-bt/g' /u-boot/config.txt
-            echo "ATTENTION! You have changed the bluetooth mode to USB! THIS NEEDS A MANUAL REBOOT!"
+        # Disable built-in Bluetooth
+        if grep -q "^dtoverlay=" "/u-boot/config.txt"; then
+            # Check if 'disable-bt' is already in a dtoverlay line
+            if grep -q "^dtoverlay=.*disable-bt" "/u-boot/config.txt"; then
+                echo "Build-in Bluetooth is already disabled."
+            else
+                # Add 'disable-bt' to the end of an existing dtoverlay line
+                sed -i '/^dtoverlay=/s/$/,disable-bt/' /u-boot/config.txt
+                echo "NOTICE! Build-in Bluetooth was disabled: 'disable-bt' has been added to the dtoverlay list. THIS NEEDS A MANUAL REBOOT!"
+            fi
+        else
+            # Add a new dtoverlay line for disable-bt if none exist
+            echo "dtoverlay=disable-bt" >> /u-boot/config.txt
+            echo "NOTICE! Build-in Bluetooth was disabled: 'disable-bt' has been added as a new dtoverlay. THIS NEEDS A MANUAL REBOOT!"
         fi
-    elif [[ $bluetooth_use_usb == *"False"* ]]; then
-        if grep -q -r "disable-bt" /u-boot/config.txt; then
-            sed -i 's/disable-bt/miniuart-bt/g' /u-boot/config.txt
-            echo "ATTENTION! You have changed the bluetooth mode to built in module! THIS NEEDS A MANUAL REBOOT!"
+    else
+        # Enable built-in Bluetooth
+        if grep -q "^dtoverlay=.*disable-bt" "/u-boot/config.txt"; then
+            # Remove 'disable-bt' from an existing dtoverlay line
+            sed -i '/^dtoverlay=/s/disable-bt,//g' /u-boot/config.txt  # Case: disable-bt is not at the end
+            sed -i '/^dtoverlay=/s/,disable-bt//g' /u-boot/config.txt  # Case: disable-bt is at the end
+            sed -i '/^dtoverlay=/s/disable-bt//g' /u-boot/config.txt   # Case: disable-bt is the only entry
+            echo "NOTICE! Build-in Bluetooth was enabled: 'disable-bt' has been removed from the dtoverlay list. THIS NEEDS A MANUAL REBOOT!"
+        else
+            echo "Build-in Bluetooth is already enabled."
         fi
     fi
+else
+    echo "WARNING: /u-boot/config.txt does not exist. This script only works on Raspberry Pi devices. This setting is ignored and build-in Bluetooth is used."
 fi
+
 
 # get BMS list from config file
 bluetooth_bms=$(awk -F "=" '/^BLUETOOTH_BMS/ {print $2}' /data/apps/dbus-serialbattery/config.ini)
@@ -237,7 +259,7 @@ if [ "$bluetooth_length" -gt 0 ]; then
         mkdir -p "/service/dbus-blebattery.$1/log"
         {
             echo "#!/bin/sh"
-            echo "exec multilog t s25000 n4 /var/log/dbus-blebattery.$1"
+            echo "exec multilog t s256250 n4 /var/log/dbus-blebattery.$1"
         } > "/service/dbus-blebattery.$1/log/run"
         chmod 755 "/service/dbus-blebattery.$1/log/run"
 
@@ -351,7 +373,7 @@ if [ "$can_lenght" -gt 0 ]; then
         mkdir -p "/service/dbus-canbattery.$1/log"
         {
             echo "#!/bin/sh"
-            echo "exec multilog t s25000 n4 /var/log/dbus-canbattery.$1"
+            echo "exec multilog t s256250 n4 /var/log/dbus-canbattery.$1"
         } > "/service/dbus-canbattery.$1/log/run"
         chmod 755 "/service/dbus-canbattery.$1/log/run"
 

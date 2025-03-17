@@ -1853,16 +1853,16 @@ class Battery(ABC):
         else return False since it's very probably not a BMS
         """
         if self.capacity is not None and (self.capacity < 0 or self.capacity > 5000):
-            logger.debug("Capacity outside of thresholds (from 0 to 5000): " + str(self.capacity))
+            logger.warning(f"Data validation failed: Capacity outside of thresholds (from 0 to 5000): {self.capacity}")
             return False
         if self.current is not None and abs(self.current) > 1000:
-            logger.debug("Current outside of thresholds (from -1000 to 1000): " + str(self.current))
+            logger.warning(f"Data validation failed: Current outside of thresholds (from -1000 to 1000): {self.current}")
             return False
         if self.voltage is not None and (self.voltage < 0 or self.voltage > 100):
-            logger.debug("Voltage outside of thresholds (form 0 to 100): " + str(self.voltage))
+            logger.warning(f"Data validation failed: Voltage outside of thresholds (form 0 to 100): {self.voltage}")
             return False
         if self.soc is not None and (self.soc < 0 or self.soc > 100):
-            logger.debug("SoC outside of thresholds (from 0 to 100): " + str(self.soc))
+            logger.warning(f"Data validation failed: SoC outside of thresholds (from 0 to 100): {self.soc}")
             return False
 
         return True

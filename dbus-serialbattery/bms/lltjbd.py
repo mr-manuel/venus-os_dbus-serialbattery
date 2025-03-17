@@ -273,7 +273,8 @@ class LltJbd(Battery):
         result = False
         try:
             # LLT/JBD does not seem to support addresses, so launch only on address 0x00
-            if self.address != b"\x00":
+            # For BLE devices the address is never 0x00, ignore it in that case (baud_rate is -1 in that case)
+            if self.address != b"\x00" and self.baud_rate != -1:
                 return False
 
             # 1) Read name of BMS
