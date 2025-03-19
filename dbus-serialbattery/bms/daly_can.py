@@ -322,8 +322,6 @@ class Daly_Can(Battery):
                         capacity_remain,
                     ) = unpack_from(">b??BL", data)
                     self.capacity_remain = capacity_remain / 1000
-                    if(self.capacity < self.capacity_remain):
-                        self.capacity = self.capacity_remain
 
                 # Settings data
                 elif normalized_arbitration_id in self.CAN_FRAMES[self.RESPONSE_SETTINGS]:
