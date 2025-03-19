@@ -59,6 +59,7 @@ class Daly_Can(Battery):
     COMMAND_TEMP = "COMMAND_TEMP"
     COMMAND_CELL_BALANCE = "COMMAND_CELL_BALANCE"
     COMMAND_ALARM = "COMMAND_ALARM"
+    COMMAND_SETTINGS = "COMMAND_SETTINGS"
 
     RESPONSE_BASE = "RESPONSE_BASE"
     RESPONSE_SOC = "RESPONSE_SOC"
@@ -70,6 +71,7 @@ class Daly_Can(Battery):
     RESPONSE_TEMP = "RESPONSE_TEMP"
     RESPONSE_CELL_BALANCE = "RESPONSE_CELL_BALANCE"
     RESPONSE_ALARM = "RESPONSE_ALARM"
+    RESPONSE_SETTINGS = "RESPONSE_SETTINGS"
 
     # command bytes [Priority=18][Command=94][BMS ID=01][Uplink ID=40]
     CAN_FRAMES = {
@@ -83,6 +85,7 @@ class Daly_Can(Battery):
         COMMAND_TEMP: [0x18960140],
         COMMAND_CELL_BALANCE: [0x18970140],
         COMMAND_ALARM: [0x18980140],
+        COMMAND_SETTINGS: [0x18500140],
         RESPONSE_BASE: [0x18944001],
         RESPONSE_SOC: [0x18904001],
         RESPONSE_MINMAX_CELL_VOLTS: [0x18914001],
@@ -93,6 +96,7 @@ class Daly_Can(Battery):
         RESPONSE_TEMP: [0x18964001],
         RESPONSE_CELL_BALANCE: [0x18974001],
         RESPONSE_ALARM: [0x18984001],
+        RESPONSE_SETTINGS: [0x18504001],
     }
 
     BATTERYTYPE = "Daly CAN"
@@ -141,7 +145,20 @@ class Daly_Can(Battery):
         # After successful connection get_settings() will be called to set up the battery
         # Set the current limits, populate cell count, etc
         # Return True if success, False for failure
-        self.capacity = BATTERY_CAPACITY
+        data = bytearray(b"\x00\x00\x00\x00\x00\x00\x00\x00")
+
+        if self.can_transport_interface.can_bus is None:
+            raise RuntimeError("CAN Interface not initialised")
+
+        try:
+            message = Message(arbitration_id=(self.CAN_FRAMES[self.COMMAND_SETTINGS][0] & 0xFFFF00FF) | (self.device_address << 8), data=data)
+            self.can_transport_interface.can_bus.send(message, timeout=0.2)
+        except CanOperationError:
+            logger.error("CAN Bus Error while sending data. Check cabeling")
+            self.capacity = BATTERY_CAPACITY
+        sleep(0.1)
+
+        self.read_daly_can()
 
         return True
 
@@ -305,6 +322,16 @@ class Daly_Can(Battery):
                         capacity_remain,
                     ) = unpack_from(">b??BL", data)
                     self.capacity_remain = capacity_remain / 1000
+                    if(self.capacity < self.capacity_remain):
+                        self.capacity = self.capacity_remain
+
+                # Settings data
+                elif normalized_arbitration_id in self.CAN_FRAMES[self.RESPONSE_SETTINGS]:
+                    (
+                        capacity,
+                        nominalVoltage,
+                    ) = unpack_from(">LL", data)
+                    self.capacity = capacity / 1000
 
                 # Alarm data
                 elif normalized_arbitration_id in self.CAN_FRAMES[self.RESPONSE_ALARM]:
