@@ -149,17 +149,18 @@ class Daly_Can(Battery):
 
         if self.can_transport_interface.can_bus is None:
             raise RuntimeError("CAN Interface not initialised")
-
+        
         try:
             message = Message(arbitration_id=(self.CAN_FRAMES[self.COMMAND_SETTINGS][0] & 0xFFFF00FF) | (self.device_address << 8), data=data)
             self.can_transport_interface.can_bus.send(message, timeout=0.2)
         except CanOperationError:
             logger.error("CAN Bus Error while sending data. Check cabeling")
-            self.capacity = BATTERY_CAPACITY
+        
+        self.capacity = BATTERY_CAPACITY
         sleep(0.1)
-
+        
         self.read_daly_can()
-
+        
         return True
 
     def refresh_data(self):
