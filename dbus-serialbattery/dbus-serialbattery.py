@@ -352,11 +352,13 @@ def main():
         """
         from bms.daly_can import Daly_Can
         from bms.jkbms_can import Jkbms_Can
+        from bms.ubms_can import Ubms_Can
 
         # only try CAN BMS on CAN port
         supported_bms_types = [
             {"bms": Daly_Can},
             {"bms": Jkbms_Can},
+            {"bms": Ubms_Can},
         ]
 
         # check if BMS_TYPE is not empty and all BMS types in the list are supported
