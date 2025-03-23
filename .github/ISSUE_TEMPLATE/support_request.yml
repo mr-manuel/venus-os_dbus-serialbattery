@@ -134,6 +134,7 @@ body:
         - Seplos
         - Seplos v3
         - Sinowealth
+        - Valence U-BMS
     validations:
       required: true
 

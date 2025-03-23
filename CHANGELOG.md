@@ -15,6 +15,7 @@
 
 * Driver version greater or equal to `v2.0.20250207dev`
   * Changes to `config.default.ini`: `TEMPERATURE_SOURCE_BATTERY` is now a list of temperature sensors, so you can choose which sensors you want to use
+  * Added: UBMS CAN - support for Valence U-BMS by @gimx
 
 * Driver version greater or equal to `v2.0.20250107dev`
   * Changes to `config.default.ini`: `CELL_VOLTAGE_DIFF_KEEP_MAX_VOLTAGE_TIME_RESTART` was superseeded by `SWITCH_TO_FLOAT_CELL_VOLTAGE_DEVIATION`, which has a different behavior
