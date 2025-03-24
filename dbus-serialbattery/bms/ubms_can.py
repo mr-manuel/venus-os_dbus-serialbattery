@@ -46,19 +46,19 @@ class Ubms_Can(Battery):
         self.last_error_time = time()
         self.error_active = False
 
-        self.numberOfModules = UBMS_CAN_MODULE_SERIES * UBMS_CAN_MODULE_PARALLEL
-        self.numberOfStrings = UBMS_CAN_MODULE_PARALLEL
-        self.modulesInSeries = int(self.numberOfModules / self.numberOfStrings)
-        self.cellsPerModule = 4
-        self.maxChargeVoltage = MAX_CELL_VOLTAGE * self.cellsPerModule * UBMS_CAN_MODULE_SERIES
-        self.max_battery_voltage = self.maxChargeVoltage
-        self.min_battery_voltage = MIN_CELL_VOLTAGE * self.cellsPerModule * UBMS_CAN_MODULE_SERIES
+        self.number_of_modules = UBMS_CAN_MODULE_SERIES * UBMS_CAN_MODULE_PARALLEL
+        self.number_of_strings = UBMS_CAN_MODULE_PARALLEL
+        self.modules_in_series = int(self.number_of_modules / self.number_of_strings)
+        self.cells_per_module = 4
+        self.max_charge_voltage = MAX_CELL_VOLTAGE * self.cells_per_module * UBMS_CAN_MODULE_SERIES
+        self.max_battery_voltage = self.max_charge_voltage
+        self.min_battery_voltage = MIN_CELL_VOLTAGE * self.cells_per_module * UBMS_CAN_MODULE_SERIES
 
-        self.cell_count = self.numberOfModules * self.cellsPerModule
+        self.cell_count = self.number_of_modules * self.cells_per_module
 
         self.cells = [Cell(False) for _ in range(self.cell_count)]
 
-        self.chargeComplete = 0
+        self.charge_complete = 0
         self.soc = 0
         self.mode = 0
         self.state = ""
@@ -66,26 +66,26 @@ class Ubms_Can(Battery):
         self.current = 0
         self.temperature = 0
         self.balanced = True
-        self.voltageAndCellTAlarms = 0
-        self.internalErrors = 0
-        self.currentAndPcbTAlarms = 0
-        self.maxPcbTemperature = 0
-        self.maxCellTemperature = 0
-        self.minCellTemperature = 0
+        self.voltage_and_cell_t_alarms = 0
+        self.internal_errors = 0
+        self.current_and_pcb_t_alarms = 0
+        self.max_pcb_temperature = 0
+        self.max_cell_temperature = 0
+        self.min_cell_temperature = 0
 
-        self.cellVoltages = [(0, 0, 0, 0) for i in range(self.numberOfModules)]
-        self.moduleVoltage = [0 for i in range(self.numberOfModules)]
-        self.moduleCurrent = [0 for i in range(self.numberOfModules)]
-        self.moduleSoc = [0 for i in range(self.numberOfModules)]
-        self.maxCellVoltage = 3.2
-        self.minCellVoltage = 3.2
-        self.maxChargeCurrent = MAX_BATTERY_CHARGE_CURRENT
-        self.maxDischargeCurrent = MAX_BATTERY_DISCHARGE_CURRENT
+        self.cell_voltages = [(0, 0, 0, 0) for i in range(self.number_of_modules)]
+        self.module_voltage = [0 for i in range(self.number_of_modules)]
+        self.module_current = [0 for i in range(self.number_of_modules)]
+        self.module_soc = [0 for i in range(self.number_of_modules)]
+        self.max_cell_voltage = 3.2
+        self.min_cell_voltage = 3.2
+        self.max_charge_current = MAX_BATTERY_CHARGE_CURRENT
+        self.max_discharge_current = MAX_BATTERY_DISCHARGE_CURRENT
         self.partnr = 0
-        self.firmwareVersion = "unknown"
-        self.numberOfModulesBalancing = 0
-        self.numberOfModulesCommunicating = 0
-        self.cyclicModeTask = None
+        self.firmware_version = "unknown"
+        self.number_of_modules_balancing = 0
+        self.number_of_modules_communicating = 0
+        self.cyclic_mode_task = None
 
     BATTERYTYPE = "UBMS CAN"
 
@@ -139,7 +139,7 @@ class Ubms_Can(Battery):
             msg = can.Message(arbitration_id=frame_id, data=data, is_extended_id=True)
 
             if msg.arbitration_id == 0x180:
-                self.firmwareVersion = msg.data[0]
+                self.firmware_version = msg.data[0]
                 # self.bms_type = msg.data[3]
                 logger.info("Found Valence U-BMS type %i with FW v%i.", msg.data[3], msg.data[0])
                 if self.hardware_version is None:
@@ -159,8 +159,10 @@ class Ubms_Can(Battery):
 
             elif msg.arbitration_id == 0xC1:
                 # check pack voltage
-                if abs(2 * msg.data[0] - self.maxChargeVoltage) > 0.15 * self.maxChargeVoltage:
-                    logger.error("U-BMS pack voltage of %dV differs significantly from configured max charge voltage %dV.", msg.data[0], self.maxChargeVoltage)
+                if abs(2 * msg.data[0] - self.max_charge_voltage) > 0.15 * self.max_charge_voltage:
+                    logger.error(
+                        "U-BMS pack voltage of %dV differs significantly from configured max charge voltage %dV.", msg.data[0], self.max_charge_voltage
+                    )
                 found = found | 4
 
         if found >= 3:
@@ -186,14 +188,14 @@ class Ubms_Can(Battery):
         return result
 
     def to_protection_bits(self):
-        self.protection.low_cell_voltage = (self.voltageAndCellTAlarms & 0x10) >> 3
-        self.protection.high_cell_voltage = (self.voltageAndCellTAlarms & 0x20) >> 4
+        self.protection.low_cell_voltage = (self.voltage_and_cell_t_alarms & 0x10) >> 3
+        self.protection.high_cell_voltage = (self.voltage_and_cell_t_alarms & 0x20) >> 4
         if not SOC_CALCULATION:
-            self.protection.low_soc = (self.voltageAndCellTAlarms & 0x08) >> 3
-        self.protection.high_discharge_current = self.currentAndPcbTAlarms & 0x3
+            self.protection.low_soc = (self.voltage_and_cell_t_alarms & 0x08) >> 3
+        self.protection.high_discharge_current = self.current_and_pcb_t_alarms & 0x3
 
         # flag high cell temperature alarm and high pcb temperature alarm
-        self.protection.high_temperature = (self.voltageAndCellTAlarms & 0x6) >> 1 | (self.currentAndPcbTAlarms & 0x18) >> 3
+        self.protection.high_temperature = (self.voltage_and_cell_t_alarms & 0x6) >> 1 | (self.current_and_pcb_t_alarms & 0x18) >> 3
         self.protection.low_temperature = (self.mode & 0x60) >> 5
 
         # FIXME check if any alarms came up
@@ -223,10 +225,10 @@ class Ubms_Can(Battery):
         self.protection.internal_failure = 0
 
     def update_cell_voltages(self):
-        chain = itertools.chain(*self.cellVoltages)
-        flatVList = list(chain)
+        chain = itertools.chain(*self.cell_voltages)
+        flat_v_list = list(chain)
         for i in range(self.cell_count):
-            self.cells[i].voltage = flatVList[i] / 1000.0
+            self.cells[i].voltage = flat_v_list[i] / 1000.0
 
     def decode_can(self):
 
@@ -237,67 +239,67 @@ class Ubms_Can(Battery):
                 self.soc = msg.data[0]
                 self.mode = msg.data[1]
                 self.balancing = True if (self.mode & 0x10) != 0 else False
-                self.voltageAndCellTAlarms = msg.data[2]
-                self.internalErrors = msg.data[3]
-                self.currentAndPcbTAlarms = msg.data[4]
+                self.voltage_and_cell_t_alarms = msg.data[2]
+                self.internal_errors = msg.data[3]
+                self.current_and_pcb_t_alarms = msg.data[4]
 
-                self.numberOfModulesCommunicating = msg.data[5]
+                self.number_of_modules_communicating = msg.data[5]
 
                 # if no module flagged missing and not too many on the bus, then this is the number the U-BMS was configured for
                 if (msg.data[2] & 1 == 0) and (msg.data[3] & 2 == 0):
-                    self.numberOfModules = self.numberOfModulesCommunicating
+                    self.number_of_modules = self.number_of_modules_communicating
 
-                self.numberOfModulesBalancing = msg.data[6]
+                self.number_of_modules_balancing = msg.data[6]
 
             elif msg.arbitration_id == 0xC1:
                 # self.voltage = msg.data[0] * 1 # voltage scale factor depends on BMS configuration, so unusable
                 self.current = struct.unpack("Bb", msg.data[0:2])[1]
 
                 if (self.mode & 0x2) != 0:  # provided in drive mode only
-                    self.maxDischargeCurrent = int((struct.unpack("<h", msg.data[3:5])[0]) / 10)
-                    self.maxChargeCurrent = int((struct.unpack("<h", bytearray([msg.data[5], msg.data[7]]))[0]) / 5)
+                    self.max_discharge_current = int((struct.unpack("<h", msg.data[3:5])[0]) / 10)
+                    self.max_charge_current = int((struct.unpack("<h", bytearray([msg.data[5], msg.data[7]]))[0]) / 5)
 
             elif msg.arbitration_id == 0xC2:
                 # data valid in charge mode only
                 if (self.mode & 0x1) != 0:
-                    self.chargeComplete = (msg.data[3] & 0x4) >> 2
-                    self.maxChargeVoltage2 = struct.unpack("<h", msg.data[1:3])[0]
+                    self.charge_complete = (msg.data[3] & 0x4) >> 2
+                    self.max_charge_voltage_2 = struct.unpack("<h", msg.data[1:3])[0]
 
                     # only apply lower charge current when equalizing
                     if (self.mode & 0x18) == 0x18:
-                        self.maxChargeCurrent = msg.data[0]
+                        self.max_charge_current = msg.data[0]
                     else:
                         # allow charge with 0.1C
-                        self.maxChargeCurrent = self.capacity * 0.1
+                        self.max_charge_current = self.capacity * 0.1
 
             elif msg.arbitration_id == 0xC4:
-                self.maxCellTemperature = msg.data[0] - 40
-                self.minCellTemperature = msg.data[1] - 40
-                self.maxPcbTemperature = msg.data[3] - 40
-                self.maxCellVoltage = struct.unpack("<h", msg.data[4:6])[0] * 0.001
-                self.minCellVoltage = struct.unpack("<h", msg.data[6:8])[0] * 0.001
-                self.cell_max_voltage = self.maxCellVoltage
-                self.cell_min_voltage = self.minCellVoltage
+                self.max_cell_temperature = msg.data[0] - 40
+                self.min_cell_temperature = msg.data[1] - 40
+                self.max_pcb_temperature = msg.data[3] - 40
+                self.max_cell_voltage = struct.unpack("<h", msg.data[4:6])[0] * 0.001
+                self.min_cell_voltage = struct.unpack("<h", msg.data[6:8])[0] * 0.001
+                self.cell_max_voltage = self.max_cell_voltage
+                self.cell_min_voltage = self.min_cell_voltage
 
             # FIXME Intra-module balance flags, 1 bit per cell, 1 byte per module
             # elif msg.arbitration_id in [0x26A, 0x26B]:
             #     for m in range [(msg.arbitration_id-0x2A) * 8, ((msg.arbitration_id-0x2A + 1) * 8) -1]:
-            #         self.cells[m * self.cellsPerModule + 0].balance = True if ((msg.data[m]>>c) & 1) != 0 else False
-            #         self.cells[m * self.cellsPerModule + 1].balance = True if ((msg.data[m]>>1) & 1) != 0 else False
-            #         self.cells[m * self.cellsPerModule + 2].balance = True if ((msg.data[m]>>2) & 1) != 0 else False
-            #         self.cells[m * self.cellsPerModule + 3].balance = True if ((msg.data[m]>>3) & 1) != 0 else False
+            #         self.cells[m * self.cells_per_module + 0].balance = True if ((msg.data[m]>>c) & 1) != 0 else False
+            #         self.cells[m * self.cells_per_module + 1].balance = True if ((msg.data[m]>>1) & 1) != 0 else False
+            #         self.cells[m * self.cells_per_module + 2].balance = True if ((msg.data[m]>>2) & 1) != 0 else False
+            #         self.cells[m * self.cells_per_module + 3].balance = True if ((msg.data[m]>>3) & 1) != 0 else False
 
             elif msg.arbitration_id in [0x350, 0x352, 0x354, 0x356, 0x358, 0x35A, 0x35C, 0x35E, 0x360, 0x362, 0x364]:
                 module = (msg.arbitration_id - 0x350) >> 1
-                self.cellVoltages[module] = struct.unpack(">hhh", msg.data[2 : msg.dlc])
+                self.cell_voltages[module] = struct.unpack(">hhh", msg.data[2 : msg.dlc])
 
             elif msg.arbitration_id in [0x351, 0x353, 0x355, 0x357, 0x359, 0x35B, 0x35D, 0x35F, 0x361, 0x363, 0x365]:
                 module = (msg.arbitration_id - 0x351) >> 1
-                self.cellVoltages[module] = self.cellVoltages[module] + tuple(struct.unpack(">h", msg.data[2 : msg.dlc]))
-                self.moduleVoltage[module] = sum(self.cellVoltages[module])
+                self.cell_voltages[module] = self.cell_voltages[module] + tuple(struct.unpack(">h", msg.data[2 : msg.dlc]))
+                self.module_voltage[module] = sum(self.cell_voltages[module])
 
-                # update pack voltage at each arrival of the first strings last modules cell voltages
-                if module == self.numberOfModules - 1:
-                    self.voltage = sum(self.moduleVoltage[0 : self.modulesInSeries]) / 1000.0
+                # update pack voltage at each arrival of the last modules cell voltages
+                if module == self.number_of_modules - 1:
+                    self.voltage = sum(self.module_voltage[0 : self.modules_in_series]) / 1000.0
 
         return True
