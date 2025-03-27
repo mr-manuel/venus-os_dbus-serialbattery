@@ -44,6 +44,7 @@ from bms.pace import Pace
 from bms.renogy import Renogy
 from bms.seplos import Seplos
 from bms.seplosv3 import Seplosv3
+from bms.sns01_485 import Daren485v2
 
 # add ext folder to sys.path
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), "ext"))
@@ -60,6 +61,7 @@ supported_bms_types = [
     {"bms": Daly, "baud": 9600, "address": b"\x40"},
     {"bms": Daly, "baud": 9600, "address": b"\x80"},
     {"bms": Daren485, "baud": 19200, "address": b"\x01"},
+    {"bms": Daren485v2, "baud": 9600, "address": b"\x01"},
     {"bms": Ecs, "baud": 19200},
     {"bms": EG4_Lifepower, "baud": 9600, "address": b"\x01"},
     {"bms": EG4_LL, "baud": 9600, "address": b"\x01"},
