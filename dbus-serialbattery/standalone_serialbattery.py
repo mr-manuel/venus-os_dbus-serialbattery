@@ -75,18 +75,17 @@
 import os
 import sys
 import logging
-
-from typing import Union
 from time import sleep
 
-from standalone_helper import DbusHelper
-from battery import Battery
+from typing import Union
 
+from battery import Battery
+from standalone_helper import DbusHelper
 from utils import (
+    BATTERY_ADDRESSES,
     BMS_TYPE,
     bytearray_to_string,
     logger,
-    BATTERY_ADDRESSES,
 )
 
 # import battery classes
@@ -146,11 +145,12 @@ if "MNB" in BMS_TYPE:
 if "Sinowealth" in BMS_TYPE:
     supported_bms_types.append({"bms": Sinowealth, "baud": 9600})
 
+expected_bms_types = [battery_type for battery_type in supported_bms_types if battery_type["bms"].__name__ in BMS_TYPE or len(BMS_TYPE) == 0]
 
 class standalone_serialbattery:
     def init_bms_types(self):
         self.supported_bms_types = supported_bms_types
-        self.expected_bms_types = [battery_type for battery_type in self.supported_bms_types if battery_type["bms"].__name__ in BMS_TYPE or len(BMS_TYPE) == 0]
+        self.expected_bms_types = expected_bms_types
 
     def __init__(self, devpath, driverOption, devadr, loglevel):
         # init with default
@@ -223,6 +223,13 @@ class standalone_serialbattery:
 
         return None
 
+    def get_port(self) -> str:
+        #Dummy for better comparison
+		return self.devpath
+		"""
+        Return the self devpath from class
+		"""
+		
     def check_bms_types(self, supported_bms_types, type) -> None:
         """
         Checks if BMS_TYPE is not empty and all specified BMS types are supported.
@@ -307,11 +314,13 @@ class standalone_serialbattery:
                 """
                 from bms.daly_can import Daly_Can
                 from bms.jkbms_can import Jkbms_Can
+     			from bms.ubms_can import Ubms_Can
 
                 # only try CAN BMS on CAN port
                 self.supported_bms_types = [
                     {"bms": Daly_Can},
                     {"bms": Jkbms_Can},
+          		    {"bms": Ubms_Can},
                 ]
 
                 self.expected_bms_types = [
@@ -341,7 +350,7 @@ class standalone_serialbattery:
                 can_transport_interface.can_message_cache_callback = can_thread.get_message_cache
                 can_transport_interface.can_bus = can_thread.can_bus
                 logging.debug("Wait shortly to make sure that all needed data is in the cache")
-                # Slowest message cycle trasmission is every 1 second, wait a bit more for the fist time to fetch all needed data
+                # Slowest message cycle transmission is every 1 second, wait a bit more for the first time to fetch all needed data (only jk bms)
                 sleep(2)
                 addresses = [None] if len(BATTERY_ADDRESSES) == 0 else BATTERY_ADDRESSES  # use default address, if not configured
 
@@ -350,9 +359,9 @@ class standalone_serialbattery:
                         bat = self.get_battery(self.devpath, address, can_transport_interface)
                         if bat:
                             self.battery[address] = bat
-                            logger.info(f"Successful battery connection at {self.devpath} and this address {str(address)}")
+                            logging.info(f"Successful battery connection at {self.devpath} and this address {str(address)}")
                         else:
-                            logger.warning(f"No battery connection at {self.devpath} and this address {str(address)}")
+                            logging.warning(f"No battery connection at {self.devpath} and this address {str(address)}")
 
                     # if we've found at least 1 battery, stop the search here. otherwise retry with other bus speeds
                     if len(self.battery) > 0:
@@ -377,9 +386,9 @@ class standalone_serialbattery:
                     found_battery = self.get_battery(self.devpath, address)
                     if found_battery:
                         self.battery[address] = found_battery
-                        logger.info(f"Successful battery connection at {self.devpath} and this address {address}")
+                        logging.info(f"Successful battery connection at {self.devpath} and this address {address}")
                     else:
-                        logger.warning(f"No battery connection at {self.devpath} and this address {address}")
+                        logging.warning(f"No battery connection at {self.devpath} and this address {address}")
             # use default address
             else:
                 self.battery[0] = self.get_battery(self.devpath)

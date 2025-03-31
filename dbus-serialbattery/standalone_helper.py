@@ -5,7 +5,7 @@
 
 import sys
 import traceback
-from time import time
+from time import sleep, time
 from utils import logger
 import utils
 
