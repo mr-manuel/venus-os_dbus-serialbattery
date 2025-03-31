@@ -353,7 +353,7 @@ def main():
     elif port.startswith(("can", "vecan", "vcan")):
         """
         Import CAN classes only if it's a CAN port; otherwise, the driver won't start due to missing Python modules.
-        This prevents issues when using the driver exclusively with a serial connection
+        This prevents issues when using the driver exclusively with a serial connection.
 
         can: Older GX devices and Raspberry Pi with CAN hat
         vecan: Newer Venus GX devices
