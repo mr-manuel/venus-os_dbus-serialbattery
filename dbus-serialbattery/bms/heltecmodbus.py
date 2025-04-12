@@ -16,7 +16,7 @@ from typing import Dict
 import threading
 
 # the Heltec BMS is not always as responsive as it should, so let's try it up to (RETRYCNT - 1) times to talk to it
-RETRYCNT = 10
+RETRYCNT = 4
 
 # the wait time after a communication - normally this should be as defined by modbus RTU and handled in minimalmodbus,
 # but yeah, it seems we need it for the Heltec BMS
