@@ -29,7 +29,6 @@ locks: Dict[int, any] = {}
 class HeltecModbus(Battery):
     def __init__(self, port, baud, address):
         super(HeltecModbus, self).__init__(port, baud, address)
-        self.address = int.from_bytes(address, byteorder="big")
         self.type = "Heltec_Smart"
         self.unique_identifier_tmp = ""
 
@@ -50,7 +49,7 @@ class HeltecModbus(Battery):
         with locks[self.address]:
             mbdev = minimalmodbus.Instrument(
                 self.port,
-                slaveaddress=self.address,
+                slaveaddress=int.from_bytes(self.address, byteorder="big"),
                 mode="rtu",
                 close_port_after_each_call=True,
                 debug=False,
@@ -74,7 +73,7 @@ class HeltecModbus(Battery):
                 break
 
             if found:
-                self.type = "#" + str(self.address) + "_Heltec_Smart"
+                self.type = "#" + str(int.from_bytes(self.address, byteorder="big")) + "_Heltec_Smart"
 
         # give the user a feedback that no BMS was found
         if not found:
