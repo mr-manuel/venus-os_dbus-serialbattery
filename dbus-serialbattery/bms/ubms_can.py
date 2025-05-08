@@ -8,7 +8,6 @@
 #   and worse ignoring the correctly calculated one and setting CVL wrongly
 # - cell balancing status
 # - CAN masking for used ids only
-# - VMU keep alive cyclic message on successful connect, otherwise the BMS disconnects battery
 
 
 from __future__ import absolute_import, division, print_function, unicode_literals
@@ -166,6 +165,14 @@ class Ubms_Can(Battery):
                 found = found | 4
 
         if found >= 3:
+            # create a cyclic mode command message simulating a VMU master
+            # a U-BMS in slave mode according to manual section 6.4.1 switches to standby
+            # after 20 seconds of not receiving it
+            msg = can.Message(
+                arbitration_id=0x440, data=[0, 2, 0, 0], is_extended_id=False
+            )  # default: drive mode, i.e. contactor closed
+
+            self.cyclic_mode_task = self.can_transport_interface.can_bus.send_periodic(msg, 1)
             return True
         else:
             return False
