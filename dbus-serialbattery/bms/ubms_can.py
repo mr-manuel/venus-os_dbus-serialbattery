@@ -48,6 +48,10 @@ class Ubms_Can(Battery):
         self.number_of_modules = UBMS_CAN_MODULE_SERIES * UBMS_CAN_MODULE_PARALLEL
         self.number_of_strings = UBMS_CAN_MODULE_PARALLEL
         self.modules_in_series = int(self.number_of_modules / self.number_of_strings)
+
+        # for the most common U27-12XP it is 130Ah per module
+        self.capacity = 130 * self.number_of_strings
+
         self.cells_per_module = 4
         self.max_charge_voltage = MAX_CELL_VOLTAGE * self.cells_per_module * UBMS_CAN_MODULE_SERIES
         self.max_battery_voltage = self.max_charge_voltage
@@ -85,6 +89,9 @@ class Ubms_Can(Battery):
         self.number_of_modules_balancing = 0
         self.number_of_modules_communicating = 0
         self.cyclic_mode_task = None
+
+        self.charge_fet = 1
+        self.discharge_fet = 1
 
     BATTERYTYPE = "UBMS CAN"
 
