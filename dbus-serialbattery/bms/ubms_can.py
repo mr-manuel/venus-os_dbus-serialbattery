@@ -5,7 +5,6 @@
 
 # TODO
 # - cell balancing status
-# - CAN masking for used ids only
 
 
 from __future__ import absolute_import, division, print_function, unicode_literals
@@ -119,9 +118,13 @@ class Ubms_Can(Battery):
             # get settings to check if the data is valid and the connection is working
             result = self.get_settings()
 
+            # Now that we've confirmed connection, update filters for normal operation
+            self._set_operational_filters()
+
             # get the rest of the data to be sure, that all data is valid and the correct battery type is recognized
             # only read next data if the first one was successful, this saves time when checking multiple battery types
             result = result and self.refresh_data()
+
         except Exception:
             (
                 exception_type,
@@ -318,3 +321,15 @@ class Ubms_Can(Battery):
                     self.voltage = sum(self.module_voltage[0 : self.modules_in_series]) / 1000.0
 
         return True
+
+    # Set up filters for the messages we want to receive
+    def _set_operational_filters(self):
+        filters = [
+            {"can_id": 0x0CF, "can_mask": 0xFF0},
+            {"can_id": 0x350, "can_mask": 0xFF0},
+            {"can_id": 0x360, "can_mask": 0xFF0},
+            {"can_id": 0x46A, "can_mask": 0xFF0},
+            {"can_id": 0x06A, "can_mask": 0xFF0},
+            {"can_id": 0x76A, "can_mask": 0xFF0},
+        ]
+        self.can_transport_interface.can_bus.set_filters(filters)
