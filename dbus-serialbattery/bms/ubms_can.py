@@ -203,6 +203,8 @@ class Ubms_Can(Battery):
 
             self.update_cell_voltages()
 
+            self.to_temperature(self, 1, self.max_pcb_temperature)
+
         return result
 
     def to_protection_bits(self):
@@ -216,7 +218,6 @@ class Ubms_Can(Battery):
         self.protection.high_temperature = (self.voltage_and_cell_t_alarms & 0x6) >> 1 | (self.current_and_pcb_t_alarms & 0x18) >> 3
         self.protection.low_temperature = (self.mode & 0x60) >> 5
 
-        # FIXME check if any alarms came up
 
     # logger.debug("alarms %d" % (alarms))
     # self.last_error_time = time()
@@ -321,6 +322,12 @@ class Ubms_Can(Battery):
                     self.voltage = sum(self.module_voltage[0 : self.modules_in_series]) / 1000.0
 
         return True
+
+    def get_max_temperature(self)
+        return self.max_cell_temperature
+
+    def get_min_temperature(self)
+        return self.min_cell_temperature
 
     # Set up filters for the messages we want to receive
     def _set_operational_filters(self):
