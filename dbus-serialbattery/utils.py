@@ -14,7 +14,7 @@ import serial
 
 
 # CONSTANTS
-DRIVER_VERSION: str = "2.0.20250511dev"
+DRIVER_VERSION: str = "2.0.20250513dev"
 """
 current version of the driver
 """
@@ -41,7 +41,14 @@ config = configparser.ConfigParser()
 path = Path(__file__).parents[0]
 default_config_file_path = str(path.joinpath(PATH_CONFIG_DEFAULT).absolute())
 custom_config_file_path = str(path.joinpath(PATH_CONFIG_USER).absolute())
-config.read([default_config_file_path, custom_config_file_path])
+try:
+    config.read([default_config_file_path, custom_config_file_path])
+except configparser.MissingSectionHeaderError as error_message:
+    logger.error(f'Error reading "{custom_config_file_path}"')
+    logger.error("Make sure the first line is exactly: [DEFAULT]")
+    logger.error(f"{error_message}\n")
+    sleep(60)
+    sys.exit(1)
 
 # Map config logging levels to logging module levels
 LOGGING_LEVELS = {

@@ -61,6 +61,7 @@
 * Added: Charge/Discharge current limitation by MOSFET temperature by @mr-manuel
 * Added: Daly CAN - Read capacity with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/217 from @atillack
 * Added: Error handling for `config.ini` by @mr-manuel
+* Added: Error handling for corrupt `config.ini` structure by @mr-manuel
 * Added: Felicity BMS by @versager
 * Added: GUIv2 - New page where you see all important data in one place for easy troubleshooting by @mr-manuel
 * Added: JKBMS CAN - Extended protocol with version V2 by @Hooorny and @mr-manuel
