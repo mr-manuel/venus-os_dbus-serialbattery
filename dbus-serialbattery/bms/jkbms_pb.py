@@ -138,7 +138,7 @@ class Jkbms_pb(Battery):
         logger.debug("SCPDelay: " + str(SCPDelay))
 
         status_data = self.read_serial_data_jkbms_pb(self.command_about, 300)
-        serial_nr = status_data[86:96].decode("utf-8")
+        serial_nr = status_data[86:97].decode("utf-8")
         vendor_id = status_data[6:18].decode("utf-8")
         hw_version = (status_data[22:26].decode("utf-8") + " / " + status_data[30:35].decode("utf-8")).replace("\x00", "")
         sw_version = status_data[30:34].decode("utf-8")  # will be overridden
