@@ -142,7 +142,7 @@ class RV_C_Can(Battery):
 
     def update_cell_voltages(self, start_index, end_index, data):
         for i in range(start_index, end_index + 1):
-            cell_voltage = unpack_from("<H", bytes([data[2], data[3]]))[0] / 20
+            cell_voltage = unpack_from("<H", bytes([data[2], data[3]]))[0] / 80
             if cell_voltage > 0:
                 if len(self.cells) <= i:
                     self.cells.insert(i, Cell(False))
@@ -164,7 +164,7 @@ class RV_C_Can(Battery):
 
             # BATT_STAT1 Voltage
             if normalized_arbitration_id in self.CAN_FRAMES[self.BATT_STAT1]:
-                self.update_cell_voltages(0, 0, data)
+                self.update_cell_voltages(0, 3, data)
                 current = unpack_from("<L", bytes([data[4], data[5], data[6], data[7]]))[0]
                 self.current = (2000000000 - current) / 1000
                 # check if all needed data is available
