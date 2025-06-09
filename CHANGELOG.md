@@ -54,7 +54,9 @@
   * Changes to `config.default.ini`: `TEMP_4_NAME` was replaced by `TEMPERATURE_4_NAME`
 
 ### What's Changed
-* Added: RV-C House Battery by @rogergrant99
+* Added: BLE - Config settings do enable/disable `BLUETOOTH_USE_POLLING` and `BLUETOOTH_FORCE_RESET_BLE_STACK` by @mr-manuel
+* Added: BLE - Error message if BLE `BMS_TYPE` was misspelled by @mr-manuel
+* Added: BLE - Error message if BLE address is missing by @mr-manuel
 * Added: Calculation of history values not provided by the battery by @mr-manuel
 * Added: Charge/Discharge current limitation by MOSFET temperature by @mr-manuel
 * Added: Daly CAN - Read capacity with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/217 from @atillack
@@ -70,6 +72,7 @@
 * Added: Min/Max lifetime temperature to history class and battery template by @mr-manuel
 * Added: Pace BMS by @KoljaWindeler
 * Added: Possibility to add external sensor for SoC by @mr-manuel
+* Added: RV-C House Battery by @rogergrant99
 * Added: Show BMS cable fault warning, if the BMS is not reachable anymore by @mr-manuel
 * Added: Show CVL also on cell voltage base by @mr-manuel
 * Added: Signal handler for clean service restart/shutdown by @mr-manuel
