@@ -162,7 +162,7 @@ class RV_C_Can(Battery):
         for frame_id, data in self.can_transport_interface.can_message_cache_callback().items():
             normalized_arbitration_id = frame_id + self.device_address
 
-            # BATT_STAT1 Voltage RV-C supports only one cell, divide the battery by 4 to populate 4 cells  
+            # BATT_STAT1 Voltage RV-C supports only one cell, divide the battery by 4 to populate 4 cells
             if normalized_arbitration_id in self.CAN_FRAMES[self.BATT_STAT1]:
                 self.update_cell_voltages(0, 3, data)
                 current = unpack_from("<L", bytes([data[4], data[5], data[6], data[7]]))[0]
