@@ -72,6 +72,7 @@
 * Added: Min/Max lifetime temperature to history class and battery template by @mr-manuel
 * Added: Pace BMS by @KoljaWindeler
 * Added: Possibility to add external sensor for SoC by @mr-manuel
+* Added: RV-C House Battery by @rogergrant99
 * Added: Show BMS cable fault warning, if the BMS is not reachable anymore by @mr-manuel
 * Added: Show CVL also on cell voltage base by @mr-manuel
 * Added: Signal handler for clean service restart/shutdown by @mr-manuel
