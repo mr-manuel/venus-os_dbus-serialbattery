@@ -568,7 +568,7 @@ class Daren485(Battery):
         Example command (mark the \r at the end):
         ~22014A47E00201FD23␍
         """
-        return self.create_command(self.address, b"\x4a", b"\x47", self.address.hex().upper())
+        return self.create_command(self.address, b"\x4a", b"\x47", "01")
 
     def create_command_get_mfg_params(self):
         """
@@ -606,7 +606,7 @@ class Daren485(Battery):
         Example command (mark the \r at the end):
         ~22014A42E00201FD28␍
         """
-        return self.create_command(self.address, b"\x4a", b"\x42", self.address.hex().upper())
+        return self.create_command(self.address, b"\x4a", b"\x42", "01")
 
     def create_command_get_manufacturer_info(self):
         """
