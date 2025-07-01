@@ -110,7 +110,6 @@ class Jkbms_pb(Battery):
         logger.debug("VolCellOV: " + str(VolCellOV))
         logger.debug("VolCellOVPR: " + str(VolCellOVPR))
         logger.debug("VolBalanTrig: " + str(VolBalanTrig))
-        logger.debug("VolBalanTrig: " + str(VolBalanTrig))
         logger.debug("VolSOC_full: " + str(VolSOC_full))
         logger.debug("VolSOC_empty: " + str(VolSOC_empty))
         logger.debug("VolSysPwrOff: " + str(VolSysPwrOff))
