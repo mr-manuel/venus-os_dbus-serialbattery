@@ -78,7 +78,7 @@ class Jkbms_pb(Battery):
         TIMBatSCPRDly = unpack_from("<i", status_data, 74)[0]
         CurBalanMax = unpack_from("<i", status_data, 78)[0] / 1000
         TMPBatCOT = unpack_from("<I", status_data, 82)[0] / 10
-        TMPBatCOTPR = unpack_from("<I", status_data, 96)[0] / 10
+        TMPBatCOTPR = unpack_from("<I", status_data, 86)[0] / 10
         TMPBatDcOT = unpack_from("<I", status_data, 90)[0] / 10
         TMPBatDcOTPR = unpack_from("<I", status_data, 94)[0] / 10
         TMPBatCUT = unpack_from("<I", status_data, 98)[0] / 10
