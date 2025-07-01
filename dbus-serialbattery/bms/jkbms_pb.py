@@ -68,8 +68,8 @@ class Jkbms_pb(Battery):
         VolBalanTrig = unpack_from("<i", status_data, 26)[0] / 1000
         VolSOC_full = unpack_from("<i", status_data, 30)[0] / 1000
         VolSOC_empty = unpack_from("<i", status_data, 34)[0] / 1000
-        VolRCV = unpack_from("<i", status_data, 38)[0] / 1000 # Voltage Cell Request Charge Voltage (RCV)
-        VolRFV = unpack_from("<i", status_data, 42)[0] / 1000 # Voltage Cell Request Float Voltage (RFV)
+        VolRCV = unpack_from("<i", status_data, 38)[0] / 1000  # Voltage Cell Request Charge Voltage (RCV)
+        VolRFV = unpack_from("<i", status_data, 42)[0] / 1000  # Voltage Cell Request Float Voltage (RFV)
         VolSysPwrOff = unpack_from("<i", status_data, 46)[0] / 1000
         CurBatCOC = unpack_from("<i", status_data, 50)[0] / 1000
         TIMBatCOCPDly = unpack_from("<i", status_data, 54)[0]
@@ -93,7 +93,7 @@ class Jkbms_pb(Battery):
         BalanEN = unpack_from("<i", status_data, 126)[0]
         CapBatCell = unpack_from("<i", status_data, 130)[0] / 1000
         SCPDelay = unpack_from("<i", status_data, 134)[0]
-        StartBalVol = unpack_from("<i", status_data, 138)[0] / 1000 # Start Balance Voltage
+        StartBalVol = unpack_from("<i", status_data, 138)[0] / 1000  # Start Balance Voltage
 
         # count of all cells in pack
         self.cell_count = CellCount
