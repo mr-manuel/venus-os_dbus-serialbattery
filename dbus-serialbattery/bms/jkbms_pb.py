@@ -68,6 +68,8 @@ class Jkbms_pb(Battery):
         VolBalanTrig = unpack_from("<i", status_data, 26)[0] / 1000
         VolSOC_full = unpack_from("<i", status_data, 30)[0] / 1000
         VolSOC_empty = unpack_from("<i", status_data, 34)[0] / 1000
+        VolRCV = unpack_from("<i", status_data, 38)[0] / 1000  # Voltage Cell Request Charge Voltage (RCV)
+        VolRFV = unpack_from("<i", status_data, 42)[0] / 1000  # Voltage Cell Request Float Voltage (RFV)
         VolSysPwrOff = unpack_from("<i", status_data, 46)[0] / 1000
         CurBatCOC = unpack_from("<i", status_data, 50)[0] / 1000
         TIMBatCOCPDly = unpack_from("<i", status_data, 54)[0]
@@ -78,7 +80,7 @@ class Jkbms_pb(Battery):
         TIMBatSCPRDly = unpack_from("<i", status_data, 74)[0]
         CurBalanMax = unpack_from("<i", status_data, 78)[0] / 1000
         TMPBatCOT = unpack_from("<I", status_data, 82)[0] / 10
-        TMPBatCOTPR = unpack_from("<I", status_data, 96)[0] / 10
+        TMPBatCOTPR = unpack_from("<I", status_data, 86)[0] / 10
         TMPBatDcOT = unpack_from("<I", status_data, 90)[0] / 10
         TMPBatDcOTPR = unpack_from("<I", status_data, 94)[0] / 10
         TMPBatCUT = unpack_from("<I", status_data, 98)[0] / 10
@@ -91,6 +93,7 @@ class Jkbms_pb(Battery):
         BalanEN = unpack_from("<i", status_data, 126)[0]
         CapBatCell = unpack_from("<i", status_data, 130)[0] / 1000
         SCPDelay = unpack_from("<i", status_data, 134)[0]
+        StartBalVol = unpack_from("<i", status_data, 138)[0] / 1000  # Start Balance Voltage
 
         # count of all cells in pack
         self.cell_count = CellCount
@@ -110,9 +113,10 @@ class Jkbms_pb(Battery):
         logger.debug("VolCellOV: " + str(VolCellOV))
         logger.debug("VolCellOVPR: " + str(VolCellOVPR))
         logger.debug("VolBalanTrig: " + str(VolBalanTrig))
-        logger.debug("VolBalanTrig: " + str(VolBalanTrig))
         logger.debug("VolSOC_full: " + str(VolSOC_full))
         logger.debug("VolSOC_empty: " + str(VolSOC_empty))
+        logger.debug("VolRCV: " + str(VolRCV))
+        logger.debug("VolRFV: " + str(VolRFV))
         logger.debug("VolSysPwrOff: " + str(VolSysPwrOff))
         logger.debug("CurBatCOC: " + str(CurBatCOC))
         logger.debug("TIMBatCOCPDly: " + str(TIMBatCOCPDly))
@@ -136,6 +140,7 @@ class Jkbms_pb(Battery):
         logger.debug("BalanEN: " + str(BalanEN))
         logger.debug("CapBatCell: " + str(CapBatCell))
         logger.debug("SCPDelay: " + str(SCPDelay))
+        logger.debug("StartBalVol: " + str(StartBalVol))
 
         status_data = self.read_serial_data_jkbms_pb(self.command_about, 300)
         serial_nr = status_data[86:97].decode("utf-8")
