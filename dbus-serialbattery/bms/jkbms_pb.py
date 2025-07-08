@@ -95,7 +95,7 @@ class Jkbms_pb(Battery):
         SCPDelay = unpack_from("<i", status_data, 134)[0]
         StartBalVol = unpack_from("<i", status_data, 138)[0] / 1000  # Start Balance Voltage
 
-	# balancer active
+        # balancer enabled
         self.balance_fet = True if BalanEN != 0 else False
 
         # count of all cells in pack
