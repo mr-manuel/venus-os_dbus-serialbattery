@@ -86,7 +86,7 @@ class Daly(Battery):
                 result = self.read_status_data(ser)
                 # get first data to show in startup log, only if result is true
                 result = result and self.read_soc_data(ser)
-                #result = result and self.read_battery_code(ser)
+                # result = result and self.read_battery_code(ser)
                 # returns always true
                 result = result and self.get_settings(ser)
 
