@@ -86,7 +86,7 @@ class Daly(Battery):
                 result = self.read_status_data(ser)
                 # get first data to show in startup log, only if result is true
                 result = result and self.read_soc_data(ser)
-                result = result and self.read_battery_code(ser)
+                #result = result and self.read_battery_code(ser)
                 # returns always true
                 result = result and self.get_settings(ser)
 
@@ -577,7 +577,7 @@ class Daly(Battery):
 
         # wait shortly, else the Daly is not ready and throws a lot of no reply errors
         # if you see a lot of errors, try to increase in steps of 0.005
-        sleep(0.020)
+        sleep(0.100)
 
         cmd = bytearray(13)
         now = datetime.now()
@@ -643,14 +643,14 @@ class Daly(Battery):
     def write_charge_discharge_mos(self, ser):
         # wait shortly, else the Daly is not ready and throws a lot of no reply errors
         # if you see a lot of errors, try to increase in steps of 0.005
-        sleep(0.020)
+        sleep(0.10)
 
         if self.trigger_force_disable_charge is None and self.trigger_force_disable_discharge is None:
             return False
 
         # wait shortly, else the Daly is not ready and throws a lot of no reply errors
         # if you see a lot of errors, try to increase in steps of 0.005
-        sleep(0.020)
+        sleep(0.100)
 
         cmd = bytearray(self.command_base)
 
@@ -695,7 +695,7 @@ class Daly(Battery):
     def request_data(self, ser, command, sentences_to_receive=1):
         # wait shortly, else the Daly is not ready and throws a lot of no reply errors
         # if you see a lot of errors, try to increase in steps of 0.005
-        sleep(0.020)
+        sleep(0.100)
 
         self.runtime = 0
         time_start = time()
