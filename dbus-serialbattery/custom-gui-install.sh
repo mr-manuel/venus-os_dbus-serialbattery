@@ -174,6 +174,10 @@ if [ -d "$pathGuiV2" ]; then
             # echo "|- Venus OS $(head -n 1 /opt/victronenergy/version) is part of v3.6x."
             sourceQmlDir="3.6x"
             installGuiV2Check=0
+        elif (( $venusVersionNumber <= $(versionStringToNumber "v3.79") )); then
+            # echo "|- Venus OS $(head -n 1 /opt/victronenergy/version) is part of v3.6x."
+            sourceQmlDir="3.7x"
+            installGuiV2Check=0
         else
             echo "|- >>> WARNING: GUIv2 installation for local display NOT SUPPORTED"
             echo "|- >>>          Your Venus OS version $(head -n 1 /opt/victronenergy/version) is NOT SUPPORTED by this version of the driver."

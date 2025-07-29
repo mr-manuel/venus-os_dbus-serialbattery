@@ -9,6 +9,12 @@
 * 🚨 The Bluetooth connection is still not stable on some systems. If you want to have a stable connection use the serial connection.
 
 
+## v2.1.x
+
+### What's Changed
+* Added: Venus OS 3.7x GUIv2 support by @mr-manuel
+
+
 ## v2.0.20250729
 
 ### Breaking Changes

@@ -14,7 +14,7 @@ import serial
 
 
 # CONSTANTS
-DRIVER_VERSION: str = "2.0.20250729dev"
+DRIVER_VERSION: str = "2.1.202507230dev"
 """
 current version of the driver
 """
