@@ -774,6 +774,13 @@ Page {
 				preferredVisible: productId.value === 0xBA77
 			}
 
+			ListLink {
+				text: "Donate to help this project, any amount is appreciated"
+				url: "https://www.paypal.com/donate/?hosted_button_id=3NEVZBDM5KABW"
+				// show only for mr-manuel/dbus-serialbattery (productId registered at Victron)
+				preferredVisible: productId.value === 0xBA77
+			}
+
 			SettingsListHeader {
 				text: "Driver Debug Data"
                 preferredVisible: chargeModeDebug.valid
