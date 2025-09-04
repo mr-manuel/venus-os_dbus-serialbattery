@@ -356,7 +356,7 @@ class Jkbms_pb(Battery):
             self.LENGTH_SIZE,  # ignored
             battery_online=self.online,
         )
-        if data is False:
+        if not data:
             return False
 
         # be = ''.join(format(x, ' 02X') for x in data)
