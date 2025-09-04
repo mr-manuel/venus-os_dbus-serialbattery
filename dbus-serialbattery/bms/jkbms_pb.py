@@ -57,7 +57,7 @@ class Jkbms_pb(Battery):
         # Set the current limits, populate cell count, etc
         # Return True if success, False for failure
         status_data = self.read_serial_data_jkbms_pb(self.command_settings, 300)
-        if status_data is False:
+        if not status_data:
             return False
 
         VolSmartSleep = unpack_from("<i", status_data, 6)[0] / 1000
@@ -175,7 +175,7 @@ class Jkbms_pb(Battery):
     def read_status_data(self):
         status_data = self.read_serial_data_jkbms_pb(self.command_status, 299)
         # check if connection success
-        if status_data is False:
+        if not status_data:
             return False
 
         #        logger.error("sucess we have data")
@@ -356,7 +356,7 @@ class Jkbms_pb(Battery):
             self.LENGTH_SIZE,  # ignored
             battery_online=self.online,
         )
-        if data is False:
+        if not data:
             return False
 
         # be = ''.join(format(x, ' 02X') for x in data)
