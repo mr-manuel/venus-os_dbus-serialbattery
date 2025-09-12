@@ -50,7 +50,7 @@ function restore_config {
         if [ -d "/data/apps/dbus-serialbattery" ]; then
             mv /data/apps/dbus-serialbattery_config.ini.backup /data/apps/dbus-serialbattery/config.ini
             echo "Config.ini restored to /data/apps/dbus-serialbattery/config.ini"
-        # restore to driver < v2.0.0 (downlgrade)
+        # restore to driver < v2.0.0 (downgrade)
         elif [ -d "/data/etc/dbus-serialbattery" ]; then
             mv /data/apps/dbus-serialbattery_config.ini.backup /data/etc/dbus-serialbattery/config.ini
             echo "Config.ini restored to /data/etc/dbus-serialbattery/config.ini"
@@ -87,7 +87,7 @@ if [ -z "$1" ]; then
     latest_release_mrmanuel_stable=$(curl -s https://api.github.com/repos/mr-manuel/venus-os_dbus-serialbattery/releases/latest | sed -nE 's/.*"tag_name": "([^"]+)".*/\1/p')
 
     # mr-manuel beta
-    latest_release_mrmanuel_beta=$(curl -s https://api.github.com/repos/mr-manuel/venus-os_dbus-serialbattery/releases | sed -nE 's/.*"tag_name": "([^"]+)".*/\1/p' | head -n 1)
+    latest_release_mrmanuel_beta=$(curl -s https://api.github.com/repos/mr-manuel/venus-os_dbus-serialbattery/releases | sed -nE 's/.*"tag_name": "([^"]+(rc|beta))".*/\1/p' | head -n 1)
 
     # mr-manuel master branch
     latest_release_mrmanuel_nightly=$(curl -s https://raw.githubusercontent.com/mr-manuel/venus-os_dbus-serialbattery/master/dbus-serialbattery/utils.py | grep DRIVER_VERSION | awk -F'"' '{print "v" $2}')
@@ -113,7 +113,7 @@ if [ -z "$1" ]; then
 
 
     echo
-    PS3=$'\nSelect which version you want to install from m-rmanuel\'s repo and enter the corresponding number: '
+    PS3=$'\nSelect which version you want to install from mr-manuel\'s repo and enter the corresponding number: '
 
     # create list of versions
     version_list=(
