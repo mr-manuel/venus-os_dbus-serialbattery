@@ -22,18 +22,23 @@ class Jkbms_Ble(Battery):
     BATTERYTYPE = "JKBMS BLE"
     resetting = False
 
-    def __init__(self, port, baud, address):
+    def __init__(self, port, baud, address, **kwargs):
         super(Jkbms_Ble, self).__init__(port, baud, address)
         self.address = address
+        self.adapter = kwargs.get("adapter")
         self.type = self.BATTERYTYPE
-        self.jk = Jkbms_Brn(address, lambda: self.reset_bluetooth())
+        self.jk = Jkbms_Brn(address, lambda: self.reset_bluetooth(), adapter=self.adapter)
         self.unique_identifier_tmp = ""
         self.history.exclude_values_to_calculate = ["charge_cycles"]
 
         logger.info("Init of Jkbms_Ble at " + address)
 
     def connection_name(self) -> str:
-        return "BLE " + self.address
+        name = "BLE " + self.address
+        if self.adapter:
+            name = name + "@" + self.adapter
+
+        return name
 
     def custom_name(self) -> str:
         return "SerialBattery(" + self.type + ") " + self.address[-5:]

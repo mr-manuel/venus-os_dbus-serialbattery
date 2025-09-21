@@ -252,7 +252,7 @@ if [ "$bluetooth_length" -gt 0 ]; then
             exit 1
         fi
 
-        echo "Installing \"$2\" with MAC address \"$3\" as dbus-blebattery.$1"
+        echo "Installing \"$2\" with MAC address \"$3\" ${4:+using HCI $4} as dbus-blebattery.$1"
 
         mkdir -p "/service/dbus-blebattery.$1/log"
         {
@@ -272,7 +272,7 @@ if [ "$bluetooth_length" -gt 0 ]; then
             echo
             echo "# Start the main process"
             echo "exec 2>&1"
-            echo "python /data/apps/dbus-serialbattery/dbus-serialbattery.py $2 $3 &"
+            echo "python /data/apps/dbus-serialbattery/dbus-serialbattery.py $2 $3 $4 &"
             echo
             echo "# Capture the PID of the child process"
             echo "PID=\$!"
@@ -291,13 +291,14 @@ if [ "$bluetooth_length" -gt 0 ]; then
 
     # Example
     # install_blebattery_service 0 Jkbms_Ble C8:47:8C:00:00:00
-    # install_blebattery_service 1 Jkbms_Ble C8:47:8C:00:00:11
+    # install_blebattery_service 1 Jkbms_Ble C8:47:8C:00:00:11 hci1
+    # install_blebattery_service 1 Jkbms_Ble C8:47:8C:00:00:22 04:42:1A:00:00:11
 
     for (( i=0; i<bluetooth_length; i++ ));
     do
-        # split BMS type and MAC address
-        IFS=' ' read -r -a bms <<< "${bms_array[$i]}"
-        install_blebattery_service $i "${bms[0]}" "${bms[1]}"
+        # split BMS type, MAC address and adapter
+        IFS=' @' read -r -a bms <<< "${bms_array[$i]}"
+        install_blebattery_service $i "${bms[0]}" "${bms[1]}" "${bms[2]}"
     done
 
     echo
