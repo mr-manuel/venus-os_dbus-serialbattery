@@ -232,6 +232,7 @@ if [ "$bluetooth_length" -gt 0 ]; then
     /etc/init.d/bluetooth stop
     sleep 2
     /etc/init.d/bluetooth start
+    sleep 2
     echo
 
     # function to install ble battery
@@ -289,6 +290,22 @@ if [ "$bluetooth_length" -gt 0 ]; then
         chmod 755 "/service/dbus-blebattery.$1/run"
     }
 
+    discover_adapter_from_mac_address()
+    {
+        local hci
+
+        for hci in $(cd /sys/class/bluetooth/; shopt -s nullglob; echo hci*); do
+            if grep -q "\\s$1\$" <(dbus-send --system \
+                    --dest=org.bluez --print-reply=literal /org/bluez/$hci \
+                    org.freedesktop.DBus.Properties.Get string:"org.bluez.Adapter1" string:"Address"); then
+                echo $hci
+                return 0
+            fi
+        done
+
+        echo "WARNING: Adapter with MAC address '$1' not found - using default adapter." >&2
+    }
+
     # Example
     # install_blebattery_service 0 Jkbms_Ble C8:47:8C:00:00:00
     # install_blebattery_service 1 Jkbms_Ble C8:47:8C:00:00:11 hci1
@@ -297,8 +314,15 @@ if [ "$bluetooth_length" -gt 0 ]; then
     for (( i=0; i<bluetooth_length; i++ ));
     do
         # split BMS type, MAC address and adapter
-        IFS=' @' read -r -a bms <<< "${bms_array[$i]}"
-        install_blebattery_service $i "${bms[0]}" "${bms[1]}" "${bms[2]}"
+        IFS=' ' read -r -a bms <<< "${bms_array[$i]}"
+
+        if [[ "${bms[1]}" =~ (.+)@(hci[0-9]+) ]]; then
+            bms=( ${bms[0]} ${BASH_REMATCH[@]:1} )
+        elif [[ "${bms[1]}" =~ (.+)@(..:..:..:..:..:..) ]]; then
+            bms=( ${bms[0]} ${BASH_REMATCH[1]} $(discover_adapter_from_mac_address  ${BASH_REMATCH[2]}) )
+        fi
+
+        install_blebattery_service $i "${bms[@]}"
     done
 
     echo
