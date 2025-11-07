@@ -237,8 +237,8 @@ class KS48100(Battery):
                 self.total_charge_capacity = int(payload[12:20], base=16) / 1
                 # total_discharge_capacity
                 self.history.total_ah_drawn = int(payload[20:28], base=16)
-                self.history.charged_energy = int(int(payload[28:32], base=16) / 10)
-                self.history.discharged_energy = int(int(payload[32:36], base=16) / 10)
+                self.history.charged_energy = int(int(payload[28:32], base=16) / 100)
+                self.history.discharged_energy = int(int(payload[32:36], base=16) / 100)
 
                 result = True
             else:
