@@ -14,10 +14,12 @@
 ### What's Changed
 * Added: Venus OS 3.7x GUIv2 support by @mr-manuel
 * Changed: Daren 485 - Fixed charge/discharge calculation with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/343 by @kopierschnitte
+* Added: Daren 485 - Read SoH with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/344 by @kopierschnitte
 * Changed: Fixed typo in activation instructions by @mr-manuel
 * Changed: JK Inverter BMS - Fixed serial number lenght by @mr-manuel
 * Changed: JKBMS CAN - Correct calculation of arbitration_id for device_address > 0. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/288 with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/306 by @Hooorny
 * Changed: KS48100 - Fixed charge/discharge calculation with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/343 by @kopierschnitte
+* Added: KS48100 - Read SoH with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/344 by @kopierschnitte
 
 ## v2.0.20250729
 
