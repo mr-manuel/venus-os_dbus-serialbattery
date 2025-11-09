@@ -271,6 +271,7 @@ class KS48100(Battery):
             payload = response[13 : len(response) - 5]
             if len(payload) >= 152:
                 self.soc = int(payload[2:6], base=16) / 100
+                self.soh = int(payload[114:118], base=16) / 1
                 self.voltage = int(payload[6:10], base=16) / 100
                 self.current = unpack(">h", bytes.fromhex(payload[106:110]))[0] / 100
                 temperature_mos = unpack(">h", bytes.fromhex(payload[84:88]))[0] / 10
