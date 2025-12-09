@@ -185,24 +185,24 @@ class Jkbms_pb(Battery):
         logger.debug("TIMSmartSleep: " + str(TIMSmartSleep))
 
         status_data = self.read_serial_data_jkbms_pb(self.command_about, 300)
-        #vendor_version start  0: 16 chars
-        #hw_version     start 16:  8 chars
-        #sw_version     start 24:  8 chars
-        #oddruntim      start 32:  1 UINT32
-        #pwr_on_time    start 36:  1 UINT32
+        # vendor_version start  0: 16 chars
+        # hw_version     start 16:  8 chars
+        # sw_version     start 24:  8 chars
+        # oddruntim      start 32:  1 UINT32
+        # pwr_on_time    start 36:  1 UINT32
 
-        vendor_id = status_data[6:21].decode("utf-8").split('\x00',1)[0]    # 16 chars
-        hw_version = status_data[22:29].decode("utf-8").split('\x00',1)[0]  #  8 chars
-        sw_version = status_data[30:37].decode("utf-8").split('\x00',1)[0]  #  8 chars
-        bms_version = (hw_version + " / " + sw_version)
+        vendor_id = status_data[6:21].decode("utf-8").split('\x00',1)[0] # 16 chars
+        hw_version = status_data[22:29].decode("utf-8").split('\x00',1)[0] # 8 chars
+        sw_version = status_data[30:37].decode("utf-8").split('\x00',1)[0] # 8 chars
+        bms_version = hw_version + " / " + sw_version
 
         ODDRunTime = unpack_from("<I", status_data, 38)[0] # 1 unit32 # runtime of the system in seconds
         PWROnTimes = unpack_from("<I", status_data, 42)[0] # 1 unit32 # how many startups the system has done
-        serial_nr = status_data[46:61].decode("utf-8").split('\x00',1)[0]  #serialnumber 16 chars max
-        usrData = status_data[102:117].decode("utf-8").split('\x00',1)[0]  #usrData 16 chars max
-        pin = status_data[118:133].decode("utf-8").split('\x00',1)[0]      #pin 16 chars max
-        usrData2 = status_data[134:149].decode("utf-8").split('\x00',1)[0] #usrData 2 16 chars max
-        ble_id = (serial_nr + "-" + str(DevAddr))
+        serial_nr = status_data[46:61].decode("utf-8").split('\x00',1)[0] # serialnumber 16 chars max
+        usrData = status_data[102:117].decode("utf-8").split('\x00',1)[0] # usrData 16 chars max
+        pin = status_data[118:133].decode("utf-8").split('\x00',1)[0] # pin 16 chars max
+        usrData2 = status_data[134:149].decode("utf-8").split('\x00',1)[0] # usrData 2 16 chars max
+        ble_id = serial_nr + "-" + str(DevAddr)
 
         self.unique_identifier_tmp = serial_nr
         self.version = sw_version
@@ -218,7 +218,9 @@ class Jkbms_pb(Battery):
         logger.debug("User data 2: " + str(usrData2))
         logger.debug("pin: " + str(pin))
         logger.debug("PWROnTimes: " + str(PWROnTimes))
-        logger.debug("ODDRunTime: " + str(ODDRunTime) +"s; " + str(ODDRunTime/60) +"m; " +str(ODDRunTime/60/60) + "h; "+str(ODDRunTime/60/60/24) + "d")
+        logger.debug(
+                "ODDRunTime: " + str(ODDRunTime) + "s; " + str(ODDRunTime / 60) +"m; " + str(ODDRunTime / 60 / 60) + "h; " + str(ODDRunTime / 60 / 60 / 24) + "d"
+        )
 
         # init the cell array
         for _ in range(self.cell_count):
@@ -296,11 +298,11 @@ class Jkbms_pb(Battery):
         self.charge_fet = 1 if charge != 0 else 0
         self.discharge_fet = 1 if discharge != 0 else 0
         self.balancing = 1 if bal != 0 else 0
-        #self.heating = 1 if heat != 0 else 0
+        # self.heating = 1 if heat != 0 else 0
 
         # HeatCurrent mA
-        #self.heat_current = unpack_from("<H", status_data, 236)[0]
-        #self.heat_power = 0 if self.heating != 1 else self.heat_current * self.voltage
+        # self.heat_current = unpack_from("<H", status_data, 236)[0]
+        # self.heat_power = 0 if self.heating != 1 else self.heat_current * self.voltage
 
 
         # show wich cells are balancing

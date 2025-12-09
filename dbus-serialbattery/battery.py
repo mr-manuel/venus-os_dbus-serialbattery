@@ -2139,7 +2139,7 @@ class Battery(ABC):
         logger.info(f"Battery {self.type} connected to dbus from {self.port}")
         logger.info("========== Settings ==========")
         logger.info(
-                f"> Connection voltage: {self.voltage} V | Current: {self.current_calc} A | SoC: {self.soc}% | SoH: {self.soh}%"
+            f"> Connection voltage: {self.voltage} V | Current: {self.current_calc} A | SoC: {self.soc}% | SoH: {self.soh}%"
             + (f" | SoC calc: {self.soc_calc:.0f}%" if utils.SOC_CALCULATION else "")
         )
         logger.info(f"> Cell count: {self.cell_count} | Cells populated: {cell_counter}")
