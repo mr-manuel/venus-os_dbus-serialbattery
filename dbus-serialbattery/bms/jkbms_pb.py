@@ -94,10 +94,10 @@ class Jkbms_pb(Battery):
         CapBatCell = unpack_from("<i", status_data, 130)[0] / 1000
         SCPDelay = unpack_from("<i", status_data, 134)[0]
         StartBalVol = unpack_from("<i", status_data, 138)[0] / 1000  # Start Balance Voltage
-        DevAddr = unpack_from("<i", status_data, 270)[0] # Device Addr
+        DevAddr = unpack_from("<i", status_data, 270)[0]  # Device Addr
         TIMPDischarge = unpack_from("<i", status_data, 274)[0]
 
-        CtrlBitMask = unpack_from("<H", status_data, 282)[0] # Controls
+        CtrlBitMask = unpack_from("<H", status_data, 282)[0]  # Controls
         # Bit0: Heating enabled
         HeatEN = 0x01 & CtrlBitMask
         # Bit1: Disable Temp.-Sensor
@@ -113,9 +113,9 @@ class Jkbms_pb(Battery):
         # Bit6: Smart Sleep
         SmartSleep = 0x1 & (CtrlBitMask >> 6)
 
-        TMPBatOTA = unpack_from("<h", status_data, 284)[0] # int 8
-        TMPBatOTAR = unpack_from("<h", status_data, 285)[0] # int 8
-        TIMSmartSleep = unpack_from("<h", status_data, 286)[0] # uint 8
+        TMPBatOTA = unpack_from("<h", status_data, 284)[0]  # int 8
+        TMPBatOTAR = unpack_from("<h", status_data, 285)[0]  # int 8
+        TIMSmartSleep = unpack_from("<h", status_data, 286)[0]  # uint 8
 
         # balancer enabled
         self.balance_fet = True if BalanEN != 0 else False
@@ -190,17 +190,17 @@ class Jkbms_pb(Battery):
         # oddruntim      start 32:  1 UINT32
         # pwr_on_time    start 36:  1 UINT32
 
-        vendor_id = status_data[6:21].decode("utf-8").split('\x00', 1)[0] # 16 chars
-        hw_version = status_data[22:29].decode("utf-8").split('\x00', 1)[0] # 8 chars
-        sw_version = status_data[30:37].decode("utf-8").split('\x00', 1)[0] # 8 chars
+        vendor_id = status_data[6:21].decode("utf-8").split('\x00', 1)[0]  # 16 chars
+        hw_version = status_data[22:29].decode("utf-8").split('\x00', 1)[0]  # 8 chars
+        sw_version = status_data[30:37].decode("utf-8").split('\x00', 1)[0]  # 8 chars
         bms_version = hw_version + " / " + sw_version
 
-        ODDRunTime = unpack_from("<I", status_data, 38)[0] # 1 unit32 # runtime of the system in seconds
-        PWROnTimes = unpack_from("<I", status_data, 42)[0] # 1 unit32 # how many startups the system has done
-        serial_nr = status_data[46:61].decode("utf-8").split('\x00', 1)[0] # serialnumber 16 chars max
-        usrData = status_data[102:117].decode("utf-8").split('\x00', 1)[0] # usrData 16 chars max
-        pin = status_data[118:133].decode("utf-8").split('\x00', 1)[0] # pin 16 chars max
-        usrData2 = status_data[134:149].decode("utf-8").split('\x00', 1)[0] # usrData 2 16 chars max
+        ODDRunTime = unpack_from("<I", status_data, 38)[0]  # 1 unit32 # runtime of the system in seconds
+        PWROnTimes = unpack_from("<I", status_data, 42)[0]  # 1 unit32 # how many startups the system has done
+        serial_nr = status_data[46:61].decode("utf-8").split('\x00', 1)[0]  # serialnumber 16 chars max
+        usrData = status_data[102:117].decode("utf-8").split('\x00', 1)[0]  # usrData 16 chars max
+        pin = status_data[118:133].decode("utf-8").split('\x00', 1)[0]  # pin 16 chars max
+        usrData2 = status_data[134:149].decode("utf-8").split('\x00', 1)[0]  # usrData 2 16 chars max
         ble_id = serial_nr + "-" + str(DevAddr)
 
         self.unique_identifier_tmp = serial_nr
@@ -218,7 +218,7 @@ class Jkbms_pb(Battery):
         logger.debug("pin: " + str(pin))
         logger.debug("PWROnTimes: " + str(PWROnTimes))
         logger.debug(
-                "ODDRunTime: " + str(ODDRunTime) + "s; " + str(ODDRunTime / 60) +"m; " + str(ODDRunTime / 60 / 60) + "h; " + str(ODDRunTime / 60 / 60 / 24) + "d"
+            "ODDRunTime: " + str(ODDRunTime) + "s; " + str(ODDRunTime / 60) +"m; " + str(ODDRunTime / 60 / 60) + "h; " + str(ODDRunTime / 60 / 60 / 24) + "d"
         )
 
         # init the cell array
@@ -302,7 +302,6 @@ class Jkbms_pb(Battery):
         # HeatCurrent mA
         # self.heat_current = unpack_from("<H", status_data, 236)[0]
         # self.heat_power = 0 if self.heating != 1 else self.heat_current * self.voltage
-
 
         # show wich cells are balancing
         if self.get_min_cell() is not None and self.get_max_cell() is not None:
