@@ -310,6 +310,7 @@ class Battery(ABC):
         self.soc_calc_reset_start_time: int = None
         self.soc_calc: float = None  # save soc_calc to preserve on restart
         self.soc: float = None
+        self.soh: float = None
         self.charge_fet: bool = None
         self.discharge_fet: bool = None
         self.balance_fet: bool = None
@@ -950,6 +951,7 @@ class Battery(ABC):
                     + (f" • penalty_sum: {safe_number_format(penalty_sum, '{:.3f}')} V" if utils.CVL_CONTROLLER_MODE == 1 else "")
                     + "\n"
                     + f"soc: {self.soc}% • soc_calc: {self.soc_calc}%\n"
+                    + f"soh: {self.soh}%\n"
                     + f"current: {safe_number_format(self.current, '{:.2f}')}A"
                     + (f" • current_calc: {safe_number_format(self.current_calc, '{:.2f}')} A\n" if self.current_calc is not None else "\n")
                     + f"current_time: {current_time}\n"
@@ -2137,7 +2139,7 @@ class Battery(ABC):
         logger.info(f"Battery {self.type} connected to dbus from {self.port}")
         logger.info("========== Settings ==========")
         logger.info(
-            f"> Connection voltage: {self.voltage} V | Current: {self.current_calc} A | SoC: {self.soc}%"
+                f"> Connection voltage: {self.voltage} V | Current: {self.current_calc} A | SoC: {self.soc}% | SoH: {self.soh}%"
             + (f" | SoC calc: {self.soc_calc:.0f}%" if utils.SOC_CALCULATION else "")
         )
         logger.info(f"> Cell count: {self.cell_count} | Cells populated: {cell_counter}")
