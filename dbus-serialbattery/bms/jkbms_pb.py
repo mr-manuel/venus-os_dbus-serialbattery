@@ -16,9 +16,9 @@ class Jkbms_pb(Battery):
         self.unique_identifier_tmp = ""
         self.cell_count = 0
         self.address = address
-        self.command_status = b"\x10\x16\x20\x00\x01\x02\x00\x00"
-        self.command_settings = b"\x10\x16\x1e\x00\x01\x02\x00\x00"
-        self.command_about = b"\x10\x16\x1c\x00\x01\x02\x00\x00"
+        self.command_status     = b"\x10\x16\x20\x00\x01\x02\x00\x00"
+        self.command_settings   = b"\x10\x16\x1e\x00\x01\x02\x00\x00"
+        self.command_about      = b"\x10\x16\x1c\x00\x01\x02\x00\x00"
         self.history.exclude_values_to_calculate = ["charge_cycles"]
 
     BATTERYTYPE = "JKBMS PB Model"
@@ -94,9 +94,35 @@ class Jkbms_pb(Battery):
         CapBatCell = unpack_from("<i", status_data, 130)[0] / 1000
         SCPDelay = unpack_from("<i", status_data, 134)[0]
         StartBalVol = unpack_from("<i", status_data, 138)[0] / 1000  # Start Balance Voltage
+        DevAddr = unpack_from("<i", status_data, 270)[0]             # Device Addr
+        TIMPDischarge = unpack_from("<i", status_data, 274)[0]
+
+        CtrlBitMask = unpack_from("<H", status_data, 282)[0]    # Controls
+        #Bit0: Heating enabled
+        HeatEN=0x01 & CtrlBitMask
+        #Bit1: Disable Temp.-Sensor
+        DisTempSens=0x01 & (CtrlBitMask>>1)
+        #Bit2: GPS Heartbeat
+        GPSHeartbeat=0x01 & (CtrlBitMask>>2)
+        #Bit3: Port Switch 1:RS485 0: CAN
+        PortSwitch=0x01 & (CtrlBitMask>>3)
+        #Bit4: LCD Always ON
+        LCDAlwaysOn=0x1 & (CtrlBitMask>>4)
+        #Bit5: Special Charger
+        SpecialCharger=0x1 & (CtrlBitMask>>5)
+        #Bit6: Smart Sleep
+        SmartSleep=0x1 & (CtrlBitMask>>6)
+
+
+        TMPBatOTA = unpack_from("<h", status_data, 284)[0]    # int 8
+        TMPBatOTAR = unpack_from("<h", status_data, 285)[0]    # int 8
+        TIMSmartSleep = unpack_from("<h", status_data, 286)[0]    # uint 8
 
         # balancer enabled
         self.balance_fet = True if BalanEN != 0 else False
+
+        # heating enabled
+        # self.control_allow_heating = True if HeatEN != 0 else False
 
         # count of all cells in pack
         self.cell_count = CellCount
@@ -144,21 +170,55 @@ class Jkbms_pb(Battery):
         logger.debug("CapBatCell: " + str(CapBatCell))
         logger.debug("SCPDelay: " + str(SCPDelay))
         logger.debug("StartBalVol: " + str(StartBalVol))
+        logger.debug("DevAddr: " + str(DevAddr))
+        logger.debug("TIMPDischarge: " + str(TIMPDischarge))
+        logger.debug("CtrlBitMask: " + str(CtrlBitMask))
+        logger.debug("HeatEN: " + str(HeatEN))
+        logger.debug("DisTempSens: " + str(DisTempSens))
+        logger.debug("GPSHeartbeat: " + str(GPSHeartbeat))
+        logger.debug("PortSwitch: " + str(PortSwitch))
+        logger.debug("LCDAlwaysOn: " + str(LCDAlwaysOn))
+        logger.debug("SpecialCharger: " + str(SpecialCharger))
+        logger.debug("SmartSleep: " + str(SmartSleep))
+        logger.debug("TMPBatOTA: " + str(TMPBatOTA))
+        logger.debug("TMPBatOTAR: " + str(TMPBatOTAR))
+        logger.debug("TIMSmartSleep: " + str(TIMSmartSleep))
 
         status_data = self.read_serial_data_jkbms_pb(self.command_about, 300)
-        serial_nr = status_data[86:101].decode("utf-8")
-        vendor_id = status_data[6:18].decode("utf-8")
-        hw_version = (status_data[22:26].decode("utf-8") + " / " + status_data[30:35].decode("utf-8")).replace("\x00", "")
-        sw_version = status_data[30:34].decode("utf-8")  # will be overridden
+        #vendor_version start  0: 16 chars
+        #hw_version     start 16:  8 chars
+        #sw_version     start 24:  8 chars
+        #oddruntim      start 32:  1 UINT32
+        #pwr_on_time    start 36:  1 UINT32
+
+        vendor_id = status_data[6:21].decode("utf-8").split('\x00',1)[0]    # 16 chars
+        hw_version = status_data[22:29].decode("utf-8").split('\x00',1)[0]  #  8 chars
+        sw_version = status_data[30:37].decode("utf-8").split('\x00',1)[0]  #  8 chars
+        bms_version = (hw_version + " / " + sw_version)
+
+        ODDRunTime = unpack_from("<I", status_data, 38)[0] # 1 unit32 # runtime of the system in seconds
+        PWROnTimes = unpack_from("<I", status_data, 42)[0] # 1 unit32 # how many startups the system has done
+        serial_nr = status_data[46:61].decode("utf-8").split('\x00',1)[0]  #serialnumber 16 chars max
+        usrData = status_data[102:117].decode("utf-8").split('\x00',1)[0]  #usrData 16 chars max
+        pin = status_data[118:133].decode("utf-8").split('\x00',1)[0]      #pin 16 chars max
+        usrData2 = status_data[134:149].decode("utf-8").split('\x00',1)[0] #usrData 2 16 chars max
+        ble_id = (serial_nr + "-" + str(DevAddr))
 
         self.unique_identifier_tmp = serial_nr
         self.version = sw_version
-        self.hardware_version = hw_version
+        self.hardware_version = bms_version
 
         logger.debug("Serial Nr: " + str(serial_nr))
+        logger.debug("Ble Id: " + str(ble_id))
         logger.debug("Vendor ID: " + str(vendor_id))
         logger.debug("HW Version: " + str(hw_version))
         logger.debug("SW Version: " + str(sw_version))
+        logger.debug("BMS Version: " + str(bms_version))
+        logger.debug("User data: " + str(usrData))
+        logger.debug("User data 2: " + str(usrData2))
+        logger.debug("pin: " + str(pin))
+        logger.debug("PWROnTimes: " + str(PWROnTimes))
+        logger.debug("ODDRunTime: " + str(ODDRunTime) +"s; " + str(ODDRunTime/60) +"m; " +str(ODDRunTime/60/60) + "h; "+str(ODDRunTime/60/60/24) + "d")
 
         # init the cell array
         for _ in range(self.cell_count):
@@ -215,6 +275,9 @@ class Jkbms_pb(Battery):
         # SOC
         self.soc = unpack_from("<B", status_data, 173)[0]
 
+        # SOH
+        self.soh = unpack_from("<B", status_data, 190)[0]
+
         # cycles
         self.history.charge_cycles = unpack_from("<i", status_data, 182)[0]
 
@@ -228,9 +291,17 @@ class Jkbms_pb(Battery):
         bal = unpack_from("<B", status_data, 172)[0]
         charge = unpack_from("<B", status_data, 198)[0]
         discharge = unpack_from("<B", status_data, 199)[0]
+        heat = unpack_from("<B", status_data, 215)[0]
+
         self.charge_fet = 1 if charge != 0 else 0
         self.discharge_fet = 1 if discharge != 0 else 0
         self.balancing = 1 if bal != 0 else 0
+        #self.heating = 1 if heat != 0 else 0
+
+        # HeatCurrent mA
+        #self.heat_current = unpack_from("<H", status_data, 236)[0]
+        #self.heat_power = 0 if self.heating != 1 else self.heat_current * self.voltage
+
 
         # show wich cells are balancing
         if self.get_min_cell() is not None and self.get_max_cell() is not None:
