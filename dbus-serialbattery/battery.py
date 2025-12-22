@@ -446,14 +446,14 @@ class Battery(ABC):
         swapped or lost, if the port changes.
         See https://github.com/Louisvdw/dbus-serialbattery/issues/1035
 
+        If `USE_PORT_AS_UNIQUE_ID` is set to True in the config.ini file, the port will be used as the unique
+        identifier instead. This is done in the dbushelper.py file where setting `self.bms_id`.
+
         :return: the unique identifier
         """
-        if utils.USE_PORT_AS_UNIQUE_ID:
-            return self.port + ("__" + utils.bytearray_to_string(self.address).replace("\\", "0") if self.address is not None else "")
-        else:
-            string = "".join(filter(str.isalnum, str(self.hardware_version))) + "_" if self.hardware_version is not None and self.hardware_version != "" else ""
-            string += str(self.capacity) + "Ah"
-            return string
+        string = "".join(filter(str.isalnum, str(self.hardware_version))) + "_" if self.hardware_version is not None and self.hardware_version != "" else ""
+        string += str(self.capacity) + "Ah"
+        return string
 
     def connection_name(self) -> str:
         """

@@ -170,9 +170,6 @@ class BatteryTemplate(Battery):
         # state of charge in percent (float)
         self.soc = VALUE_FROM_BMS
 
-        # state of health in percent (float)
-        self.soh = VALUE_FROM_BMS
-
         # temperature sensor 1 in °C (float)
         temperature_1 = VALUE_FROM_BMS
         self.to_temperature(1, temperature_1)
@@ -189,6 +186,9 @@ class BatteryTemplate(Battery):
         # remaining capacity of the battery in ampere hours (float)
         # if not available, then it's calculated from the SOC and the capacity
         self.capacity_remain = VALUE_FROM_BMS
+
+        # state of health in percent (float)
+        self.soh = VALUE_FROM_BMS
 
         # temperature sensor 2 in °C (float)
         temperature_2 = VALUE_FROM_BMS

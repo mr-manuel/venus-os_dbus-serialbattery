@@ -52,10 +52,14 @@ class DbusHelper:
             + ("__" + str(bms_address) if bms_address is not None and bms_address != 0 else "")
         )
         self._dbusservice = VeDbusService(self._dbusname, get_bus(), register=False)
-        self.bms_id = "".join(
-            # remove all non alphanumeric characters except underscore from the identifier
-            c if c.isalnum() else "_"
-            for c in self.battery.unique_identifier()
+        self.bms_id = (
+            "".join(
+                # remove all non alphanumeric characters except underscore from the identifier
+                c if c.isalnum() else "_"
+                for c in self.battery.unique_identifier()
+            )
+            if not utils.USE_PORT_AS_UNIQUE_ID
+            else self.battery.port + ("__" + utils.bytearray_to_string(self.battery.address).replace("\\", "0") if self.battery.address is not None else "")
         )
         self.path_battery = None
         self.save_charge_details_last = {
@@ -98,12 +102,10 @@ class DbusHelper:
 
         # fail, if the file is already locked
         except OSError:
-            logger.error(
-                "** DRIVER STOPPED! Another battery with the same serial number/unique identifier " + f'"{self.battery.unique_identifier()}" found! **'
-            )
+            logger.error("** DRIVER STOPPED! Another battery with the same serial number/unique identifier " + f'"{self.bms_id}" found! **')
             logger.error("Please check that the batteries have unique identifiers.")
 
-            if "Ah" in self.battery.unique_identifier():
+            if "Ah" in self.bms_id:
                 logger.error("Change the battery capacities to be unique.")
                 logger.error("Example for batteries with 280 Ah:")
                 logger.error("- Battery 1: 279 Ah")
