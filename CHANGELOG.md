@@ -20,6 +20,7 @@
 * Changed: JK Inverter BMS - Fixed serial number lenght by @mr-manuel
 * Changed: JKBMS CAN - Correct calculation of arbitration_id for device_address > 0. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/288 with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/306 by @Hooorny
 * Changed: KS48100 - Fixed charge/discharge calculation with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/343 by @kopierschnitte
+* Changed: Use port and address as unique identifier is now available for all serial BMS by @mr-manuel
 
 ## v2.0.20250729
 
@@ -66,6 +67,7 @@
   * Changes to `config.default.ini`: `TEMP_4_NAME` was replaced by `TEMPERATURE_4_NAME`
 
 ### What's Changed
+
 * Added: BLE - Config settings do enable/disable `BLUETOOTH_USE_POLLING` and `BLUETOOTH_FORCE_RESET_BLE_STACK` by @mr-manuel
 * Added: BLE - Error message if BLE `BMS_TYPE` was misspelled by @mr-manuel
 * Added: BLE - Error message if BLE address is missing by @mr-manuel

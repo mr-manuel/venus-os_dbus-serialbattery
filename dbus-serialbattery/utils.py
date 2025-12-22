@@ -14,7 +14,7 @@ import serial
 
 
 # CONSTANTS
-DRIVER_VERSION: str = "2.1.20251209dev"
+DRIVER_VERSION: str = "2.1.20251222dev"
 """
 current version of the driver
 """
@@ -686,8 +686,8 @@ def get_connection_error_message(battery_online: bool, suffix: str = None) -> No
     It returns True if the connection is successful, otherwise False.
     It also handles the error logging if the connection is lost.
 
-    :battery_online: Boolean indicating if the battery is online
-    :suffix: Optional suffix to add to the error message
+    :parambattery_online: Boolean indicating if the battery is online
+    :param suffix: Optional suffix to add to the error message
     :return: True if the connection is successful, otherwise False
     """
     if battery_online is None:
@@ -697,6 +697,17 @@ def get_connection_error_message(battery_online: bool, suffix: str = None) -> No
     if battery_online:
         logger.error(">>> No response from battery. Connection lost or battery not recognized. Check cabeling!" + (" " + suffix if suffix else ""))
         return
+
+
+def generate_unique_identifier(port: str, address) -> str:
+    """
+    Generate a unique identifier for the battery based on the port and address.
+
+    :param port: Serial port
+    :param address: Battery address
+    :return: Unique identifier
+    """
+    return str(port).replace("/dev/", "") + "__" + (bytearray_to_string(address).replace("\\", "0") if address is not None else "0x01")
 
 
 def open_serial_port(port: str, baud: int) -> Union[serial.Serial, None]:

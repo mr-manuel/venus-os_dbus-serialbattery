@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from battery import Battery, Cell
-from utils import bytearray_to_string, read_serial_data, unpack_from, logger
+from utils import read_serial_data, unpack_from, generate_unique_identifier, logger
 from struct import unpack
 import struct
 import sys
@@ -46,7 +46,7 @@ class Renogy(Battery):
         if self.serial_number is not None:
             return self.serial_number
         else:
-            return self.port + ("__" + bytearray_to_string(self.address).replace("\\", "0") if self.address is not None else "")
+            return generate_unique_identifier(self.port, self.address)
 
     def test_connection(self):
         """

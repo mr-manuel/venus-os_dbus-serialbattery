@@ -441,19 +441,20 @@ class Battery(ABC):
         By slightly changing the capacity of each battery, this can make every battery unique.
         On +/- 5 Ah you can identify 11 different batteries.
 
-        For some BMS it's not possible to change the capacity or other values. In this case the port has
-        to be used as `unique_identifier`. Custom values for this battery like the custom name, will be
-        swapped or lost, if the port changes.
-        See https://github.com/Louisvdw/dbus-serialbattery/issues/1035
+        For some BMS models, you cannot change the battery’s capacity or other values. In these cases, the
+        port name has to be used as the unique identifier. If the port changes, custom settings like the battery’s
+        name may be lost or swapped.
+
+        If you set `USE_PORT_AS_UNIQUE_ID = True` in your config.ini, the port will always be used as the unique
+        identifier. This is handled in dbushelper.py when setting self.bms_id.
+
+        See: https://github.com/Louisvdw/dbus-serialbattery/issues/1035
 
         :return: the unique identifier
         """
-        if utils.USE_PORT_AS_UNIQUE_ID:
-            return self.port + ("__" + utils.bytearray_to_string(self.address).replace("\\", "0") if self.address is not None else "")
-        else:
-            string = "".join(filter(str.isalnum, str(self.hardware_version))) + "_" if self.hardware_version is not None and self.hardware_version != "" else ""
-            string += str(self.capacity) + "Ah"
-            return string
+        string = ("".join(filter(str.isalnum, str(self.hardware_version))) + "_") if self.hardware_version is not None and self.hardware_version != "" else ""
+        string += str(self.capacity) + "Ah"
+        return string
 
     def connection_name(self) -> str:
         """
@@ -2168,6 +2169,8 @@ class Battery(ABC):
         logger.info(f"> CCCM SOC:   {str(utils.CCCM_SOC_ENABLE).ljust(5)} | DCCM SOC:      {utils.DCCM_SOC_ENABLE}")
         logger.info(f"> CHARGE FET: {str(self.charge_fet).ljust(5)} | DISCHARGE FET: {self.discharge_fet} | BALANCE FET: {self.balance_fet}")
         logger.info(f"Serial Number/Unique Identifier: {self.unique_identifier()}")
+        if utils.USE_PORT_AS_UNIQUE_ID:
+            logger.info(f"Serial number/Unique identifier (USE_PORT_AS_UNIQUE_ID): {utils.generate_unique_identifier(self.port, self.address)}")
 
         return
 
