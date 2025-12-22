@@ -120,7 +120,8 @@ class Jkbms_Ble(Battery):
         tmp = self.jk.get_status()["device_info"]["manufacturing_date"]
         self.production = "20" + tmp if tmp and tmp != "" else None
 
-        self.unique_identifier_tmp = self.jk.get_status()["device_info"]["serial_number"]
+        # ATTENTION: is sometimes trucated
+        # self.serial_number = self.jk.get_status()["device_info"]["serial_number"]
 
         for c in range(self.cell_count):
             self.cells.append(Cell(False))
@@ -142,7 +143,7 @@ class Jkbms_Ble(Battery):
         """
         Used to identify a BMS when multiple BMS are connected
         """
-        return self.unique_identifier_tmp
+        return self.address.replace(":", "").lower()
 
     def use_callback(self, callback: Callable) -> bool:
         if BLUETOOTH_USE_POLLING:

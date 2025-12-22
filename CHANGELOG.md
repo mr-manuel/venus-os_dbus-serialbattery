@@ -11,7 +11,13 @@
 
 ## v2.1.x
 
+### Breaking Changes
+
+* Driver version greater or equal to `v2.1.20251222dev`
+  * The unique identifier for all Bluetooth BMS devices is now the BLE MAC address. Because of this change, your battery will appear as a new device after the update. Custom names and calculated data will be lost once during the upgrade.
+
 ### What's Changed
+
 * Added: Daren 485 - Read SoH with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/344 by @kopierschnitte
 * Added: KS48100 - Read SoH with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/344 by @kopierschnitte
 * Added: Venus OS 3.7x GUIv2 support by @mr-manuel
@@ -20,6 +26,7 @@
 * Changed: JK Inverter BMS - Fixed serial number lenght by @mr-manuel
 * Changed: JKBMS CAN - Correct calculation of arbitration_id for device_address > 0. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/288 with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/306 by @Hooorny
 * Changed: KS48100 - Fixed charge/discharge calculation with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/343 by @kopierschnitte
+* Changed: Use Bluetooth MAC address as unique identifier for all Bluetooth BMS by @mr-manuel
 * Changed: Use port and address as unique identifier is now available for all serial BMS by @mr-manuel
 
 ## v2.0.20250729

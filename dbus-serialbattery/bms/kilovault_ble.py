@@ -233,7 +233,7 @@ class Kilovault_Ble(Battery):
         """
         Serial number reported by the battery is bogus, so we just use the battery name
         """
-        return self.custom_name()
+        return self.address.replace(":", "").lower()
 
     def get_settings(self):
         return True
