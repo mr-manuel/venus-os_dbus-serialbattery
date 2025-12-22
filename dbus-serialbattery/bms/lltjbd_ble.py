@@ -183,8 +183,7 @@ class LltJbd_Ble(LltJbd):
         since it can be changed by small amounts to make a battery unique.
         On +/- 5 Ah you can identify 11 batteries
         """
-        string = self.address.replace(":", "").lower()
-        return string
+        return self.address.replace(":", "").lower()
 
     async def send_command(self, command) -> Union[bytearray, bool]:
         if not self.bt_client:

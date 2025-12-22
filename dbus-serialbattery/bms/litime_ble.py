@@ -41,7 +41,7 @@ class LiTime_Ble(Battery):
             return False
 
     def unique_identifier(self) -> str:
-        return self.address
+        return self.address.replace(":", "").lower()
 
     def connection_name(self) -> str:
         return "BLE " + self.address
