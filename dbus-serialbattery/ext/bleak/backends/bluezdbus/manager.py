@@ -19,10 +19,11 @@ import logging
 import os
 from collections import defaultdict
 from collections.abc import Callable, Coroutine, MutableMapping
+from functools import partial
 from typing import Any, NamedTuple, Optional, cast
 from weakref import WeakKeyDictionary
 
-from dbus_fast import BusType, Message, MessageType, Variant, unpack_variants
+from dbus_fast import AuthError, BusType, Message, MessageType, Variant, unpack_variants
 from dbus_fast.aio.message_bus import MessageBus
 
 from bleak.args.bluez import OrPatternLike
@@ -44,7 +45,12 @@ from bleak.backends.bluezdbus.utils import (
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.descriptor import BleakGATTDescriptor
 from bleak.backends.service import BleakGATTService, BleakGATTServiceCollection
-from bleak.exc import BleakDBusError, BleakError
+from bleak.exc import (
+    BleakBluetoothNotAvailableError,
+    BleakBluetoothNotAvailableReason,
+    BleakDBusError,
+    BleakError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -154,6 +160,12 @@ _ADVERTISING_DATA_PROPERTIES = {
 }
 
 
+def get_max_write_without_response_size(char_props: GattCharacteristic1) -> int:
+    # "MTU" property was added in BlueZ 5.62, otherwise fall
+    # back to minimum MTU according to Bluetooth spec.
+    return char_props.get("MTU", 23) - 3
+
+
 class BlueZManager:
     """
     BlueZ D-Bus object manager.
@@ -169,7 +181,7 @@ class BlueZManager:
         self._properties: dict[str, dict[str, dict[str, Any]]] = {}
 
         # set of available adapters for quick lookup
-        self._adapters = set[str]()
+        self._adapters: set[str] = set()
 
         # The BlueZ APIs only maps children to parents, so we need to keep maps
         # to quickly find the children of a parent D-Bus object.
@@ -244,9 +256,18 @@ class BlueZManager:
             # dbus-next will destroy the underlying file descriptors
             # when the previous one is closed in its finalizer.
             bus = MessageBus(bus_type=BusType.SYSTEM, auth=get_dbus_authenticator())
-            await bus.connect()
 
             try:
+                # We need to call bus.disconnect() even when bus.connect() fails in
+                # order to release the file handles created in the constructor.
+                try:
+                    await bus.connect()
+                except AuthError as e:
+                    raise BleakBluetoothNotAvailableError(
+                        e.args[0],
+                        BleakBluetoothNotAvailableReason.DENIED_BY_SYSTEM,
+                    ) from e
+
                 # Add signal listeners
 
                 bus.add_message_handler(self._parse_msg)
@@ -287,7 +308,6 @@ class BlueZManager:
                         interface=defs.OBJECT_MANAGER_INTERFACE,
                     )
                 )
-                assert reply
                 assert_reply(reply)
 
                 # dictionaries are cleared in case AddInterfaces was received first
@@ -340,6 +360,11 @@ class BlueZManager:
                 bus.disconnect()
                 raise
 
+            if self._bus:
+                # Even if we are disconnected, still need to call this to
+                # release file handles.
+                self._bus.disconnect()
+
             # Everything is setup, so save the bus
             self._bus = bus
 
@@ -351,19 +376,42 @@ class BlueZManager:
             Name of the first found powered adapter on the system, i.e. "/org/bluez/hciX".
 
         Raises:
-            BleakError:
-                if there are no Bluetooth adapters or if none of the adapters are powered
+            BleakBluetoothNotAvailableError:
+                if there are no Bluetooth Low Energy adapters or if none of the adapters are powered
+
+        .. versionchanged:: 2.0
+            Now raises :class:`BleakBluetoothNotAvailableError` instead of :class:`BleakError`.
         """
         if not any(self._adapters):
-            raise BleakError("No Bluetooth adapters found.")
+            raise BleakBluetoothNotAvailableError(
+                "No Bluetooth adapters found.",
+                BleakBluetoothNotAvailableReason.NO_BLUETOOTH,
+            )
 
-        for adapter_path in self._adapters:
+        ble_central_adapters = list(
+            filter(
+                lambda a: "central"
+                in self._properties[a][defs.ADAPTER_INTERFACE]["Roles"],
+                self._adapters,
+            )
+        )
+
+        if not ble_central_adapters:
+            raise BleakBluetoothNotAvailableError(
+                "No Bluetooth adapters with BLE 'central' role found.",
+                BleakBluetoothNotAvailableReason.NO_BLE_CENTRAL_ROLE,
+            )
+
+        for adapter_path in ble_central_adapters:
             if cast(
                 defs.Adapter1, self._properties[adapter_path][defs.ADAPTER_INTERFACE]
             )["Powered"]:
                 return adapter_path
 
-        raise BleakError("No powered Bluetooth adapters found.")
+        raise BleakBluetoothNotAvailableError(
+            "No powered Bluetooth adapters found. Turn on Bluetooth and try again.",
+            BleakBluetoothNotAvailableReason.POWERED_OFF,
+        )
 
     async def active_scan(
         self,
@@ -416,7 +464,6 @@ class BlueZManager:
                         body=[filters],
                     )
                 )
-                assert reply
                 assert_reply(reply)
 
                 # Start scanning
@@ -428,7 +475,6 @@ class BlueZManager:
                         member="StartDiscovery",
                     )
                 )
-                assert reply
                 assert_reply(reply)
 
                 async def stop() -> None:
@@ -453,7 +499,6 @@ class BlueZManager:
                                 member="StopDiscovery",
                             )
                         )
-                        assert reply
 
                         try:
                             assert_reply(reply)
@@ -472,7 +517,6 @@ class BlueZManager:
                                     body=[{}],
                                 )
                             )
-                            assert reply
                             assert_reply(reply)
 
                 return stop
@@ -540,7 +584,6 @@ class BlueZManager:
                         body=[monitor_path],
                     )
                 )
-                assert reply
 
                 if (
                     reply.message_type == MessageType.ERROR
@@ -582,7 +625,6 @@ class BlueZManager:
                                 body=[monitor_path],
                             )
                         )
-                        assert reply
                         assert_reply(reply)
 
                 return stop
@@ -709,9 +751,11 @@ class BlueZManager:
                     extract_service_handle_from_path(char_path),
                     char_props["UUID"],
                     char_props["Flags"],
-                    # "MTU" property was added in BlueZ 5.62, otherwise fall
-                    # back to minimum MTU according to Bluetooth spec.
-                    lambda: char_props.get("MTU", 23) - 3,
+                    # Because `char_props` is a loop varialbe, we cannot
+                    # directly bind a closure (i.e. lambda) to it;
+                    # instead, we let `functools.partial` create a new
+                    # function frame to close over at each iteration.
+                    partial(get_max_write_without_response_size, char_props),
                     service,
                 )
 
