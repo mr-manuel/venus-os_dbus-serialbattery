@@ -1,0 +1,25 @@
+{
+    "cell_count": 4,
+    "capacity": 100,
+    "serial_number": "SN12345678",
+    "voltage": 13.2,
+    "current": 5.2,
+    "soc": 45.87,
+    "temperature_1": 25.5,
+    "charge_fet": true,
+    "discharge_fet": true,
+    "cells": [
+        {
+            "voltage": 3.3
+        },
+        {
+            "voltage": 3.31
+        },
+        {
+            "voltage": 3.29
+        },
+        {
+            "voltage": 3.3
+        }
+    ]
+}

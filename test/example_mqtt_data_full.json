@@ -1,0 +1,79 @@
+{
+    "balance_fet": false,
+    "capacity_remain": 80,
+    "capacity": 100,
+    "cell_count": 4,
+    "charge_fet": true,
+    "current": 5.2,
+    "custom_field": "Example custom value",
+    "discharge_fet": true,
+    "hardware_version": "v1.2",
+    "max_battery_charge_current": 50,
+    "max_battery_discharge_current": 60,
+    "max_battery_voltage_bms": 14.6,
+    "min_battery_voltage_bms": 10,
+    "production": "2025-12-25",
+    "serial_number": "SN12345678",
+    "soc": 45.87,
+    "soh": 98.5,
+    "temperature_1": 25.5,
+    "temperature_2": 25.6,
+    "temperature_3": 25.7,
+    "temperature_4": 25.8,
+    "temperature_mos": 30,
+    "voltage": 13.2,
+    "cells": [
+        {
+            "voltage": 3.3,
+            "balance": false
+        },
+        {
+            "voltage": 3.31,
+            "balance": true
+        },
+        {
+            "voltage": 3.29,
+            "balance": false
+        },
+        {
+            "voltage": 3.3,
+            "balance": false
+        }
+    ],
+    "history": {
+        "deepest_discharge": -80.0,
+        "last_discharge": -40.0,
+        "average_discharge": -50.0,
+        "total_ah_drawn": -1200.0,
+        "charge_cycles": 120,
+        "timestamp_last_full_charge": 1766774400,
+        "full_discharges": 5,
+        "minimum_voltage": 10.5,
+        "maximum_voltage": 14.7,
+        "minimum_cell_voltage": 2.5,
+        "maximum_cell_voltage": 3.7,
+        "low_voltage_alarms": 2,
+        "high_voltage_alarms": 1,
+        "minimum_temperature": 15.0,
+        "maximum_temperature": 38.5,
+        "discharged_energy": 350,
+        "charged_energy": 360
+    },
+    "protection": {
+        "high_voltage": 0,
+        "high_cell_voltage": 0,
+        "low_voltage": 0,
+        "low_cell_voltage": 0,
+        "low_soc": 0,
+        "high_charge_current": 0,
+        "high_discharge_current": 0,
+        "cell_imbalance": 0,
+        "internal_failure": 0,
+        "high_charge_temperature": 0,
+        "low_charge_temperature": 0,
+        "high_temperature": 0,
+        "low_temperature": 0,
+        "high_internal_temperature": 0,
+        "fuse_blown": 0
+    }
+}

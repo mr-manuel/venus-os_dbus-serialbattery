@@ -334,7 +334,7 @@ can_lenght=${#can_array[@]}
 
 # stop all dbus-canbattery services, if at least one exists
 if ls /service/dbus-canbattery.* 1> /dev/null 2>&1; then
-    echo "Stop all dbus-serialbattery services..."
+    echo "Stop all dbus-canbattery services..."
     for service in /service/dbus-canbattery.*; do
         [ -e "$service" ] && svc -d "$service"
     done
@@ -425,6 +425,110 @@ fi
 
 
 
+### MQTT PART | START ###
+
+# get MQTT topic(s) from config file
+mqtt_topic=$(awk -F "=" '/^MQTT_TOPIC/ {print $2}' /data/apps/dbus-serialbattery/config.ini)
+#echo $mqtt_topic
+
+# clear whitespaces
+mqtt_topic_clean="$(echo $mqtt_topic | sed 's/\s*,\s*/,/g')"
+#echo $mqtt_topic_clean
+
+# split into array
+IFS="," read -r -a mqtt_array <<< "$mqtt_topic_clean"
+#declare -p mqtt_array
+# readarray -td, mqtt_array <<< "$mqtt_topic_clean,"; unset 'mqtt_array[-1]'; declare -p mqtt_array;
+
+mqtt_lenght=${#mqtt_array[@]}
+# echo $mqtt_lenght
+
+# stop dbus-mqttbattery service
+if [ -d "/service/dbus-mqttbattery" ]; then
+    echo "Stop dbus-mqttbattery service..."
+    svc -d "/service/dbus-mqttbattery"
+
+    # always remove existing mqttbattery service to cleanup
+    rm -rf /service/dbus-mqttbattery
+
+    # kill all mqttbattery processes that remain
+    pkill -f "supervise dbus-mqttbattery.*"
+    pkill -f "multilog .* /var/log/dbus-mqttbattery.*"
+    pkill -f "python .*/dbus-serialbattery.py mqtt.*"
+fi
+
+
+if [ "$mqtt_lenght" -gt 0 ]; then
+
+    echo
+    echo "Found $mqtt_lenght MQTT topic(s) in the config file!"
+    echo
+
+    # Required packages, shipped with the driver:
+    # - opkg install python3-misc
+    # - opkg install python3-pip
+    # - pip3 install paho-mqtt
+
+    # function to install MQTT battery
+    install_mqttbattery_service() {
+        if [ -z "$1" ]; then
+            echo "ERROR: MQTT topic is empty. Aborting installation."
+            echo
+            exit 1
+        fi
+
+        echo "Installing MQTT topic \"$1\" as dbus-mqttbattery"
+
+        mkdir -p "/service/dbus-mqttbattery/log"
+        {
+            echo "#!/bin/sh"
+            echo "exec multilog t s500000 n4 /var/log/dbus-mqttbattery"
+        } > "/service/dbus-mqttbattery/log/run"
+        chmod 755 "/service/dbus-mqttbattery/log/run"
+
+        {
+            echo "#!/bin/sh"
+            echo
+            echo "# Forward signals to the child process"
+            echo "trap 'kill -TERM \$PID' TERM INT"
+            echo
+            echo "# Start the main process"
+            echo "exec 2>&1"
+            echo "python /data/apps/dbus-serialbattery/dbus-serialbattery.py mqtt \"$1\" &"
+            echo
+            echo "# Capture the PID of the child process"
+            echo "PID=\$!"
+            echo
+            echo "# Wait for the child process to exit"
+            echo "wait \$PID"
+            echo
+            echo "# Capture the exit status"
+            echo "EXIT_STATUS=\$?"
+            echo
+            echo "# Exit with the same status"
+            echo "exit \$EXIT_STATUS"
+        } > "/service/dbus-mqttbattery/run"
+        chmod 755 "/service/dbus-mqttbattery/run"
+    }
+
+    # Example
+    # install_mqttbattery_service dbus-serialbattery/battery-1
+    # install_mqttbattery_service dbus-serialbattery/battery-1,dbus-serialbattery/battery-2
+
+    install_mqttbattery_service "$mqtt_topic_clean"
+
+else
+
+    echo
+    echo "No MQTT topic configuration found in \"/data/apps/dbus-serialbattery/config.ini\"."
+    echo "You can ignore this, if you are using only a serial connection."
+    echo
+
+fi
+### MQTT PART | END ###
+
+
+
 ### needed for upgrading from older versions | start ###
 # remove old drivers before changing from dbus-blebattery-$1 to dbus-blebattery.$1
 rm -rf /service/dbus-blebattery-*
@@ -465,6 +569,15 @@ echo "    2. In the remote console/GUI, go to 'Settings -> Services -> VE.Can po
 echo "       matches your BMS."
 echo
 echo "    3. Re-run \"/data/apps/dbus-serialbattery/enable.sh\", if the CAN port was not added to the \"config.ini\" before."
+echo
+echo "MQTT battery connection: There are a few more steps to complete activation."
+echo
+echo "    1. Add your MQTT topic to the config file \"/data/apps/dbus-serialbattery/config.ini\"."
+echo "       Check the default config file \"/data/apps/dbus-serialbattery/config.default.ini\" for more informations."
+echo
+echo "    2. Make sure that your MQTT client settings in the config file are correct."
+echo
+echo "    3. Re-run \"/data/apps/dbus-serialbattery/enable.sh\", if the MQTT topic was not added to the \"config.ini\" before."
 echo
 echo "CUSTOM SETTINGS: If you want to add custom settings, then check the settings you want to change in \"/data/apps/dbus-serialbattery/config.default.ini\""
 echo "                 and add them to \"/data/apps/dbus-serialbattery/config.ini\" to persist future driver updates."
