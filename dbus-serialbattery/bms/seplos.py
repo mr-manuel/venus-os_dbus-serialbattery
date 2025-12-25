@@ -123,6 +123,30 @@ class Seplos(Battery):
 
         return result
 
+    def unique_identifier(self) -> str:
+        """
+        Used to identify a BMS when multiple BMS are connected and the port changes for whatever reason.
+
+        If not provided by the BMS/driver then the hardware version and capacity is used as fallback.
+        By slightly changing the capacity of each battery, this can make every battery unique.
+        On +/- 5 Ah you can identify 11 different batteries.
+
+        For some BMS models, you cannot change the battery’s capacity or other values. In these cases, the
+        port name has to be used as the unique identifier. If the port changes, custom settings like the battery’s
+        name may be lost or swapped.
+
+        If you set `USE_PORT_AS_UNIQUE_ID = True` in your config.ini, the port will always be used as the unique
+        identifier. This is handled in dbushelper.py when setting self.bms_id.
+
+        See: https://github.com/Louisvdw/dbus-serialbattery/issues/1035
+
+        :return: the unique identifier
+        """
+        string = ("".join(filter(str.isalnum, str(self.hardware_version))) + "_") if self.hardware_version is not None and self.hardware_version != "" else ""
+        string += ("0x" + self.address.hex().upper() + "_") if self.address is not None and self.address != b"\x00" else ""
+        string += str(self.capacity) + "Ah"
+        return string
+
     def get_settings(self):
         # After successful connection get_settings() will be called to set up the battery.
         # Set the current limits, populate cell count, etc.

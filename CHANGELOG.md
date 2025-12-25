@@ -18,15 +18,16 @@
 
 ### What's Changed
 
-* Added: Daren 485 - Read SoH with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/344 by @kopierschnitte
-* Added: KS48100 - Read SoH with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/344 by @kopierschnitte
+* Added: Daren 485 BMS - Read SoH with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/344 by @kopierschnitte
+* Added: KS48100 BMS - Read SoH with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/344 by @kopierschnitte
 * Added: Venus OS 3.7x GUIv2 support by @mr-manuel
-* Changed: Daren 485 - Fixed charge/discharge calculation with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/343 by @kopierschnitte
+* Changed: Daren 485 BMS - Fixed charge/discharge calculation with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/343 by @kopierschnitte
 * Changed: Fixed typo in activation instructions by @mr-manuel
 * Changed: GUIv2: Add cell diff to mean and improve calculations to reduce CPU load. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/360 by @mr-manuel
 * Changed: JK Inverter BMS - Fixed serial number lenght by @mr-manuel
 * Changed: JKBMS CAN - Correct calculation of arbitration_id for device_address > 0. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/288 with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/306 by @Hooorny
-* Changed: KS48100 - Fixed charge/discharge calculation with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/343 by @kopierschnitte
+* Changed: KS48100 BMS - Fixed charge/discharge calculation with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/343 by @kopierschnitte
+* Changed: Seplos BMS: Fix problems with unique identifier when daisy chained by @KoljaWindeler
 * Changed: Use Bluetooth MAC address as unique identifier for all Bluetooth BMS by @mr-manuel
 * Changed: Use port and address as unique identifier is now available for all serial BMS by @mr-manuel
 
