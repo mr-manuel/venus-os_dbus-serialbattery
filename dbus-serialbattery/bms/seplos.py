@@ -240,7 +240,10 @@ class Seplos(Battery):
         self.capacity = Seplos.int_from_2byte_hex_ascii(data, offset=110) / 100
         self.soc = Seplos.int_from_2byte_hex_ascii(data, offset=114) / 10
         self.history.charge_cycles = Seplos.int_from_2byte_hex_ascii(data, offset=122)
-        self.hardware_version = "Seplos BMS {}S".format(self.cell_count)
+        if(self.address != 0):
+            self.hardware_version = "Seplos BMS {}S 0x{}".format(self.cell_count, self.address.hex().upper())
+        else:
+            self.hardware_version = "Seplos BMS {}S".format(self.cell_count)
         logger.debug("Current = {}A , Voltage = {}V".format(self.current, self.voltage))
         logger.debug("Capacity = {}/{}Ah , SOC = {}%".format(self.capacity_remain, self.capacity, self.soc))
         logger.debug("Cycles = {}".format(self.history.charge_cycles))
