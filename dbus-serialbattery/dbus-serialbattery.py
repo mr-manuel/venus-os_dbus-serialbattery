@@ -466,8 +466,6 @@ def main():
 
     # Have a mainloop, so we can send/receive asynchronous calls to and from dbus
     DBusGMainLoop(set_as_default=True)
-    if sys.version_info.major == 2:
-        gobject.threads_init()
     mainloop = gobject.MainLoop()
 
     # Get the initial values for the battery used by setup_vedbus
