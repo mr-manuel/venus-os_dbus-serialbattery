@@ -554,6 +554,17 @@ UBMS_CAN_MODULE_SERIES: int = get_int_from_config("DEFAULT", "UBMS_CAN_MODULE_SE
 UBMS_CAN_MODULE_PARALLEL: int = get_int_from_config("DEFAULT", "UBMS_CAN_MODULE_PARALLEL")
 
 
+# --- MQTT battery instance settings
+MQTT_TOPIC: list = get_list_from_config("DEFAULT", "MQTT_TOPIC", str)
+MQTT_BROKER_ADDRESS: str = config["DEFAULT"]["MQTT_BROKER_ADDRESS"]
+MQTT_BROKER_PORT: int = get_int_from_config("DEFAULT", "MQTT_BROKER_PORT")
+MQTT_TLS_ENABLED: bool = get_bool_from_config("DEFAULT", "MQTT_TLS_ENABLED")
+MQTT_TLS_PATH_TO_CA: str = config["DEFAULT"]["MQTT_TLS_PATH_TO_CA"]
+MQTT_TLS_INSECURE: bool = get_bool_from_config("DEFAULT", "MQTT_TLS_INSECURE")
+MQTT_USERNAME: str = config["DEFAULT"]["MQTT_USERNAME"]
+MQTT_PASSWORD: str = config["DEFAULT"]["MQTT_PASSWORD"]
+
+
 # FUNCTIONS
 def constrain(val: float, min_val: float, max_val: float) -> float:
     """
