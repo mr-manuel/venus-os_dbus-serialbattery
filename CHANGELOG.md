@@ -24,6 +24,7 @@
 * Added: KS48100 BMS - Read SoH with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/344 by @kopierschnitte
 * Added: Venus OS 3.7x GUIv2 support by @mr-manuel
 * Changed: Daren 485 BMS - Fixed charge/discharge calculation with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/343 by @kopierschnitte
+* Changed: Exit behavior for excluded devices to behave like Victron services by @mr-manuel
 * Changed: Fixed typo in activation instructions by @mr-manuel
 * Changed: GUIv2: Add cell diff to mean and improve calculations to reduce CPU load. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/360 by @mr-manuel
 * Changed: JK Inverter BMS - Fixed serial number lenght by @mr-manuel

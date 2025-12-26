@@ -271,17 +271,17 @@ def main():
             if port not in EXCLUDED_DEVICES:
                 return port
             else:
-                logger.debug("Stopping dbus-serialbattery: " + str(port) + " is excluded through the config file")
-                sleep(60)
-                # Exit with error so that the serialstarter continues
-                exit_driver(None, None, 1)
+                logger.info("Stopped dbus-serialbattery: " + str(port) + " is excluded by the config file")
+                # exit so that the serialstarter continues
+                # info only: dbus-gps and vedirect exits with code 129
+                sys.exit(0)
+
         elif "MNB" in BMS_TYPE:
             # Special case for MNB-SPI
             logger.info("No Port needed")
             return "/dev/ttyUSB9"
         else:
             logger.error(">>> No port specified in the command line arguments")
-            sleep(60)
             exit_driver(None, None, 1)
 
     def check_bms_types(supported_bms_types, type) -> None:
@@ -332,7 +332,6 @@ def main():
 
         if len(sys.argv) <= 2:
             logger.error(">>> Bluetooth address is missing in the command line arguments")
-            sleep(60)
             exit_driver(None, None, 1)
         else:
             ble_address = sys.argv[2]
@@ -451,7 +450,6 @@ def main():
 
         if len(sys.argv) <= 2:
             logger.error(">>> MQTT topic is missing in the command line arguments")
-            sleep(60)
             exit_driver(None, None, 1)
         else:
             from bms.generic_mqtt import Generic_Mqtt
