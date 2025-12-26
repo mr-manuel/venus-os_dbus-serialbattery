@@ -186,6 +186,21 @@ def main():
 
         return True
 
+    def health_check_battery(loop) -> bool:
+        """
+        Health check for the battery connection.
+        Currently not implemented.
+
+        :param loop: The main event loop
+        :return: Always returns True
+        """
+        for key_address in battery:
+            logger.debug(f"Health checking battery connection for address {key_address}")
+            # requires that battery class: refresh_data() handles connection issues internally
+            helper[key_address].publish_battery(loop)
+
+        return True
+
     def get_battery(_port: str, _bus_address: hex = None, can_transport_interface: object = None) -> Union[Battery, None]:
         """
         Attempts to establish a connection to the battery and returns the battery object if successful.
@@ -521,6 +536,9 @@ def main():
     use_active_callback = battery[first_key].use_callback(lambda: poll_battery(mainloop))
     if use_active_callback:
         logger.info("Polling interval: active callback used")
+        # add a timeout to detect lost connections/callbacks (watchdog)
+        refresh_data_timeout = 5  # needs to be the same as in the battery class under refresh_data()
+        gobject.timeout_add(refresh_data_timeout * 1000, lambda: health_check_battery(mainloop))
     else:
         # set poll interval from config if provided
         if POLL_INTERVAL is not None:

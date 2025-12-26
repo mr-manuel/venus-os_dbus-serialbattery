@@ -173,6 +173,10 @@ class Generic_Mqtt(Battery):
         Return True if success, False for failure
         """
         # this is done on_message when receiving a new MQTT message
+        refresh_data_timeout = 5 + 1
+        if (int(time()) - self.battery_data_last_success) > refresh_data_timeout:
+            logger.debug("Timeout of %i seconds exceeded, since no new MQTT message was received in this time." % refresh_data_timeout)
+            return False
 
         return True
 
