@@ -31,6 +31,7 @@
 * Changed: Seplos BMS: Fix problems with unique identifier when daisy chained by @KoljaWindeler
 * Changed: Use Bluetooth MAC address as unique identifier for all Bluetooth BMS by @mr-manuel
 * Changed: Use port and address as unique identifier is now available for all serial BMS by @mr-manuel
+* Changed: Fixed discharge current limit calculations when MOSFET temperature is not available, by @dchervov
 
 ## v2.0.20250729
 
