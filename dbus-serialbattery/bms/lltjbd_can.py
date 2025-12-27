@@ -4,13 +4,10 @@
 # Victron CAN protocol support for JBD BMS.
 # This is quite similar to Pylon CAN protocol, so maybe in the future this file can be extended to support both.
 #
-# Tested with JBD UP16S015:
-# - Change CAN protocol in the BMS settings to "Victron"
-# - Depending on your BMS model, these instructions might be applicable, explaining how to chain the BMSs and set the DIP switches:
-#   https://cdn.shopify.com/s/files/1/0253/9752/6580/files/48V100AH_-24-08-21-min.pdf?v=1728522535
-# - Use Victron Type A cable to connect CAN1 port on the BMS to Cerbo (regular ethernet cable won't work!):
-#   https://www.victronenergy.com/live/battery_compatibility:can-bus_bms-cable
-# - In Cerbo settings -> Connectivity set the CAN port profile to "CAN-bus BMS LV (500 kbit/s)"
+# Note that RS-485 provides more detailed information such as individual cell voltages that's not available at all with CAN
+# protocol.
+#
+# Tested with JBD UP16S015.
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 from battery import Battery, Cell
@@ -33,8 +30,9 @@ class LltJbd_Can(Battery):
         # Storage for multi-part messages
         self.bms_model_part1 = None
         self.bms_model_part2 = None
-        self.bms_serial_part1 = None
-        self.bms_serial_part2 = None
+        self.bms_serial_number_part1 = None
+        self.bms_serial_number_part2 = None
+        self.bms_serial_number = None
 
     BATTERYTYPE = "LLT/JBD"
 
@@ -53,12 +51,12 @@ class LltJbd_Can(Battery):
     CELL_VOLTAGE_RANGE = "CELL_VOLTAGE_RANGE"
     MIN_VOLTAGE_CELL_ID = "MIN_VOLTAGE_CELL_ID"
     MAX_VOLTAGE_CELL_ID = "MAX_VOLTAGE_CELL_ID"
-    MIN_TEMP_CELL_ID = "MIN_TEMP_CELL_ID"
-    MAX_TEMP_CELL_ID = "MAX_TEMP_CELL_ID"
+    MIN_TEMP_SENSOR_ID = "MIN_TEMP_SENSOR_ID"
+    MAX_TEMP_SENSOR_ID = "MAX_TEMP_SENSOR_ID"
     ENERGY_CHARGED_DISCHARGED = "ENERGY_CHARGED_DISCHARGED"
     CAPACITY = "CAPACITY"
-    SERIAL_1 = "SERIAL_1"
-    SERIAL_2 = "SERIAL_2"
+    BMS_SERIAL_NUMBER_1 = "BMS_SERIAL_NUMBER_1"
+    BMS_SERIAL_NUMBER_2 = "BMS_SERIAL_NUMBER_2"
     PRODUCT_ID = "PRODUCT_ID"
 
     CAN_FRAMES = {
@@ -79,15 +77,16 @@ class LltJbd_Can(Battery):
         # Cells 10-15 have IDs from ID:01.0: to ID:01.0?, and cell 16 confusingly shows up as ID:01.10
         MIN_VOLTAGE_CELL_ID: [0x374],
         MAX_VOLTAGE_CELL_ID: [0x375],
-        MIN_TEMP_CELL_ID: [0x376],
-        MAX_TEMP_CELL_ID: [0x377],
+        # Temperature sensor IDs are similarly in format "ID:01.01", with the second number indicating the sensor ID from 1 to 4.
+        MIN_TEMP_SENSOR_ID: [0x376],
+        MAX_TEMP_SENSOR_ID: [0x377],
         ENERGY_CHARGED_DISCHARGED: [0x378],  # Returns all 0.
         # JBD BMS appears to take only the capacity of the master battery pack and multiply it by the number of the packs regardless of the actual capacity of
         # the other packs.
         CAPACITY: [0x379],
         # JBD BMS by default returns a dummy non-unique value in 0x380 and 0x381 frames, but it can be reprogrammed in the BMS software.
-        SERIAL_1: [0x380],
-        SERIAL_2: [0x381],
+        BMS_SERIAL_NUMBER_1: [0x380],
+        BMS_SERIAL_NUMBER_2: [0x381],
         PRODUCT_ID: [0x382],
     }
 
@@ -135,10 +134,10 @@ class LltJbd_Can(Battery):
         """
 
         # Fall back to the default unique_identifier implementation when serial number has the default dummy value.
-        if self.serial_number is None or self.serial_number == "JBD87654321":
-            return super(LltJbd_Can, self)
+        if self.bms_serial_number is None or self.bms_serial_number == "JBD87654321":
+            return super().unique_identifier()
 
-        return self.serial_number
+        return self.bms_serial_number
 
     def get_settings(self):
         """
@@ -179,10 +178,9 @@ class LltJbd_Can(Battery):
     def to_protection_bits(self, data):
         """
         Parse alarm and warning data from frame 0x35A.
-        TODO: This code is unverified!
         Source: https://www.genetrysolar.com/wp-content/uploads/wpforo/default_attachments/IPB/s3_g308908/monthly_2023_02/1016944466_can-bus_bms_protocol20210417_pdf.b32c1954d6145579b857d66191327e30 # noqa: E501
+        TODO: Verify BMS actually sets these values, in this format.
         """
-        # TODO: verify whether high_cell_voltage and low_cell_voltage are actually for cell or overall battery voltage
         high_cell_voltage = self.convert_protection_value(data, 0, 2)
         low_cell_voltage = self.convert_protection_value(data, 0, 4)
         high_temperature = self.convert_protection_value(data, 0, 6)
@@ -299,8 +297,6 @@ class LltJbd_Can(Battery):
 
                 data_check |= self.DATA_CHECK_CELL_VOLTAGES
 
-            # TODO: integrate this file with the rest of the system where needed, and change the BMS type in the config accordingly
-
             # 0x379: Capacity
             elif frame_id in self.CAN_FRAMES[self.CAPACITY]:
                 capacity_ah = unpack_from("<H", data, 0)[0]
@@ -309,14 +305,14 @@ class LltJbd_Can(Battery):
                     data_check |= self.DATA_CHECK_CAPACITY
 
             # 0x380: BMS Serial Number (Part 1)
-            elif frame_id in self.CAN_FRAMES[self.SERIAL_1]:
-                self.bms_serial_part1 = self.bytes_to_string(data)
+            elif frame_id in self.CAN_FRAMES[self.BMS_SERIAL_NUMBER_1]:
+                self.bms_serial_number_part1 = self.bytes_to_string(data)
 
             # 0x381: BMS Serial Number (Part 2)
-            elif frame_id in self.CAN_FRAMES[self.SERIAL_2]:
-                self.bms_serial_part2 = self.bytes_to_string(data)
-                if self.bms_serial_part1:
-                    self.serial = self.bms_serial_part1 + self.bms_serial_part2
+            elif frame_id in self.CAN_FRAMES[self.BMS_SERIAL_NUMBER_2]:
+                self.bms_serial_number_part2 = self.bytes_to_string(data)
+                if self.bms_serial_number_part1:
+                    self.bms_serial_number = self.bms_serial_number_part1 + self.bms_serial_number_part2
 
         # Check if we received essential data
         if data_check == 0:
