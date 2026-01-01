@@ -1301,7 +1301,7 @@ class Battery(ABC):
             # set error code, to show in the GUI that something is wrong
             self.manage_error_code(8)
 
-            logger.error("calc_max_charge_current_from_cell_voltage(): Error while executing," + " using default current instead.")
+            logger.error("calc_max_discharge_current_from_cell_voltage(): Error while executing," + " using default current instead.")
             logger.error(
                 f"get_min_cell_voltage: {self.get_min_cell_voltage()}"
                 + f" • CELL_VOLTAGES_WHILE_DISCHARGING: {utils.CELL_VOLTAGES_WHILE_DISCHARGING}"
@@ -1422,7 +1422,7 @@ class Battery(ABC):
             file = exception_traceback.tb_frame.f_code.co_filename
             line = exception_traceback.tb_lineno
             logger.error("Non blocking exception occurred: " + f"{repr(exception_object)} of type {exception_type} in {file} line #{line}")
-            return self.max_battery_charge_current
+            return self.max_battery_discharge_current
 
     def calc_max_charge_current_from_mosfet_temperature(self) -> float:
         """
@@ -1471,7 +1471,7 @@ class Battery(ABC):
         :return: The maximum discharge current
         """
         if self.temperature_mos is None:
-            return self.max_battery_charge_current
+            return self.max_battery_discharge_current
 
         try:
             if utils.CHARGE_MODE == 2:
@@ -1502,7 +1502,7 @@ class Battery(ABC):
             file = exception_traceback.tb_frame.f_code.co_filename
             line = exception_traceback.tb_lineno
             logger.error("Non blocking exception occurred: " + f"{repr(exception_object)} of type {exception_type} in {file} line #{line}")
-            return self.max_battery_charge_current
+            return self.max_battery_discharge_current
 
     def calc_max_charge_current_from_soc(self) -> float:
         """
