@@ -186,6 +186,21 @@ def main():
 
         return True
 
+    def health_check_battery(loop) -> bool:
+        """
+        Health check for the battery connection.
+        Currently not implemented.
+
+        :param loop: The main event loop
+        :return: Always returns True
+        """
+        for key_address in battery:
+            logger.debug(f"Health checking battery connection for address {key_address}")
+            # requires that battery class: refresh_data() handles connection issues internally
+            helper[key_address].publish_battery(loop)
+
+        return True
+
     def get_battery(_port: str, _bus_address: hex = None, can_transport_interface: object = None) -> Union[Battery, None]:
         """
         Attempts to establish a connection to the battery and returns the battery object if successful.
@@ -256,17 +271,17 @@ def main():
             if port not in EXCLUDED_DEVICES:
                 return port
             else:
-                logger.debug("Stopping dbus-serialbattery: " + str(port) + " is excluded through the config file")
-                sleep(60)
-                # Exit with error so that the serialstarter continues
-                exit_driver(None, None, 1)
+                logger.info("Stopped dbus-serialbattery: " + str(port) + " is excluded by the config file")
+                # exit so that the serialstarter continues
+                # info only: dbus-gps and vedirect exits with code 129
+                sys.exit(0)
+
         elif "MNB" in BMS_TYPE:
             # Special case for MNB-SPI
             logger.info("No Port needed")
             return "/dev/ttyUSB9"
         else:
             logger.error(">>> No port specified in the command line arguments")
-            sleep(60)
             exit_driver(None, None, 1)
 
     def check_bms_types(supported_bms_types, type) -> None:
@@ -317,7 +332,6 @@ def main():
 
         if len(sys.argv) <= 2:
             logger.error(">>> Bluetooth address is missing in the command line arguments")
-            sleep(60)
             exit_driver(None, None, 1)
         else:
             ble_address = sys.argv[2]
@@ -365,6 +379,7 @@ def main():
         """
         from bms.daly_can import Daly_Can
         from bms.jkbms_can import Jkbms_Can
+        from bms.lltjbd_can import LltJbd_Can
         from bms.rv_c_can import RV_C_Can
         from bms.ubms_can import Ubms_Can
 
@@ -372,6 +387,7 @@ def main():
         supported_bms_types = [
             {"bms": Daly_Can},
             {"bms": Jkbms_Can},
+            {"bms": LltJbd_Can},
             {"bms": RV_C_Can},
             {"bms": Ubms_Can},
         ]
@@ -427,6 +443,36 @@ def main():
             can_thread.setup_can(channel=port, bitrate=busspeed, force=True)
             sleep(2)
 
+    # MQTT
+    elif port == "mqtt":
+        """
+        Import MQTT class only if it's a MQTT connection; otherwise, the driver won't start due to missing Python modules.
+        This prevents issues when using the driver exclusively with a serial connection.
+        """
+
+        if len(sys.argv) <= 2:
+            logger.error(">>> MQTT topic is missing in the command line arguments")
+            exit_driver(None, None, 1)
+        else:
+            from bms.generic_mqtt import Generic_Mqtt
+
+            # TODO: Currently only one topic is supported
+            # TODO: No timeout implemented yet
+
+            mqtt_topic = sys.argv[2]
+
+            # Split mqtt topics by comma to allow multiple batteries
+            # TODO: implement multiple battery support
+            mqtt_topics = mqtt_topic.split(",")
+            logger.info("MQTT topics: " + ", ".join(mqtt_topics))
+
+            # do not remove mqtt_ prefix, since the dbus service cannot be only numbers
+            testbms = Generic_Mqtt("mqtt_0", None, mqtt_topics[0])
+
+            if testbms.test_connection():
+                logger.info("-- Connection established to " + testbms.__class__.__name__)
+                battery[0] = testbms
+
     # SERIAL
     else:
         # check if BMS_TYPE is not empty and all BMS types in the list are supported
@@ -466,8 +512,6 @@ def main():
 
     # Have a mainloop, so we can send/receive asynchronous calls to and from dbus
     DBusGMainLoop(set_as_default=True)
-    if sys.version_info.major == 2:
-        gobject.threads_init()
     mainloop = gobject.MainLoop()
 
     # Get the initial values for the battery used by setup_vedbus
@@ -489,21 +533,25 @@ def main():
     # get first key from battery dict
     first_key = list(battery.keys())[0]
 
-    # try using active callback on this battery (normally only used for Bluetooth BMS)
-    if not battery[first_key].use_callback(lambda: poll_battery(mainloop)):
-        # change poll interval if set in config
+    # check if active callback is enabled for this battery
+    # normally used only for BLE and MQTT batteries
+    use_active_callback = battery[first_key].use_callback(lambda: poll_battery(mainloop))
+    if use_active_callback:
+        logger.info("Polling interval: active callback used")
+        # add a timeout to detect lost connections/callbacks (watchdog)
+        refresh_data_timeout = 5  # needs to be the same as in the battery class under refresh_data()
+        gobject.timeout_add(refresh_data_timeout * 1000, lambda: health_check_battery(mainloop))
+    else:
+        # set poll interval from config if provided
         if POLL_INTERVAL is not None:
             battery[first_key].poll_interval = POLL_INTERVAL
 
         logger.info(f"Polling interval: {battery[first_key].poll_interval/1000:.3f} s")
-
-        # if not possible, poll the battery every poll_interval milliseconds
+        # schedule periodic polling
         gobject.timeout_add(
             battery[first_key].poll_interval,
             lambda: poll_battery(mainloop),
         )
-    else:
-        logger.info("Polling interval: active callback used")
 
     # print log at this point, else not all data is correctly populated
     for key_address in battery:

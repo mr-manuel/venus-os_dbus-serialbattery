@@ -13,14 +13,15 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 from battery import Battery, Cell
-from utils import bytearray_to_string, logger
 from utils import (
+    generate_unique_identifier,
     MAX_BATTERY_CHARGE_CURRENT,
     MAX_BATTERY_DISCHARGE_CURRENT,
     MAX_CELL_VOLTAGE,
     MIN_CELL_VOLTAGE,
     UBMS_CAN_MODULE_SERIES,
     UBMS_CAN_MODULE_PARALLEL,
+    logger,
 )
 from time import time
 import sys
@@ -97,7 +98,7 @@ class Ubms_Can(Battery):
         e.g. the serial number
         If there is no such value, please remove this function
         """
-        return self.port + ("__" + bytearray_to_string(self.address).replace("\\", "0") if self.address is not None else "")
+        return generate_unique_identifier(self.port, self.address)
 
     def test_connection(self):
         """

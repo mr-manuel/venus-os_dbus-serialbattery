@@ -5,7 +5,7 @@ import platform
 import dbus
 import traceback
 from time import sleep, time
-from utils import get_venus_os_version, get_venus_os_device_type, logger, publish_config_variables
+from utils import logger
 import utils
 from xml.etree import ElementTree
 import requests
@@ -52,11 +52,16 @@ class DbusHelper:
             + ("__" + str(bms_address) if bms_address is not None and bms_address != 0 else "")
         )
         self._dbusservice = VeDbusService(self._dbusname, get_bus(), register=False)
-        self.bms_id = "".join(
-            # remove all non alphanumeric characters except underscore from the identifier
-            c if c.isalnum() else "_"
-            for c in self.battery.unique_identifier()
+        self.bms_id = (
+            "".join(
+                # remove all non alphanumeric characters except underscore from the identifier
+                c if c.isalnum() else "_"
+                for c in self.battery.unique_identifier()
+            )
+            if not utils.USE_PORT_AS_UNIQUE_ID
+            else utils.generate_unique_identifier(self.battery.port, self.battery.address)
         )
+
         self.path_battery = None
         self.save_charge_details_last = {
             "allow_max_voltage": self.battery.allow_max_voltage,
@@ -98,12 +103,10 @@ class DbusHelper:
 
         # fail, if the file is already locked
         except OSError:
-            logger.error(
-                "** DRIVER STOPPED! Another battery with the same serial number/unique identifier " + f'"{self.battery.unique_identifier()}" found! **'
-            )
+            logger.error("** DRIVER STOPPED! Another battery with the same serial number/unique identifier " + f'"{self.bms_id}" found! **')
             logger.error("Please check that the batteries have unique identifiers.")
 
-            if "Ah" in self.battery.unique_identifier():
+            if "Ah" in self.bms_id:
                 logger.error("Change the battery capacities to be unique.")
                 logger.error("Example for batteries with 280 Ah:")
                 logger.error("- Battery 1: 279 Ah")
@@ -754,7 +757,7 @@ class DbusHelper:
 
         logger.debug(f"Publish config values: {utils.PUBLISH_CONFIG_VALUES}")
         if utils.PUBLISH_CONFIG_VALUES:
-            publish_config_variables(self._dbusservice)
+            utils.publish_config_variables(self._dbusservice)
 
         self._dbusservice.add_path("/Settings/HasTemperature", 1, writeable=True)
 
@@ -1559,8 +1562,8 @@ class DbusHelper:
         # assemble the data to be uploaded
         data = {
             "vrm_id": get_vrm_portal_id(),
-            "venus_os_version": get_venus_os_version(),
-            "gx_device_type": get_venus_os_device_type(),
+            "venus_os_version": utils.get_venus_os_version(),
+            "gx_device_type": utils.get_venus_os_device_type(),
             "driver_version": utils.DRIVER_VERSION,
             "device_instance": self.instance,
             "bms_type": self.battery.type,

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from dbus.mainloop.glib import DBusGMainLoop
-from gi.repository import GObject as gobject
+from gi.repository import GLib
 import dbus
 import dbus.service
 from pprint import pprint
@@ -62,7 +62,7 @@ def printall():
 
 	print(chr(27) + "[2J" + chr(27) + "[;H")
 
-	row_format = "{:<60} {:>4}  {:>4}%  {:>4.2f} / s"
+	row_format = "{:<60} {:>4}   {:>5.1f} %  {:>6.2f} / s"
 
 	print(row_format.format("Total", total, 100, total / t_elapsed))
 
@@ -84,9 +84,9 @@ def main():
 
 	d = DbusTracker()
 
-	gobject.timeout_add(2000, printall)
+	GLib.timeout_add(2000, printall)
 
-	mainloop = gobject.MainLoop()
+	mainloop = GLib.MainLoop()
 	mainloop.run()
 
 

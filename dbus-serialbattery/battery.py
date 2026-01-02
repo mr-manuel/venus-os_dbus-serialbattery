@@ -447,19 +447,20 @@ class Battery(ABC):
         By slightly changing the capacity of each battery, this can make every battery unique.
         On +/- 5 Ah you can identify 11 different batteries.
 
-        For some BMS it's not possible to change the capacity or other values. In this case the port has
-        to be used as `unique_identifier`. Custom values for this battery like the custom name, will be
-        swapped or lost, if the port changes.
-        See https://github.com/Louisvdw/dbus-serialbattery/issues/1035
+        For some BMS models, you cannot change the battery’s capacity or other values. In these cases, the
+        port name has to be used as the unique identifier. If the port changes, custom settings like the battery’s
+        name may be lost or swapped.
+
+        If you set `USE_PORT_AS_UNIQUE_ID = True` in your config.ini, the port will always be used as the unique
+        identifier. This is handled in dbushelper.py when setting self.bms_id.
+
+        See: https://github.com/Louisvdw/dbus-serialbattery/issues/1035
 
         :return: the unique identifier
         """
-        if utils.USE_PORT_AS_UNIQUE_ID:
-            return self.port + ("__" + utils.bytearray_to_string(self.address).replace("\\", "0") if self.address is not None else "")
-        else:
-            string = "".join(filter(str.isalnum, str(self.hardware_version))) + "_" if self.hardware_version is not None and self.hardware_version != "" else ""
-            string += str(self.capacity) + "Ah"
-            return string
+        string = ("".join(filter(str.isalnum, str(self.hardware_version))) + "_") if self.hardware_version is not None and self.hardware_version != "" else ""
+        string += str(self.capacity) + "Ah"
+        return string
 
     def connection_name(self) -> str:
         """
@@ -1322,7 +1323,7 @@ class Battery(ABC):
             # set error code, to show in the GUI that something is wrong
             self.manage_error_code(8)
 
-            logger.error("calc_max_charge_current_from_cell_voltage(): Error while executing," + " using default current instead.")
+            logger.error("calc_max_discharge_current_from_cell_voltage(): Error while executing," + " using default current instead.")
             logger.error(
                 f"get_min_cell_voltage: {self.get_min_cell_voltage()}"
                 + f" • CELL_VOLTAGES_WHILE_DISCHARGING: {utils.CELL_VOLTAGES_WHILE_DISCHARGING}"
@@ -1443,7 +1444,7 @@ class Battery(ABC):
             file = exception_traceback.tb_frame.f_code.co_filename
             line = exception_traceback.tb_lineno
             logger.error("Non blocking exception occurred: " + f"{repr(exception_object)} of type {exception_type} in {file} line #{line}")
-            return self.max_battery_charge_current
+            return self.max_battery_discharge_current
 
     def calc_max_charge_current_from_mosfet_temperature(self) -> float:
         """
@@ -1492,7 +1493,7 @@ class Battery(ABC):
         :return: The maximum discharge current
         """
         if self.temperature_mos is None:
-            return self.max_battery_charge_current
+            return self.max_battery_discharge_current
 
         try:
             if utils.CHARGE_MODE == 2:
@@ -1523,7 +1524,7 @@ class Battery(ABC):
             file = exception_traceback.tb_frame.f_code.co_filename
             line = exception_traceback.tb_lineno
             logger.error("Non blocking exception occurred: " + f"{repr(exception_object)} of type {exception_type} in {file} line #{line}")
-            return self.max_battery_charge_current
+            return self.max_battery_discharge_current
 
     def calc_max_charge_current_from_soc(self) -> float:
         """
@@ -2198,6 +2199,8 @@ class Battery(ABC):
             f"> CHARGE FET: {str(self.charge_fet).ljust(5)} | DISCHARGE FET: {self.discharge_fet} | BALANCE FET: {self.balance_fet} | HEATING: {self.control_allow_heating}"
         )
         logger.info(f"Serial Number/Unique Identifier: {self.unique_identifier()}")
+        if utils.USE_PORT_AS_UNIQUE_ID:
+            logger.info(f"Serial number/Unique identifier (USE_PORT_AS_UNIQUE_ID): {utils.generate_unique_identifier(self.port, self.address)}")
 
         return
 
