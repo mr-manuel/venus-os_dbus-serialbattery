@@ -20,7 +20,7 @@ class Jkbms_pb(Battery):
         self.command_settings = b"\x10\x16\x1e\x00\x01\x02\x00\x00"
         self.command_about = b"\x10\x16\x1c\x00\x01\x02\x00\x00"
         self.history.exclude_values_to_calculate = ["charge_cycles"]
-    #    self.available_callbacks = ["callback_heating_onoff"]
+        # self.available_callbacks = ["callback_heating_onoff"]
 
     BATTERYTYPE = "JKBMS PB Model"
     LENGTH_CHECK = 0  # ignored
@@ -188,16 +188,12 @@ class Jkbms_pb(Battery):
         logger.debug("TMPStartHeating: " + str(TMPStartHeating))
         logger.debug("TMPStopHeating: " + str(TMPStopHeating))
 
-        #print(status_data)
-
         status_data = self.read_serial_data_jkbms_pb(self.command_about, 300)
         # vendor_version start  0: 16 chars
         # hw_version     start 16:  8 chars
         # sw_version     start 24:  8 chars
         # oddruntim      start 32:  1 UINT32
         # pwr_on_time    start 36:  1 UINT32
-
-        #print(status_data)
 
         vendor_id = status_data[6:21].decode("utf-8").split("\x00", 1)[0]  # 16 chars
         hw_version = status_data[22:29].decode("utf-8").split("\x00", 1)[0]  # 8 chars
@@ -214,7 +210,6 @@ class Jkbms_pb(Battery):
 
         logger.debug("TMPStartHeating: " + str(self.heat_temperature_start))
         logger.debug("TMPStopHeating: " + str(self.heat_temperature_stop))
-
 
         ODDRunTime = unpack_from("<I", status_data, 38)[0]  # 1 unit32 # runtime of the system in seconds
         PWROnTimes = unpack_from("<I", status_data, 42)[0]  # 1 unit32 # how many startups the system has done

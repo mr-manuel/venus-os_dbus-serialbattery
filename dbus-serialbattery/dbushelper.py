@@ -670,9 +670,9 @@ class DbusHelper:
         self._dbusservice.add_path("/Io/AllowToDischarge", 0, writeable=True)
         self._dbusservice.add_path("/Io/AllowToBalance", 0, writeable=True)
         if "callback_heating_onoff" in self.battery.available_callbacks:
-            self._dbusservice.add_path("/Io/AllowToHeat", 0, writeable=True, onchangecallback=self.battery.callback_heating_onoff )
+            self._dbusservice.add_path("/Io/AllowToHeat", 0, writeable=True, onchangecallback=self.battery.callback_heating_onoff)
         else:
-            self._dbusservice.add_path("/Io/AllowToHeat", 0, writeable=True )
+            self._dbusservice.add_path("/Io/AllowToHeat", 0, writeable=True)
 
         self._dbusservice.add_path(
             "/Io/ForceChargingOff",

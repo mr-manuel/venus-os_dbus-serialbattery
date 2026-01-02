@@ -974,12 +974,12 @@ class Battery(ABC):
 
                 if self.control_allow_heating != "None":
                     self.charge_mode_debug += (
-                    f"heating: {self.heating} • "
-                    + f"control_allow_heating: {self.control_allow_heating}\n"
-                    + f"heat_current: {self.heat_current} mA • "
-                    + f"heat_power: {safe_number_format(self.heat_power/1000, '{:.3f}')} W\n"
-                    + f"heat_temperature_start: {self.heat_temperature_start} °C • "
-                    + f"heat_temperature_stop: {self.heat_temperature_stop} °C\n"
+                        f"heating: {self.heating} • "
+                        + f"control_allow_heating: {self.control_allow_heating}\n"
+                        + f"heat_current: {self.heat_current} mA • "
+                        + f"heat_power: {safe_number_format(self.heat_power/1000, '{:.3f}')} W\n"
+                        + f"heat_temperature_start: {self.heat_temperature_start} °C • "
+                        + f"heat_temperature_stop: {self.heat_temperature_stop} °C\n"
                     )
                 self.charge_mode_debug += (
                     (
@@ -2194,7 +2194,9 @@ class Battery(ABC):
         logger.info(f"> CCCM T:     {str(utils.CCCM_T_ENABLE).ljust(5)} | DCCM T:        {utils.DCCM_T_ENABLE}")
         logger.info(f"> CCCM T MOS: {str(utils.CCCM_T_MOSFET_ENABLE).ljust(5)} | DCCM T MOS:    {utils.DCCM_T_MOSFET_ENABLE}")
         logger.info(f"> CCCM SOC:   {str(utils.CCCM_SOC_ENABLE).ljust(5)} | DCCM SOC:      {utils.DCCM_SOC_ENABLE}")
-        logger.info(f"> CHARGE FET: {str(self.charge_fet).ljust(5)} | DISCHARGE FET: {self.discharge_fet} | BALANCE FET: {self.balance_fet} | HEATING: {self.control_allow_heating}")
+        logger.info(
+            f"> CHARGE FET: {str(self.charge_fet).ljust(5)} | DISCHARGE FET: {self.discharge_fet} | BALANCE FET: {self.balance_fet} | HEATING: {self.control_allow_heating}"
+        )
         logger.info(f"Serial Number/Unique Identifier: {self.unique_identifier()}")
 
         return
