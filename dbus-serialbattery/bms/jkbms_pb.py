@@ -20,6 +20,7 @@ class Jkbms_pb(Battery):
         self.command_settings = b"\x10\x16\x1e\x00\x01\x02\x00\x00"
         self.command_about = b"\x10\x16\x1c\x00\x01\x02\x00\x00"
         self.history.exclude_values_to_calculate = ["charge_cycles"]
+    #    self.available_callbacks = ["callback_heating_onoff"]
 
     BATTERYTYPE = "JKBMS PB Model"
     LENGTH_CHECK = 0  # ignored
@@ -96,6 +97,8 @@ class Jkbms_pb(Battery):
         StartBalVol = unpack_from("<i", status_data, 138)[0] / 1000  # Start Balance Voltage
         DevAddr = unpack_from("<i", status_data, 270)[0]  # Device Addr
         TIMPDischarge = unpack_from("<i", status_data, 274)[0]
+        TMPStartHeating = unpack_from("<b", status_data, 284)[0]
+        TMPStopHeating = unpack_from("<b", status_data, 285)[0]
 
         CtrlBitMask = unpack_from("<H", status_data, 282)[0]  # Controls
         # Bit0: Heating enabled
@@ -113,15 +116,15 @@ class Jkbms_pb(Battery):
         # Bit6: Smart Sleep
         SmartSleep = 0x1 & (CtrlBitMask >> 6)
 
-        TMPBatOTA = unpack_from("<h", status_data, 284)[0]  # int 8
-        TMPBatOTAR = unpack_from("<h", status_data, 285)[0]  # int 8
-        TIMSmartSleep = unpack_from("<h", status_data, 286)[0]  # uint 8
+        TMPBatOTA = unpack_from("<b", status_data, 284)[0]  # int 8
+        TMPBatOTAR = unpack_from("<b", status_data, 285)[0]  # int 8
+        TIMSmartSleep = unpack_from("<b", status_data, 286)[0]  # uint 8
 
         # balancer enabled
         self.balance_fet = True if BalanEN != 0 else False
 
         # heating enabled
-        # self.control_allow_heating = True if HeatEN != 0 else False
+        self.control_allow_heating = True if HeatEN != 0 else False
 
         # count of all cells in pack
         self.cell_count = CellCount
@@ -182,6 +185,10 @@ class Jkbms_pb(Battery):
         logger.debug("TMPBatOTA: " + str(TMPBatOTA))
         logger.debug("TMPBatOTAR: " + str(TMPBatOTAR))
         logger.debug("TIMSmartSleep: " + str(TIMSmartSleep))
+        logger.debug("TMPStartHeating: " + str(TMPStartHeating))
+        logger.debug("TMPStopHeating: " + str(TMPStopHeating))
+
+        #print(status_data)
 
         status_data = self.read_serial_data_jkbms_pb(self.command_about, 300)
         # vendor_version start  0: 16 chars
@@ -190,10 +197,24 @@ class Jkbms_pb(Battery):
         # oddruntim      start 32:  1 UINT32
         # pwr_on_time    start 36:  1 UINT32
 
+        #print(status_data)
+
         vendor_id = status_data[6:21].decode("utf-8").split("\x00", 1)[0]  # 16 chars
         hw_version = status_data[22:29].decode("utf-8").split("\x00", 1)[0]  # 8 chars
         sw_version = status_data[30:37].decode("utf-8").split("\x00", 1)[0]  # 8 chars
         bms_version = hw_version + " / " + sw_version
+
+        # if we have an older hardware older as 19A (starting with 19A the FW supports the heating temperature setting) we use the old behavior by using the Bat Charge Under Temperature and Reset value
+        if hw_version > "15A":
+            self.heat_temperature_start = TMPStartHeating
+            self.heat_temperature_stop = TMPStopHeating
+        else:
+            self.heat_temperature_start = TMPBatCUT
+            self.heat_temperature_stop = TMPBatCUTPR
+
+        logger.debug("TMPStartHeating: " + str(self.heat_temperature_start))
+        logger.debug("TMPStopHeating: " + str(self.heat_temperature_stop))
+
 
         ODDRunTime = unpack_from("<I", status_data, 38)[0]  # 1 unit32 # runtime of the system in seconds
         PWROnTimes = unpack_from("<I", status_data, 42)[0]  # 1 unit32 # how many startups the system has done
@@ -276,11 +297,12 @@ class Jkbms_pb(Battery):
         # SOC
         self.soc = unpack_from("<B", status_data, 173)[0]
 
-        # SOH
-        self.soh = unpack_from("<B", status_data, 190)[0]
-
         # cycles
         self.history.charge_cycles = unpack_from("<i", status_data, 182)[0]
+
+        # SOH
+        self.soh = unpack_from("<B", status_data, 190)[0]
+        # precharge = unpack_from("<B", status_data, 191)[0]
 
         # capacity
         self.capacity_remain = unpack_from("<i", status_data, 174)[0] / 1000
@@ -292,16 +314,16 @@ class Jkbms_pb(Battery):
         bal = unpack_from("<B", status_data, 172)[0]
         charge = unpack_from("<B", status_data, 198)[0]
         discharge = unpack_from("<B", status_data, 199)[0]
-        # heat = unpack_from("<B", status_data, 215)[0]
+        heat = unpack_from("<B", status_data, 215)[0]
 
         self.charge_fet = 1 if charge != 0 else 0
         self.discharge_fet = 1 if discharge != 0 else 0
         self.balancing = 1 if bal != 0 else 0
-        # self.heating = 1 if heat != 0 else 0
+        self.heating = 1 if heat != 0 else 0
 
         # HeatCurrent mA
-        # self.heat_current = unpack_from("<H", status_data, 236)[0]
-        # self.heat_power = 0 if self.heating != 1 else self.heat_current * self.voltage
+        self.heat_current = int(unpack_from("<H", status_data, 236)[0])
+        self.heat_power = 0.0 if self.heating != 1 else float(self.heat_current * self.voltage)
 
         # show wich cells are balancing
         if self.get_min_cell() is not None and self.get_max_cell() is not None:
@@ -457,3 +479,6 @@ class Jkbms_pb(Battery):
                 else:
                     crc >>= 1
         return crc.to_bytes(2, "little")
+
+    def callback_heating_onoff(self, path: str, value: int) -> bool:
+        return False

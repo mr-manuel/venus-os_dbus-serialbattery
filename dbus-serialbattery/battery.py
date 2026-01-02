@@ -319,6 +319,13 @@ class Battery(ABC):
         self.control_discharge_current: int = None
         self.control_allow_charge: bool = None
         self.control_allow_discharge: bool = None
+        self.control_allow_heating: bool = None
+        self.balancing: bool = None
+        self.heating: bool = None
+        self.heat_current: int = None
+        self.heat_power: float = None
+        self.heat_temperature_start: float = None
+        self.heat_temperature_stop: float = None
 
         self.current_avg: float = None
         self.current_avg_lst: list = []
@@ -330,7 +337,6 @@ class Battery(ABC):
         self.protection = Protection()
         self.history = History()
         self.version = None
-        self.soh: float = None  # state of health
         self.time_to_soc_update: int = 0
         self.temperature_1: float = None
         self.temperature_2: float = None
@@ -860,6 +866,9 @@ class Battery(ABC):
                 if self.get_balancing():
                     self.charge_mode += " + Balancing"
 
+                if self.get_heating():
+                    self.charge_mode += " + Heating"
+
             # Float mode
             else:
                 float_voltage = round((utils.FLOAT_CELL_VOLTAGE * self.cell_count), 2)
@@ -960,7 +969,20 @@ class Battery(ABC):
                     + f"discharge_fet: {self.discharge_fet} • "
                     + f"control_allow_discharge: {self.control_allow_discharge}\n"
                     + f"block_because_disconnect: {self.block_because_disconnect}\n"
-                    + (
+                    + f"balance_fet: {self.balance_fet}\n"
+                )
+
+                if self.control_allow_heating != "None":
+                    self.charge_mode_debug += (
+                    f"heating: {self.heating} • "
+                    + f"control_allow_heating: {self.control_allow_heating}\n"
+                    + f"heat_current: {self.heat_current} mA • "
+                    + f"heat_power: {safe_number_format(self.heat_power/1000, '{:.3f}')} W\n"
+                    + f"heat_temperature_start: {self.heat_temperature_start} °C • "
+                    + f"heat_temperature_stop: {self.heat_temperature_stop} °C\n"
+                    )
+                self.charge_mode_debug += (
+                    (
                         (
                             "soc_reset_last_reached: "
                             + ("Never" if self.soc_reset_last_reached == 0 else f"{soc_reset_days_ago} d ago")
@@ -1833,6 +1855,9 @@ class Battery(ABC):
                 return 1
         return 0
 
+    def get_heating(self) -> int:
+        return self.heating
+
     def get_filtered_temperature_map(self) -> Dict[int, float]:
         """
         Get the temperature map with only the sensors that are in the TEMPERATURE_SOURCE_BATTERY list.
@@ -1906,6 +1931,9 @@ class Battery(ABC):
 
     def get_allow_to_balance(self) -> bool:
         return True if self.balance_fet else False if self.balance_fet is False else None
+
+    def get_allow_to_heat(self) -> bool:
+        return True if self.control_allow_heating else False if self.control_allow_heating is False else None
 
     def validate_data(self) -> bool:
         """
@@ -2166,10 +2194,16 @@ class Battery(ABC):
         logger.info(f"> CCCM T:     {str(utils.CCCM_T_ENABLE).ljust(5)} | DCCM T:        {utils.DCCM_T_ENABLE}")
         logger.info(f"> CCCM T MOS: {str(utils.CCCM_T_MOSFET_ENABLE).ljust(5)} | DCCM T MOS:    {utils.DCCM_T_MOSFET_ENABLE}")
         logger.info(f"> CCCM SOC:   {str(utils.CCCM_SOC_ENABLE).ljust(5)} | DCCM SOC:      {utils.DCCM_SOC_ENABLE}")
-        logger.info(f"> CHARGE FET: {str(self.charge_fet).ljust(5)} | DISCHARGE FET: {self.discharge_fet} | BALANCE FET: {self.balance_fet}")
+        logger.info(f"> CHARGE FET: {str(self.charge_fet).ljust(5)} | DISCHARGE FET: {self.discharge_fet} | BALANCE FET: {self.balance_fet} | HEATING: {self.control_allow_heating}")
         logger.info(f"Serial Number/Unique Identifier: {self.unique_identifier()}")
 
         return
+
+    """
+    Proposal for naming callback functions:  callback_<option>_<action>
+    The callback function must be declared as dummy in battery.py and be registered in dbushelper.py for handling the dbus path.
+    The callback function must be fully implemented at the driver level and must be specified in self.available_callbacks = [“<callback function name>”] to activate the registration by dbushelper.py
+    """
 
     def reset_soc_callback(self, path: str, value: int) -> bool:
         # callback for handling reset soc request
@@ -2182,6 +2216,9 @@ class Battery(ABC):
         return False  # return False to indicate that the callback was not handled
 
     def turn_balancing_off_callback(self, path: str, value: int) -> bool:
+        return False  # return False to indicate that the callback was not handled
+
+    def callback_heating_onoff(self, path: str, value: int) -> bool:
         return False  # return False to indicate that the callback was not handled
 
     def trigger_soc_reset(self) -> bool:
