@@ -10,8 +10,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from battery import Battery, Cell
 from utils import (
     BATTERY_CAPACITY,
-    bytearray_to_string,
     get_connection_error_message,
+    generate_unique_identifier,
     INVERT_CURRENT_MEASUREMENT,
     logger,
     AUTO_RESET_SOC,
@@ -116,7 +116,7 @@ class Daly_Can(Battery):
         e.g. the serial number
         If there is no such value, please remove this function
         """
-        return self.port + ("__" + bytearray_to_string(self.address).replace("\\", "0") if self.address is not None else "")
+        return generate_unique_identifier(self.port, self.address)
 
     def test_connection(self):
         """

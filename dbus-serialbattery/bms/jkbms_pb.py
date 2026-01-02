@@ -4,7 +4,7 @@
 # Added by https://github.com/KoljaWindeler
 
 from battery import Battery, Cell
-from utils import bytearray_to_string, read_serial_data, get_connection_error_message, logger, USE_PORT_AS_UNIQUE_ID
+from utils import read_serial_data, get_connection_error_message, logger
 from struct import unpack_from
 import sys
 
@@ -297,6 +297,9 @@ class Jkbms_pb(Battery):
         # SOC
         self.soc = unpack_from("<B", status_data, 173)[0]
 
+        # SOH
+        self.soh = unpack_from("<B", status_data, 190)[0]
+
         # cycles
         self.history.charge_cycles = unpack_from("<i", status_data, 182)[0]
 
@@ -351,11 +354,7 @@ class Jkbms_pb(Battery):
         """
         Used to identify a BMS when multiple BMS are connected
         """
-        # TODO: Temporary solution, since the serial number is not correctly read
-        if USE_PORT_AS_UNIQUE_ID:
-            return self.port + ("__" + bytearray_to_string(self.address).replace("\\", "0") if self.address is not None else "")
-        else:
-            return self.unique_identifier_tmp
+        return self.unique_identifier_tmp
 
     def get_balancing(self):
         return 1 if self.balancing else 0
