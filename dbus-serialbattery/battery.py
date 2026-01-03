@@ -2196,7 +2196,8 @@ class Battery(ABC):
         logger.info(f"> CCCM T MOS: {str(utils.CCCM_T_MOSFET_ENABLE).ljust(5)} | DCCM T MOS:    {utils.DCCM_T_MOSFET_ENABLE}")
         logger.info(f"> CCCM SOC:   {str(utils.CCCM_SOC_ENABLE).ljust(5)} | DCCM SOC:      {utils.DCCM_SOC_ENABLE}")
         logger.info(
-            f"> CHARGE FET: {str(self.charge_fet).ljust(5)} | DISCHARGE FET: {self.discharge_fet} | BALANCE FET: {self.balance_fet} | HEATING: {self.control_allow_heating}"
+            f"> CHARGE FET: {str(self.charge_fet).ljust(5)} | DISCHARGE FET: {self.discharge_fet} | BALANCE FET: {self.balance_fet} \
+| HEATING: {self.control_allow_heating}"
         )
         logger.info(f"Serial Number/Unique Identifier: {self.unique_identifier()}")
         if utils.USE_PORT_AS_UNIQUE_ID:
@@ -2207,7 +2208,8 @@ class Battery(ABC):
     """
     Proposal for naming callback functions:  callback_<option>_<action>
     The callback function must be declared as dummy in battery.py and be registered in dbushelper.py for handling the dbus path.
-    The callback function must be fully implemented at the driver level and must be specified in self.available_callbacks = [“<callback function name>”] to activate the registration by dbushelper.py
+    The callback function must be fully implemented at the driver level and must be specified in self.available_callbacks = [“<callback function name>”]
+    to activate the registration by dbushelper.py
     """
 
     def reset_soc_callback(self, path: str, value: int) -> bool:

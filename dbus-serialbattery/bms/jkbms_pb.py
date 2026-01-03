@@ -200,7 +200,8 @@ class Jkbms_pb(Battery):
         sw_version = status_data[30:37].decode("utf-8").split("\x00", 1)[0]  # 8 chars
         bms_version = hw_version + " / " + sw_version
 
-        # if we have an older hardware older as 19A (starting with 19A the FW supports the heating temperature setting) we use the old behavior by using the Bat Charge Under Temperature and Reset value
+        # if we have an older hardware older as 19A (starting with 19A the FW supports the heating temperature setting)
+        # we use the old behavior by using the Bat Charge Under Temperature and Reset value
         if hw_version > "15A":
             self.heat_temperature_start = TMPStartHeating
             self.heat_temperature_stop = TMPStopHeating
