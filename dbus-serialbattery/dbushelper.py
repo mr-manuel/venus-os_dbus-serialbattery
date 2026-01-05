@@ -664,9 +664,16 @@ class DbusHelper:
         self._dbusservice.add_path("/History/CanBeCleared", 1, writeable=True)
 
         self._dbusservice.add_path("/Balancing", None, writeable=True)
+        self._dbusservice.add_path("/Heating", None, writeable=True)
+        self._dbusservice.add_path("/Info/HeatingCurrent", None, writeable=True)
+        self._dbusservice.add_path("/Info/HeatingPower", None, writeable=True)
+        self._dbusservice.add_path("/Info/HeatingTemperatureStart", None, writeable=True)
+        self._dbusservice.add_path("/Info/HeatingTemperatureStop", None, writeable=True)
         self._dbusservice.add_path("/Io/AllowToCharge", 0, writeable=True)
         self._dbusservice.add_path("/Io/AllowToDischarge", 0, writeable=True)
         self._dbusservice.add_path("/Io/AllowToBalance", 0, writeable=True)
+        self._dbusservice.add_path("/Io/AllowToHeat", 0, writeable=True)
+
         self._dbusservice.add_path(
             "/Io/ForceChargingOff",
             (0 if "force_charging_off_callback" in self.battery.available_callbacks else None),
@@ -753,6 +760,13 @@ class DbusHelper:
 
         if self.battery.has_settings:
             self._dbusservice.add_path("/Settings/HasSettings", 1, writeable=False)
+            if "callback_heating_on_off" in self.battery.available_callbacks:
+                self._dbusservice.add_path(
+                    "/Settings/TurnHeatingOff",
+                    0,
+                    writeable=True,
+                    onchangecallback=self.battery.callback_heating_on_off,
+                )
             self._dbusservice.add_path(
                 "/Settings/ResetSoc",
                 0,
@@ -991,6 +1005,7 @@ class DbusHelper:
         self._dbusservice["/Io/AllowToCharge"] = 1 if self.battery.get_allow_to_charge() else 0
         self._dbusservice["/Io/AllowToDischarge"] = 1 if self.battery.get_allow_to_discharge() else 0
         self._dbusservice["/Io/AllowToBalance"] = 1 if self.battery.get_allow_to_balance() else 0 if self.battery.get_allow_to_balance() is not None else None
+        self._dbusservice["/Io/AllowToHeat"] = 1 if self.battery.get_allow_to_heat() else 0 if self.battery.get_allow_to_heat() is not None else None
         self._dbusservice["/System/NrOfModulesBlockingCharge"] = 0 if self.battery.get_allow_to_charge() else 1
         self._dbusservice["/System/NrOfModulesBlockingDischarge"] = 0 if self.battery.get_allow_to_discharge() else 1
         self._dbusservice["/System/NrOfModulesOnline"] = 1 if self.battery.online else 0
@@ -1038,6 +1053,11 @@ class DbusHelper:
         self._dbusservice["/System/MinCellVoltage"] = self.battery.get_min_cell_voltage()
         self._dbusservice["/System/MaxCellVoltage"] = self.battery.get_max_cell_voltage()
         self._dbusservice["/Balancing"] = self.battery.get_balancing()
+        self._dbusservice["/Heating"] = self.battery.get_heating()
+        self._dbusservice["/Info/HeatingCurrent"] = self.battery.heater_current
+        self._dbusservice["/Info/HeatingPower"] = self.battery.heater_power
+        self._dbusservice["/Info/HeatingTemperatureStart"] = self.battery.heater_temperature_start
+        self._dbusservice["/Info/HeatingTemperatureStop"] = self.battery.heater_temperature_stop
 
         # Update the alarms
         self.battery.protection.set_previous()

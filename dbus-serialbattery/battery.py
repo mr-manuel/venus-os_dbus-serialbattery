@@ -314,6 +314,7 @@ class Battery(ABC):
         self.charge_fet: bool = None
         self.discharge_fet: bool = None
         self.balance_fet: bool = None
+        self.heater_fet: bool = None
         self.block_because_disconnect: bool = False
         self.control_charge_current: int = None
         self.control_discharge_current: int = None
@@ -330,7 +331,6 @@ class Battery(ABC):
         self.protection = Protection()
         self.history = History()
         self.version = None
-        self.soh: float = None  # state of health
         self.time_to_soc_update: int = 0
         self.temperature_1: float = None
         self.temperature_2: float = None
@@ -357,6 +357,11 @@ class Battery(ABC):
         self.linear_cvl_last_set: int = 0
         self.linear_ccl_last_set: int = 0
         self.linear_dcl_last_set: int = 0
+        self.heating: bool = None
+        self.heater_current: int = None
+        self.heater_power: float = None
+        self.heater_temperature_start: float = None
+        self.heater_temperature_stop: float = None
 
         # Needed for history calculation
         self.full_discharge_active: bool = False
@@ -860,6 +865,9 @@ class Battery(ABC):
                 # if self.get_balancing() and voltage_cell_diff >= utils.SWITCH_TO_BULK_CELL_VOLTAGE_DIFF:
                 if self.get_balancing():
                     self.charge_mode += " + Balancing"
+
+                if self.get_heating():
+                    self.charge_mode += " + Heating"
 
             # Float mode
             else:
@@ -1834,6 +1842,9 @@ class Battery(ABC):
                 return 1
         return 0
 
+    def get_heating(self) -> int:
+        return self.heating
+
     def get_filtered_temperature_map(self) -> Dict[int, float]:
         """
         Get the temperature map with only the sensors that are in the TEMPERATURE_SOURCE_BATTERY list.
@@ -1907,6 +1918,9 @@ class Battery(ABC):
 
     def get_allow_to_balance(self) -> bool:
         return True if self.balance_fet else False if self.balance_fet is False else None
+
+    def get_allow_to_heat(self) -> bool:
+        return True if self.heater_fet else False if self.heater_fet is False else None
 
     def validate_data(self) -> bool:
         """
@@ -2167,12 +2181,24 @@ class Battery(ABC):
         logger.info(f"> CCCM T:     {str(utils.CCCM_T_ENABLE).ljust(5)} | DCCM T:        {utils.DCCM_T_ENABLE}")
         logger.info(f"> CCCM T MOS: {str(utils.CCCM_T_MOSFET_ENABLE).ljust(5)} | DCCM T MOS:    {utils.DCCM_T_MOSFET_ENABLE}")
         logger.info(f"> CCCM SOC:   {str(utils.CCCM_SOC_ENABLE).ljust(5)} | DCCM SOC:      {utils.DCCM_SOC_ENABLE}")
-        logger.info(f"> CHARGE FET: {str(self.charge_fet).ljust(5)} | DISCHARGE FET: {self.discharge_fet} | BALANCE FET: {self.balance_fet}")
+        logger.info(f"> CHARGE FET: {str(self.charge_fet).ljust(5)} | DISCHARGE FET: {self.discharge_fet}")
+        logger.info(
+            (f"BALANCE FET: {self.balance_fet}" if self.balance_fet is not None else "")
+            + (" | " if self.balance_fet is not None and self.heater_fet is not None else "")
+            + (f"HEATER_FET: {self.heater_fet}" if self.heater_fet is not None else "")
+        )
         logger.info(f"Serial Number/Unique Identifier: {self.unique_identifier()}")
         if utils.USE_PORT_AS_UNIQUE_ID:
             logger.info(f"Serial number/Unique identifier (USE_PORT_AS_UNIQUE_ID): {utils.generate_unique_identifier(self.port, self.address)}")
 
         return
+
+    """
+    Proposal for naming callback functions:  callback_<option>_<action>
+    The callback function must be declared as dummy in battery.py and be registered in dbushelper.py for handling the dbus path.
+    The callback function must be fully implemented at the driver level and must be specified in self.available_callbacks = [“<callback function name>”]
+    to activate the registration by dbushelper.py
+    """
 
     def reset_soc_callback(self, path: str, value: int) -> bool:
         # callback for handling reset soc request
@@ -2185,6 +2211,9 @@ class Battery(ABC):
         return False  # return False to indicate that the callback was not handled
 
     def turn_balancing_off_callback(self, path: str, value: int) -> bool:
+        return False  # return False to indicate that the callback was not handled
+
+    def callback_heating_on_off(self, path: str, value: int) -> bool:
         return False  # return False to indicate that the callback was not handled
 
     def trigger_soc_reset(self) -> bool:
