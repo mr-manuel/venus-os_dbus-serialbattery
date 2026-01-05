@@ -158,10 +158,8 @@ class HLPdataBMS4S(Battery):
         self.current = float(par[4])
         self.soc = int(par[5])
         st = int(par[6]) == 1
-        self.control_allow_charge = st
         self.charge_fet = st
         st = int(par[7]) == 1
-        self.control_allow_discharge = st
         self.discharge_fet = st
 
         beep = int(par[11])

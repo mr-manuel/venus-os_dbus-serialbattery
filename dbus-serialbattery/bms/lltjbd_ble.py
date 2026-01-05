@@ -292,8 +292,8 @@ if __name__ == "__main__":
         logger.error(">>> ERROR: Unable to connect")
     else:
         # Allow to change charge / discharge FET
-        bat.control_allow_charge = True
-        bat.control_allow_discharge = True
+        bat.charge_fet = True
+        bat.discharge_fet = True
 
         bat.trigger_disable_balancer = True
         bat.trigger_force_disable_charge = True

@@ -212,8 +212,8 @@ class RV_C_Can(Battery):
             elif normalized_arbitration_id in self.CAN_FRAMES[self.BATT_STAT11]:
                 self.capacity = unpack_from("<H", bytes([data[3], data[4]]))[0]
                 fet = unpack_from("<B", bytes([data[2]]))[0]
-                self.control_allow_discharge = 1 if int(bin(fet | 0x100)[8:9]) > 0 else 0
-                self.control_allow_charge = 1 if int(bin(fet | 0x100)[10:11]) > 0 else 0
+                self.discharge_fet = 1 if int(bin(fet | 0x100)[8:9]) > 0 else 0
+                self.charge_fet = 1 if int(bin(fet | 0x100)[10:11]) > 0 else 0
                 # check if all needed data is available
                 data_check += 2
 

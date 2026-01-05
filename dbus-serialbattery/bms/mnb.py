@@ -150,9 +150,9 @@ class MNB(Battery):
         # Change depending on the cell_max_voltage values
 
         if self.cell_max_voltage > self.V_C_max - 0.05:
-            self.control_allow_charge = False
+            self.charge_fet = False
         else:
-            self.control_allow_charge = True
+            self.charge_fet = True
         # Change depending on the cell_max_voltage values
         if self.cell_max_voltage > self.V_C_max - 0.15:
             b = 10 * (self.V_C_max - self.cell_max_voltage - 0.05)
@@ -167,9 +167,9 @@ class MNB(Battery):
 
         # Change depending on the cell_min_voltage values
         if self.cell_min_voltage < self.V_C_min + 0.05:
-            self.control_allow_discharge = False
+            self.discharge_fet = False
         else:
-            self.control_allow_discharge = True
+            self.discharge_fet = True
 
         if self.cell_min_voltage < self.V_C_min + 0.15:
             b = 10 * (self.cell_min_voltage - self.V_C_min - 0.05)
