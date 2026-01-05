@@ -51,7 +51,7 @@ class EG4_LL(Battery):
         self.cell_min_voltage = 0
         self.cell_max_voltage = None
         self.has_settings = 0
-        self.reset_soc = 0
+        self.soc_reset_to = 0
         self.soc_to_set = None
         self.type = self.BATTERYTYPE
         self.runtime = 0  # TROUBLESHOOTING for no reply errors

@@ -16,6 +16,12 @@
 * Driver version greater or equal to `v2.1.20251222dev`
   * The unique identifier for all Bluetooth BMS devices is now the BLE MAC address. Because of this change, your battery will appear as a new device after the update. Custom names and calculated data will be lost once during the upgrade.
 
+* Driver version greater or equal to `v2.1.20260105`
+  * Moved d-bus/MQTT path from `/Io/ForceChargingOff` to `/Settings/ForceChargingOff`
+  * Moved d-bus/MQTT path from `/Io/ForceDischargingOff` to `/Settings/ForceDischargingOff`
+  * Moved d-bus/MQTT path from `/Io/TurnBalancingOff` to `/Settings/TurnBalancingOff`
+  * Moved d-bus/MQTT path from `/Settings/ResetSoc` to `/Settings/ResetSocTo`
+
 ### What's Changed
 
 * Added: Daren 485 BMS - Read SoH with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/344 by @kopierschnitte
@@ -26,6 +32,7 @@
 * Added: KS48100 BMS - Read SoH with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/344 by @kopierschnitte
 * Added: Venus OS 3.7x GUIv2 support by @mr-manuel
 * Changed: Daren 485 BMS - Fixed charge/discharge calculation with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/343 by @kopierschnitte
+* Changed: Driver internals: Renamed callback variables/functions and added a better description by @mr-manuel
 * Changed: Exit behavior for excluded devices to behave like Victron services by @mr-manuel
 * Changed: Fixed discharge current limit calculations when MOSFET temperature is not available, by @dchervov
 * Changed: Fixed typo in activation instructions by @mr-manuel

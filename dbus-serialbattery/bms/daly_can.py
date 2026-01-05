@@ -40,7 +40,7 @@ class Daly_Can(Battery):
         self.poll_step = 0
         self.type = self.BATTERYTYPE
         self.has_settings = True
-        self.reset_soc = 0
+        self.soc_reset_to = 0
         self.soc_to_set = None
         self.last_charge_mode = self.charge_mode
 
@@ -48,6 +48,11 @@ class Daly_Can(Battery):
         self.device_address = int.from_bytes(address, byteorder="big") if address is not None else 0x01
         self.error_active = False
         self.last_error_time = 0
+        # list of available callbacks, in order to display the buttons in the GUI
+        self.callbacks_available = [
+            "callback_soc_reset_to",
+        ]
+
         self.history.exclude_values_to_calculate = ["charge_cycles"]
 
     COMMAND_BASE = "COMMAND_BASE"
@@ -168,7 +173,7 @@ class Daly_Can(Battery):
         # call all functions that will refresh the battery data.
         # This will be called for every iteration (1 second)
         # Return True if success, False for failure
-        self.reset_soc = self.soc if self.soc else 0
+        self.soc_reset_to = self.soc if self.soc else 0
 
         self.request_daly_can()
         sleep(0.1)
@@ -473,14 +478,14 @@ class Daly_Can(Battery):
             logger.error(f"Exception occurred: {repr(exception_object)} of type {exception_type} in {file} line #{line}")
             return False
 
-    def reset_soc_callback(self, path, value):
+    def callback_soc_reset_to(self, path, value):
         if value is None:
             return False
 
         if value < 0 or value > 100:
             return False
 
-        self.reset_soc = value
+        self.soc_reset_to = value
         self.soc_to_set = value
         return True
 

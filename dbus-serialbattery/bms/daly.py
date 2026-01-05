@@ -34,7 +34,7 @@ class Daly(Battery):
         self.poll_interval = 1000
         self.type = self.BATTERYTYPE
         self.has_settings = True
-        self.reset_soc = 0
+        self.soc_reset_to = 0
         self.soc_to_set = None
         self.runtime = 0  # TROUBLESHOOTING for no reply errors
         self.trigger_force_disable_discharge = None
@@ -42,9 +42,10 @@ class Daly(Battery):
         self.cells_volts_data_lastreadbad = False
         self.last_charge_mode = self.charge_mode
         # list of available callbacks, in order to display the buttons in the GUI
-        self.available_callbacks = [
-            "force_charging_off_callback",
-            "force_discharging_off_callback",
+        self.callbacks_available = [
+            "callback_charging_force_off",
+            "callback_discharging_force_off",
+            "callback_soc_reset_to",
         ]
         self.history.exclude_values_to_calculate = ["charge_cycles"]
 
@@ -120,7 +121,7 @@ class Daly(Battery):
         try:
             with open_serial_port(self.port, self.baud_rate) as ser:
                 result = self.read_soc_data(ser)
-                self.reset_soc = self.soc if self.soc else 0
+                self.soc_reset_to = self.soc if self.soc else 0
                 if self.runtime > 0.200:  # TROUBLESHOOTING for no reply errors
                     logger.debug("  |- refresh_data: read_soc_data - result: " + str(result) + " - runtime: " + str(f"{self.runtime:.1f}") + "s")
 
@@ -560,14 +561,14 @@ class Daly(Battery):
         else:
             return str(self.production) + "_" + str(int(self.capacity))
 
-    def reset_soc_callback(self, path, value):
+    def callback_soc_reset_to(self, path, value):
         if value is None:
             return False
 
         if value < 0 or value > 100:
             return False
 
-        self.reset_soc = value
+        self.soc_reset_to = value
         self.soc_to_set = value
         return True
 
@@ -612,7 +613,7 @@ class Daly(Battery):
             logger.error("write soc failed")
         return True
 
-    def force_charging_off_callback(self, path, value):
+    def callback_charging_force_off(self, path, value):
         if value is None:
             return False
 
@@ -626,7 +627,7 @@ class Daly(Battery):
 
         return False
 
-    def force_discharging_off_callback(self, path, value):
+    def callback_discharging_force_off(self, path, value):
         if value is None:
             return False
 

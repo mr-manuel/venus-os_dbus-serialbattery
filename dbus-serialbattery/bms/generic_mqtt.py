@@ -32,6 +32,14 @@ class Generic_Mqtt(Battery):
     def __init__(self, port, baud, address):
         super(Generic_Mqtt, self).__init__(port, baud, address)
         self.type = self.BATTERYTYPE
+        self.has_settings = True
+        self.callbacks_available = [
+            "callback_charging_force_off",
+            "callback_discharging_force_off",
+            "callback_balancing_turn_off",
+            "callback_heating_turn_off",
+            "callback_soc_reset_to",
+        ]
         # Exclude history values from calculation if they are provided from the BMS
         self.history.exclude_values_to_calculate = []
         self.mqtt_topic = address
@@ -246,6 +254,12 @@ class Generic_Mqtt(Battery):
                         ("temperature_4", float, False),
                         ("temperature_mos", float, False),
                         ("balance_fet", bool, False),
+                        ("heater_fet", bool, False),
+                        ("heating", bool, False),
+                        ("heater_current", float, False),
+                        ("heater_power", float, False),
+                        ("heater_temperature_start", float, False),
+                        ("heater_temperature_stop", float, False),
                         # cell data
                         ("cells", dict, True),
                         # protection data
@@ -406,3 +420,18 @@ class Generic_Mqtt(Battery):
             file = exception_traceback.tb_frame.f_code.co_filename
             line = exception_traceback.tb_lineno
             logger.error(f"Exception occurred: {repr(exception_object)} of type {exception_type} in {file} line #{line}")
+
+    def callback_charging_force_off(self, path, value):
+        return True
+
+    def callback_discharging_force_off(self, path, value):
+        return True
+
+    def callback_balancing_turn_off(self, path, value):
+        return True
+
+    def callback_heating_turn_off(self, path, value):
+        return True
+
+    def callback_soc_reset_to(self, path, value):
+        return True

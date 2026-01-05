@@ -358,7 +358,7 @@ class Battery(ABC):
         self.linear_ccl_last_set: int = 0
         self.linear_dcl_last_set: int = 0
         self.heating: bool = None
-        self.heater_current: int = None
+        self.heater_current: float = None
         self.heater_power: float = None
         self.heater_temperature_start: float = None
         self.heater_temperature_stop: float = None
@@ -381,7 +381,7 @@ class Battery(ABC):
         self.energy_discharged: float = 0
 
         # list of available callbacks, in order to display the buttons in the GUI
-        self.available_callbacks: List[str] = []
+        self.callbacks_available: List[str] = []
 
         # display errors in the GUI
         # https://github.com/victronenergy/veutil/blob/master/inc/veutil/ve_regs_payload.h
@@ -1090,7 +1090,7 @@ class Battery(ABC):
                 else:
                     charge_limits.update({tmp: "SoC"})
 
-        # set CCL to 0, if BMS does not allow to charge
+        # set CCL to 0, if BMS does not allow to charge or battery is disconnected
         if self.charge_fet is False or self.block_because_disconnect:
             if 0 in charge_limits:
                 charge_limits.update({0: charge_limits[0] + ", BMS"})
@@ -1188,7 +1188,7 @@ class Battery(ABC):
                 else:
                     discharge_limits.update({tmp: "SoC"})
 
-        # set DCL to 0, if BMS does not allow to discharge
+        # set DCL to 0, if BMS does not allow to discharge or battery is disconnected
         if self.discharge_fet is False or self.block_because_disconnect:
             if 0 in discharge_limits:
                 discharge_limits.update({0: discharge_limits[0] + ", BMS"})
@@ -2158,6 +2158,7 @@ class Battery(ABC):
             + (f" | SoC calc: {self.soc_calc:.0f}%" if utils.SOC_CALCULATION else "")
         )
         logger.info(f"> Cell count: {self.cell_count} | Cells populated: {cell_counter}")
+        logger.info(f"> BLOCK ON DISCONNECT: {utils.BLOCK_ON_DISCONNECT}")
         logger.info(f'> CHARGE MODE: {"Linear" if utils.CHARGE_MODE == 1 else "Step" if utils.CHARGE_MODE == 2 else "Unknown"}')
         logger.info(
             f"> MIN CELL VOLTAGE: {utils.MIN_CELL_VOLTAGE:.3f} V "
@@ -2176,17 +2177,19 @@ class Battery(ABC):
                 f"> MAX BATTERY CHARGE CURRENT: {self.max_battery_charge_current} A | "
                 + f"MAX BATTERY DISCHARGE CURRENT: {self.max_battery_discharge_current} A (read from BMS)"
             )
-        logger.info(f"> CVCM:       {utils.CVCM_ENABLE}")
-        logger.info(f"> CCCM CV:    {str(utils.CCCM_CV_ENABLE).ljust(5)} | DCCM CV:       {utils.DCCM_CV_ENABLE}")
-        logger.info(f"> CCCM T:     {str(utils.CCCM_T_ENABLE).ljust(5)} | DCCM T:        {utils.DCCM_T_ENABLE}")
-        logger.info(f"> CCCM T MOS: {str(utils.CCCM_T_MOSFET_ENABLE).ljust(5)} | DCCM T MOS:    {utils.DCCM_T_MOSFET_ENABLE}")
-        logger.info(f"> CCCM SOC:   {str(utils.CCCM_SOC_ENABLE).ljust(5)} | DCCM SOC:      {utils.DCCM_SOC_ENABLE}")
-        logger.info(f"> CHARGE FET: {str(self.charge_fet).ljust(5)} | DISCHARGE FET: {self.discharge_fet}")
-        logger.info(
-            (f"BALANCE FET: {self.balance_fet}" if self.balance_fet is not None else "")
-            + (" | " if self.balance_fet is not None and self.heater_fet is not None else "")
-            + (f"HEATER_FET: {self.heater_fet}" if self.heater_fet is not None else "")
-        )
+        logger.info(f"> CVCM:        {utils.CVCM_ENABLE}")
+        logger.info(f"> CCCM CV:     {str(utils.CCCM_CV_ENABLE).ljust(5)} | DCCM CV:       {utils.DCCM_CV_ENABLE}")
+        logger.info(f"> CCCM T:      {str(utils.CCCM_T_ENABLE).ljust(5)} | DCCM T:        {utils.DCCM_T_ENABLE}")
+        logger.info(f"> CCCM T MOS:  {str(utils.CCCM_T_MOSFET_ENABLE).ljust(5)} | DCCM T MOS:    {utils.DCCM_T_MOSFET_ENABLE}")
+        logger.info(f"> CCCM SOC:    {str(utils.CCCM_SOC_ENABLE).ljust(5)} | DCCM SOC:      {utils.DCCM_SOC_ENABLE}")
+        logger.info(f"> CHARGE FET:  {str(self.charge_fet).ljust(5)} | DISCHARGE FET: {self.discharge_fet}")
+        if self.balance_fet is not None or self.heater_fet is not None:
+            logger.info(
+                "> "
+                + (f"BALANCE FET: {str(self.balance_fet).ljust(5)}" if self.balance_fet is not None else "")
+                + (" | " if self.balance_fet is not None and self.heater_fet is not None else "")
+                + (f"HEATER FET: {self.heater_fet}" if self.heater_fet is not None else "")
+            )
         logger.info(f"Serial Number/Unique Identifier: {self.unique_identifier()}")
         if utils.USE_PORT_AS_UNIQUE_ID:
             logger.info(f"Serial number/Unique identifier (USE_PORT_AS_UNIQUE_ID): {utils.generate_unique_identifier(self.port, self.address)}")
@@ -2194,33 +2197,77 @@ class Battery(ABC):
         return
 
     """
-    Proposal for naming callback functions:  callback_<option>_<action>
+    Naming of callback functions:  callback_<option>_<action>
     The callback function must be declared as dummy in battery.py and be registered in dbushelper.py for handling the dbus path.
-    The callback function must be fully implemented at the driver level and must be specified in self.available_callbacks = [“<callback function name>”]
+    The callback function must be fully implemented at the driver level and must be specified in self.callbacks_available = ["<callback function name>"]
     to activate the registration by dbushelper.py
     """
 
-    def reset_soc_callback(self, path: str, value: int) -> bool:
-        # callback for handling reset soc request
-        return False  # return False to indicate that the callback was not handled
+    def callback_charging_force_off(self, path: str, value: int) -> bool:
+        """
+        Callback to disable charging directly on the BMS hardware (not in the driver).
 
-    def force_charging_off_callback(self, path: str, value: int) -> bool:
-        return False  # return False to indicate that the callback was not handled
+        :param self: Instance of the battery class
+        :param path: d-bus path of the value that changed (can be ignored in this case)
+        :param value: value that was set through the GUI (0=disabled, 1=enabled)
+        :return: True if the callback was handled successfully, False otherwise
+        """
+        return False
 
-    def force_discharging_off_callback(self, path: str, value: int) -> bool:
-        return False  # return False to indicate that the callback was not handled
+    def callback_discharging_force_off(self, path: str, value: int) -> bool:
+        """
+        Callback to disable discharging directly on the BMS hardware (not in the driver).
 
-    def turn_balancing_off_callback(self, path: str, value: int) -> bool:
-        return False  # return False to indicate that the callback was not handled
+        :param self: Instance of the battery class
+        :param path: d-bus path of the value that changed (can be ignored in this case)
+        :param value: value that was set through the GUI (0=disabled, 1=enabled)
+        :return: True if the callback was handled successfully, False otherwise
+        """
+        return False
 
-    def callback_heating_on_off(self, path: str, value: int) -> bool:
-        return False  # return False to indicate that the callback was not handled
+    def callback_balancing_turn_off(self, path: str, value: int) -> bool:
+        """
+        Callback to disable balancing directly on the BMS hardware (not in the driver).
+
+        :param self: Instance of the battery class
+        :param path: d-bus path of the value that changed (can be ignored in this case)
+        :param value: value that was set through the GUI (0=disabled, 1=enabled)
+        :return: True if the callback was handled successfully, False otherwise
+        """
+        return False
+
+    def callback_heating_turn_off(self, path: str, value: int) -> bool:
+        """
+        Callback to disable heating directly on the BMS hardware (not in the driver).
+
+        :param self: Instance of the battery class
+        :param path: d-bus path of the value that changed (can be ignored in this case)
+        :param value: value that was set through the GUI (0=disabled, 1=enabled)
+        :return: True if the callback was handled successfully, False otherwise
+        """
+        return False
+
+    def callback_soc_reset_to(self, path: str, value: int) -> bool:
+        """
+        Callback to reset the SOC directly on the BMS hardware (not in the driver)
+        to a specific value.
+
+        :param self: Instance of the battery class
+        :param path: d-bus path of the value that changed (can be ignored in this case)
+        :param value: value that was set through the GUI (0=disabled, 1=enabled)
+        :return: True if the callback was handled successfully, False otherwise
+        """
+        return False
 
     def trigger_soc_reset(self) -> bool:
         """
-        This method can be used to implement SOC reset when the battery is assumed to be full
+        This method is called when the driver charging algorithm changes from bulk/absorption to float.
+        It can be used to set the SOC on the BMS hardware (not in the driver) to 100% when the battery is
+        assumed to be full
+
+        :return: True if the callback was handled successfully, False otherwise
         """
-        return False  # return False to indicate that the callback was not handled
+        return False
 
     def history_calculate_values(self) -> None:
         """

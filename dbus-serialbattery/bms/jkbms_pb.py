@@ -20,8 +20,8 @@ class Jkbms_pb(Battery):
         self.command_settings = b"\x10\x16\x1e\x00\x01\x02\x00\x00"
         self.command_about = b"\x10\x16\x1c\x00\x01\x02\x00\x00"
         self.history.exclude_values_to_calculate = ["charge_cycles"]
-        # self.available_callbacks = ["callback_heating_on_off"]
         # self.has_settings = True
+        # self.callbacks_available = ["callback_heating_turn_off"]
 
     BATTERYTYPE = "JKBMS PB Model"
     LENGTH_CHECK = 0  # ignored
@@ -473,5 +473,5 @@ class Jkbms_pb(Battery):
                     crc >>= 1
         return crc.to_bytes(2, "little")
 
-    def callback_heating_on_off(self, path: str, value: int) -> bool:
+    def callback_heating_turn_off(self, path: str, value: int) -> bool:
         return False

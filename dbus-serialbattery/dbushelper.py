@@ -42,17 +42,17 @@ class DbusHelper:
 
     def __init__(self, battery, bms_address=None):
         self.battery = battery
-        self.instance = 1
+        self.instance: int = 1
         self.settings = None
-        self.error = {"count": 0, "timestamp_first": None, "timestamp_last": None}
-        self.cell_voltages_good = None
-        self._dbusname = (
+        self.error: dict = {"count": 0, "timestamp_first": None, "timestamp_last": None}
+        self.cell_voltages_good: bool = None
+        self._dbusname: str = (
             "com.victronenergy.battery."
             + self.battery.port[self.battery.port.rfind("/") + 1 :]
             + ("__" + str(bms_address) if bms_address is not None and bms_address != 0 else "")
         )
-        self._dbusservice = VeDbusService(self._dbusname, get_bus(), register=False)
-        self.bms_id = (
+        self._dbusservice: VeDbusService = VeDbusService(self._dbusname, get_bus(), register=False)
+        self.bms_id: str = (
             "".join(
                 # remove all non alphanumeric characters except underscore from the identifier
                 c if c.isalnum() else "_"
@@ -62,8 +62,8 @@ class DbusHelper:
             else utils.generate_unique_identifier(self.battery.port, self.battery.address)
         )
 
-        self.path_battery = None
-        self.save_charge_details_last = {
+        self.path_battery: str = None
+        self.save_charge_details_last: dict = {
             "allow_max_voltage": self.battery.allow_max_voltage,
             "max_voltage_start_time": self.battery.max_voltage_start_time,
             "soc_calc": (self.battery.soc_calc if self.battery.soc_calc is not None else ""),
@@ -673,25 +673,6 @@ class DbusHelper:
         self._dbusservice.add_path("/Io/AllowToDischarge", 0, writeable=True)
         self._dbusservice.add_path("/Io/AllowToBalance", 0, writeable=True)
         self._dbusservice.add_path("/Io/AllowToHeat", 0, writeable=True)
-
-        self._dbusservice.add_path(
-            "/Io/ForceChargingOff",
-            (0 if "force_charging_off_callback" in self.battery.available_callbacks else None),
-            writeable=True,
-            onchangecallback=self.battery.force_charging_off_callback,
-        )
-        self._dbusservice.add_path(
-            "/Io/ForceDischargingOff",
-            (0 if "force_discharging_off_callback" in self.battery.available_callbacks else None),
-            writeable=True,
-            onchangecallback=self.battery.force_discharging_off_callback,
-        )
-        self._dbusservice.add_path(
-            "/Io/TurnBalancingOff",
-            (0 if "turn_balancing_off_callback" in self.battery.available_callbacks else None),
-            writeable=True,
-            onchangecallback=self.battery.turn_balancing_off_callback,
-        )
         # self._dbusservice.add_path('/SystemSwitch', 1, writeable=True)
 
         # Create the alarms
@@ -760,19 +741,41 @@ class DbusHelper:
 
         if self.battery.has_settings:
             self._dbusservice.add_path("/Settings/HasSettings", 1, writeable=False)
-            if "callback_heating_on_off" in self.battery.available_callbacks:
+            if "callback_charging_force_off" in self.battery.callbacks_available:
+                self._dbusservice.add_path(
+                    "/Settings/ForceChargingOff",
+                    0,
+                    writeable=True,
+                    onchangecallback=self.battery.callback_charging_force_off,
+                )
+            if "callback_discharging_force_off" in self.battery.callbacks_available:
+                self._dbusservice.add_path(
+                    "/Settings/ForceDischargingOff",
+                    0,
+                    writeable=True,
+                    onchangecallback=self.battery.callback_discharging_force_off,
+                )
+            if "callback_balancing_turn_off" in self.battery.callbacks_available:
+                self._dbusservice.add_path(
+                    "/Settings/TurnBalancingOff",
+                    0,
+                    writeable=True,
+                    onchangecallback=self.battery.callback_balancing_turn_off,
+                )
+            if "callback_heating_turn_off" in self.battery.callbacks_available:
                 self._dbusservice.add_path(
                     "/Settings/TurnHeatingOff",
                     0,
                     writeable=True,
-                    onchangecallback=self.battery.callback_heating_on_off,
+                    onchangecallback=self.battery.callback_heating_turn_off,
                 )
-            self._dbusservice.add_path(
-                "/Settings/ResetSoc",
-                0,
-                writeable=True,
-                onchangecallback=self.battery.reset_soc_callback,
-            )
+            if "callback_soc_reset_to" in self.battery.callbacks_available:
+                self._dbusservice.add_path(
+                    "/Settings/ResetSocTo",
+                    0,
+                    writeable=True,
+                    onchangecallback=self.battery.callback_soc_reset_to,
+                )
 
         self._dbusservice.add_path("/JsonData", None, writeable=False)
 
@@ -787,6 +790,7 @@ class DbusHelper:
         """
         Publishes the battery data to dbus.
         This is called every battery.poll_interval milli second as set up per battery type to read and update the data
+        or as callback when data is received for some battery types.
 
         :param loop: The main loop of the driver.
         """
@@ -1230,7 +1234,7 @@ class DbusHelper:
             self.battery.log_cell_data()
 
         if self.battery.has_settings:
-            self._dbusservice["/Settings/ResetSoc"] = self.battery.reset_soc
+            self._dbusservice["/Settings/ResetSocTo"] = self.battery.reset_soc
 
         # get all paths from the dbus service
         if utils.PUBLISH_BATTERY_DATA_AS_JSON:
@@ -1240,7 +1244,7 @@ class DbusHelper:
             all_items = {key: self.dbus_to_python(value["Value"]) for key, value in all_items.items()}
 
             # Filter out unwanted keys
-            filtered_data = {key: value for key, value in all_items.items() if key not in ["/JsonData", "/Settings/ResetSoc", "/Settings/HasSettings"]}
+            filtered_data = {key: value for key, value in all_items.items() if not key.startswith("/Settings") and key != "/JsonData"}
 
             # Set empty lists to empty string
             filtered_data = {key: "" if value == [] else value for key, value in filtered_data.items()}
