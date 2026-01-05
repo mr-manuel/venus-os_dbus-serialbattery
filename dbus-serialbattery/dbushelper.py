@@ -1233,9 +1233,6 @@ class DbusHelper:
             logger.debug("logged to dbus [%s]" % str(round(self.battery.soc, 2)))
             self.battery.log_cell_data()
 
-        if self.battery.has_settings:
-            self._dbusservice["/Settings/ResetSocTo"] = self.battery.reset_soc
-
         # get all paths from the dbus service
         if utils.PUBLISH_BATTERY_DATA_AS_JSON:
             all_items = self._dbusservice._dbusnodes["/"].GetItems()
