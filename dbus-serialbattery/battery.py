@@ -1025,7 +1025,7 @@ class Battery(ABC):
             exception_type, exception_object, exception_traceback = sys.exc_info()
             file = exception_traceback.tb_frame.f_code.co_filename
             line = exception_traceback.tb_lineno
-            logger.error("Non blocking exception occurred: " + f"{repr(exception_object)} of type {exception_type} in {file} line #{line}")
+            logger.error(f"Non blocking exception occurred: {repr(exception_object)} of type {exception_type} in {file} line #{line}")
 
     def manage_charge_and_discharge_current(self) -> None:
         """
@@ -1274,7 +1274,7 @@ class Battery(ABC):
             exception_type, exception_object, exception_traceback = sys.exc_info()
             file = exception_traceback.tb_frame.f_code.co_filename
             line = exception_traceback.tb_lineno
-            logger.error("Non blocking exception occurred: " + f"{repr(exception_object)} of type {exception_type} in {file} line #{line}")
+            logger.error(f"Non blocking exception occurred: {repr(exception_object)} of type {exception_type} in {file} line #{line}")
             return self.max_battery_charge_current
 
     def calc_max_discharge_current_from_cell_voltage(self) -> float:
@@ -1319,7 +1319,7 @@ class Battery(ABC):
             exception_type, exception_object, exception_traceback = sys.exc_info()
             file = exception_traceback.tb_frame.f_code.co_filename
             line = exception_traceback.tb_lineno
-            logger.error("Non blocking exception occurred: " + f"{repr(exception_object)} of type {exception_type} in {file} line #{line}")
+            logger.error(f"Non blocking exception occurred: {repr(exception_object)} of type {exception_type} in {file} line #{line}")
             return self.max_battery_charge_current
 
     def calc_max_charge_current_from_temperature(self) -> float:
@@ -1374,7 +1374,7 @@ class Battery(ABC):
             exception_type, exception_object, exception_traceback = sys.exc_info()
             file = exception_traceback.tb_frame.f_code.co_filename
             line = exception_traceback.tb_lineno
-            logger.error("Non blocking exception occurred: " + f"{repr(exception_object)} of type {exception_type} in {file} line #{line}")
+            logger.error(f"Non blocking exception occurred: {repr(exception_object)} of type {exception_type} in {file} line #{line}")
             return self.max_battery_charge_current
 
     def calc_max_discharge_current_from_temperature(self) -> float:
@@ -1429,7 +1429,7 @@ class Battery(ABC):
             exception_type, exception_object, exception_traceback = sys.exc_info()
             file = exception_traceback.tb_frame.f_code.co_filename
             line = exception_traceback.tb_lineno
-            logger.error("Non blocking exception occurred: " + f"{repr(exception_object)} of type {exception_type} in {file} line #{line}")
+            logger.error(f"Non blocking exception occurred: {repr(exception_object)} of type {exception_type} in {file} line #{line}")
             return self.max_battery_discharge_current
 
     def calc_max_charge_current_from_mosfet_temperature(self) -> float:
@@ -1469,7 +1469,7 @@ class Battery(ABC):
             exception_type, exception_object, exception_traceback = sys.exc_info()
             file = exception_traceback.tb_frame.f_code.co_filename
             line = exception_traceback.tb_lineno
-            logger.error("Non blocking exception occurred: " + f"{repr(exception_object)} of type {exception_type} in {file} line #{line}")
+            logger.error(f"Non blocking exception occurred: {repr(exception_object)} of type {exception_type} in {file} line #{line}")
             return self.max_battery_charge_current
 
     def calc_max_discharge_current_from_mosfet_temperature(self) -> float:
@@ -1509,7 +1509,7 @@ class Battery(ABC):
             exception_type, exception_object, exception_traceback = sys.exc_info()
             file = exception_traceback.tb_frame.f_code.co_filename
             line = exception_traceback.tb_lineno
-            logger.error("Non blocking exception occurred: " + f"{repr(exception_object)} of type {exception_type} in {file} line #{line}")
+            logger.error(f"Non blocking exception occurred: {repr(exception_object)} of type {exception_type} in {file} line #{line}")
             return self.max_battery_discharge_current
 
     def calc_max_charge_current_from_soc(self) -> float:
@@ -1968,7 +1968,7 @@ class Battery(ABC):
             if is_present_in_vebus:
 
                 if utils.EXTERNAL_SENSOR_DBUS_PATH_CURRENT is not None:
-                    logger.info("Using external sensor for current: " + f"{utils.EXTERNAL_SENSOR_DBUS_DEVICE}{utils.EXTERNAL_SENSOR_DBUS_PATH_CURRENT}")
+                    logger.info(f"Using external sensor for current: {utils.EXTERNAL_SENSOR_DBUS_DEVICE}{utils.EXTERNAL_SENSOR_DBUS_PATH_CURRENT}")
                     dbus_objects["Current"] = VeDbusItemImport(
                         dbus_connection,
                         utils.EXTERNAL_SENSOR_DBUS_DEVICE,
@@ -1976,7 +1976,7 @@ class Battery(ABC):
                     )
 
                 if utils.EXTERNAL_SENSOR_DBUS_PATH_SOC is not None:
-                    logger.info("Using external sensor for SOC: " + f"{utils.EXTERNAL_SENSOR_DBUS_DEVICE}{utils.EXTERNAL_SENSOR_DBUS_PATH_SOC}")
+                    logger.info(f"Using external sensor for SOC: {utils.EXTERNAL_SENSOR_DBUS_DEVICE}{utils.EXTERNAL_SENSOR_DBUS_PATH_SOC}")
                     dbus_objects["Soc"] = VeDbusItemImport(
                         dbus_connection,
                         utils.EXTERNAL_SENSOR_DBUS_DEVICE,
@@ -1998,7 +1998,7 @@ class Battery(ABC):
             ) = sys.exc_info()
             file = exception_traceback.tb_frame.f_code.co_filename
             line = exception_traceback.tb_lineno
-            logger.error("Exception occurred: " + f"{repr(exception_object)} of type {exception_type} in {file} line #{line}")
+            logger.error(f"Exception occurred: {repr(exception_object)} of type {exception_type} in {file} line #{line}")
             logger.error("External current sensor setup failed, fallback to internal sensor")
 
     def get_current(self) -> Union[float, None]:
@@ -2154,19 +2154,28 @@ class Battery(ABC):
         logger.info(f"Battery {self.type} connected to dbus from {self.port}")
         logger.info("========== Settings ==========")
         logger.info(
-            f"> Connection voltage: {self.voltage} V | Current: {self.current_calc} A | SoC: {self.soc}% | SoH: {self.soh}%"
+            f"> Connection voltage: {self.voltage} V | Current: {self.current_calc} A | SoC: {self.soc}%"
+            + (f" | SoH: {self.soh}%" if self.soh is not None else "")
             + (f" | SoC calc: {self.soc_calc:.0f}%" if utils.SOC_CALCULATION else "")
         )
         logger.info(f"> Cell count: {self.cell_count} | Cells populated: {cell_counter}")
         logger.info(f"> BLOCK ON DISCONNECT: {utils.BLOCK_ON_DISCONNECT}")
+        if not utils.BLOCK_ON_DISCONNECT:
+            logger.info(f"> |- BLOCK ON DISCONNECT TIMEOUT MINUTES: {utils.BLOCK_ON_DISCONNECT_TIMEOUT_MINUTES}")
+            logger.info(f"> |- BLOCK ON DISCONNECT VOLTAGE MIN: {utils.BLOCK_ON_DISCONNECT_VOLTAGE_MIN:.3f} V")
+            logger.info(f"> |- BLOCK ON DISCONNECT VOLTAGE MAX: {utils.BLOCK_ON_DISCONNECT_VOLTAGE_MAX:.3f} V")
         logger.info(f'> CHARGE MODE: {"Linear" if utils.CHARGE_MODE == 1 else "Step" if utils.CHARGE_MODE == 2 else "Unknown"}')
+        logger.info(f"> MIN CELL VOLTAGE: {utils.MIN_CELL_VOLTAGE:.3f} V | MAX CELL VOLTAGE: {utils.MAX_CELL_VOLTAGE:.3f} V")
         logger.info(
-            f"> MIN CELL VOLTAGE: {utils.MIN_CELL_VOLTAGE:.3f} V "
-            + f"| MAX CELL VOLTAGE: {utils.MAX_CELL_VOLTAGE:.3f} V"
-            + f"| FLOAT CELL VOLTAGE: {utils.FLOAT_CELL_VOLTAGE:.3f} V"
+            f"> FLOAT CELL VOLTAGE: {utils.FLOAT_CELL_VOLTAGE:.3f} V"
+            + (
+                f" | SOC RESET CELL VOLTAGE: {utils.SOC_RESET_CELL_VOLTAGE:.3f} V | SOC_RESET_AFTER_DAYS: {utils.SOC_RESET_AFTER_DAYS}"
+                if utils.SOC_RESET_AFTER_DAYS is not None
+                else ""
+            )
         )
         logger.info(
-            f"> MAX BATTERY CHARGE CURRENT: {utils.MAX_BATTERY_CHARGE_CURRENT} A | " + f"MAX BATTERY DISCHARGE CURRENT: {utils.MAX_BATTERY_DISCHARGE_CURRENT} A"
+            f"> MAX BATTERY CHARGE CURRENT: {utils.MAX_BATTERY_CHARGE_CURRENT} A | MAX BATTERY DISCHARGE CURRENT: {utils.MAX_BATTERY_DISCHARGE_CURRENT} A"
         )
         if (
             (utils.MAX_BATTERY_CHARGE_CURRENT != self.max_battery_charge_current or utils.MAX_BATTERY_DISCHARGE_CURRENT != self.max_battery_discharge_current)
