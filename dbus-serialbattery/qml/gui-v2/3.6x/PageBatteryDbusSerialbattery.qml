@@ -9,100 +9,103 @@ import Victron.VenusOS
 Page {
 	id: root
 
+	//% "dbus-serialbattery - General"
+	title: qsTrId("dbus_serialbattery_general_title")
+
 	property string bindPrefix
 
 	function getActiveAlarmsText(){
 		let result = []
 		if (alarmLowBatteryVoltage.valid && alarmLowBatteryVoltage.value !== 0) {
-			//% "Low battery voltage"
+			// "Low battery voltage"
 			result.push((alarmLowBatteryVoltage.value === 2 ? "⚠️ " : "") + CommonWords.low_battery_voltage);
 		}
 		if (alarmHighBatteryVoltage.valid && alarmHighBatteryVoltage.value !== 0) {
-			//% "High battery voltage"
+			// "High battery voltage"
 			result.push((alarmHighBatteryVoltage.value === 2 ? "⚠️ " : "") + qsTrId("batteryalarms_high_battery_voltage"));
 		}
 		if (alarmHighCellVoltage.valid && alarmHighCellVoltage.value !== 0) {
-			//% "High cell voltage"
+			// "High cell voltage"
 			result.push((alarmHighCellVoltage.value === 2 ? "⚠️ " : "") + qsTrId("batteryalarms_high_cell_voltage"));
 		}
 		if (alarmHighChargeCurrent.valid && alarmHighChargeCurrent.value !== 0) {
-			//% "High charge current"
+			// "High charge current"
 			result.push((alarmHighChargeCurrent.value === 2 ? "⚠️ " : "") + qsTrId("batteryalarms_high_charge_current"));
 		}
 		if (alarmHighCurrent.valid && alarmHighCurrent.value !== 0) {
-			//% "High current"
+			// "High current"
 			result.push((alarmHighCurrent.value === 2 ? "⚠️ " : "") + qsTrId("batteryalarms_high_current"));
 		}
 		if (alarmHighDischargeCurrent.valid && alarmHighDischargeCurrent.value !== 0) {
-			//% "High discharge current"
+			// "High discharge current"
 			result.push((alarmHighDischargeCurrent.value === 2 ? "⚠️ " : "") + qsTrId("batteryalarms_high_discharge_current"));
 		}
 		if (alarmLowSoc.valid && alarmLowSoc.value !== 0) {
-			//% "Low SOC"
+			// "Low SOC"
 			result.push((alarmLowSoc.value === 2 ? "⚠️ " : "") + qsTrId("batteryalarms_low_soc"));
 		}
 		if (alarmStateOfHealth.valid && alarmStateOfHealth.value !== 0) {
-			//% "State of health"
+			// "State of health"
 			result.push((alarmStateOfHealth.value === 2 ? "⚠️ " : "") + qsTrId("batteryalarms_state_of_health"));
 		}
 		if (alarmLowStarterVoltage.valid && alarmLowStarterVoltage.value !== 0) {
-			//% "Low starter voltage"
+			// "Low starter voltage"
 			result.push((alarmLowStarterVoltage.value === 2 ? "⚠️ " : "") + qsTrId("batteryalarms_low_starter_voltage"));
 		}
 		if (alarmHighStarterVoltage.valid && alarmHighStarterVoltage.value !== 0) {
-			//% "High starter voltage"
+			// "High starter voltage"
 			result.push((alarmHighStarterVoltage.value === 2 ? "⚠️ " : "") + qsTrId("batteryalarms_high_starter_voltage"));
 		}
 		if (alarmLowTemperature.valid && alarmLowTemperature.value !== 0) {
-			//% "Low temperature"
+			// "Low temperature"
 			result.push((alarmLowTemperature.value === 2 ? "⚠️ " : "") + CommonWords.low_temperature);
 		}
 		if (alarmHighTemperature.valid && alarmHighTemperature.value !== 0) {
-			//% "High temperature"
+			// "High temperature"
 			result.push((alarmHighTemperature.value === 2 ? "⚠️ " : "") + CommonWords.high_temperature);
 		}
 		if (alarmBatteryTemperatureSensor.valid && alarmBatteryTemperatureSensor.value !== 0) {
-			//% "Battery temperature sensor"
+			// "Battery temperature sensor"
 			result.push((alarmBatteryTemperatureSensor.value === 2 ? "⚠️ " : "") + qsTrId("batteryalarms_battery_temperature_sensor"));
 		}
 		if (alarmMidPointVoltage.valid && alarmMidPointVoltage.value !== 0) {
-			//% "Midpoint voltage"
+			// "Midpoint voltage"
 			result.push((alarmMidPointVoltage.value === 2 ? "⚠️ " : "") + qsTrId("batteryalarms_midpoint_voltage"));
 		}
 		if (alarmFuseBlown.valid && alarmFuseBlown.value !== 0) {
-			//% "Fuse blown"
+			// "Fuse blown"
 			result.push((alarmFuseBlown.value === 2 ? "⚠️ " : "") + qsTrId("batteryalarms_fuse_blown"));
 		}
 		if (alarmHighInternalTemperature.valid && alarmHighInternalTemperature.value !== 0) {
-			//% "High internal temperature"
+			// "High internal temperature"
 			result.push((alarmHighInternalTemperature.value === 2 ? "⚠️ " : "") + qsTrId("batteryalarms_high_internal_temperature"));
 		}
 		if (alarmLowChargeTemperature.valid && alarmLowChargeTemperature.value !== 0) {
-			//% "Low charge temperature"
+			// "Low charge temperature"
 			result.push((alarmLowChargeTemperature.value === 2 ? "⚠️ " : "") + qsTrId("batteryalarms_low_charge_temperature"));
 		}
 		if (alarmHighChargeTemperature.valid && alarmHighChargeTemperature.value !== 0) {
-			//% "High charge temperature"
+			// "High charge temperature"
 			result.push((alarmHighChargeTemperature.value === 2 ? "⚠️ " : "") + qsTrId("batteryalarms_high_charge_temperature"));
 		}
 		if (alarmInternalFailure.valid && alarmInternalFailure.value !== 0) {
-			//% "Internal failure"
+			// "Internal failure"
 			result.push((alarmInternalFailure.value === 2 ? "⚠️ " : "") + qsTrId("batteryalarms_internal_failure"));
 		}
 		if (alarmCellImbalance.valid && alarmCellImbalance.value !== 0) {
-			//% "Cell imbalance"
+			// "Cell imbalance"
 			result.push((alarmCellImbalance.value === 2 ? "⚠️ " : "") + qsTrId("batteryalarms_cell_imbalance"));
 		}
 		if (alarmLowCellVoltage.valid && alarmLowCellVoltage.value !== 0) {
-			//% "Low cell voltage"
+			// "Low cell voltage"
 			result.push((alarmLowCellVoltage.value === 2 ? "⚠️ " : "") + qsTrId("batteryalarms_low_cell_voltage"));
 		}
 		if (alarmBmsCable.valid && alarmBmsCable.value !== 0) {
-			//% "BMS cable"
+			// "BMS cable"
 			result.push((alarmBmsCable.value === 2 ? "⚠️ " : "") + qsTrId("batteryalarms_bms_cable"));
 		}
 		if (alarmContactor.valid && alarmContactor.value !== 0) {
-			//% "Bad contactor"
+			// "Bad contactor"
 			result.push((alarmContactor.value === 2 ? "⚠️ " : "") + qsTrId("batteryalarms_contactor"));
 		}
 
@@ -119,10 +122,10 @@ Page {
 		id: voltageItem
 		uid: root.bindPrefix + "/Dc/0/Voltage"
 	}
-    VeQuickItem {
-        id: currentAvgItem
-        uid: root.bindPrefix + "/CurrentAvg"
-    }
+	VeQuickItem {
+		id: currentAvgItem
+		uid: root.bindPrefix + "/CurrentAvg"
+	}
 	VeQuickItem {
 		id: cellSumItem
 		uid: root.bindPrefix + "/Voltages/Sum"
@@ -193,18 +196,22 @@ Page {
 		uid: root.bindPrefix + "/System/Temperature4Name"
 	}
 
-    VeQuickItem {
-        id: allowToChargeItem
-        uid: root.bindPrefix + "/Io/AllowToCharge"
-    }
-    VeQuickItem {
-        id: allowToDischargeItem
-        uid: root.bindPrefix + "/Io/AllowToDischarge"
-    }
-    VeQuickItem {
-        id: allowToBalanceItem
-        uid: root.bindPrefix + "/Io/AllowToBalance"
-    }
+	VeQuickItem {
+		id: allowToChargeItem
+		uid: root.bindPrefix + "/Io/AllowToCharge"
+	}
+	VeQuickItem {
+		id: allowToDischargeItem
+		uid: root.bindPrefix + "/Io/AllowToDischarge"
+	}
+	VeQuickItem {
+		id: allowToBalanceItem
+		uid: root.bindPrefix + "/Io/AllowToBalance"
+	}
+	VeQuickItem {
+		id: allowToHeatItem
+		uid: root.bindPrefix + "/Io/AllowToHeat"
+	}
 
 	VeQuickItem {
 		id: chargeModeItem
@@ -321,7 +328,8 @@ Page {
 		model: VisibleItemModel {
 			ListItem {
 				id: cellOverviewItem
-				text: "Overview"
+				// "Overview"
+				text: qsTrId("nav_overview")
 				content.children: [
 					Row {
 						id: contentRowOverview
@@ -345,7 +353,8 @@ Page {
 							Label {
 								width: parent.width
 								horizontalAlignment: Text.AlignHCenter
-								text: "Current"
+								// "Current"
+								text: CommonWords.current_amps
 								color: Theme.color_font_secondary
 								font.pixelSize: Theme.font_size_caption
 							}
@@ -364,7 +373,9 @@ Page {
 							Label {
 								width: parent.width
 								horizontalAlignment: Text.AlignHCenter
-								text: "Current avg"
+								//: Label of the current average in amps
+								//% "Current avg"
+								text: qsTrId("dbus_serialbattery_general_current_avg")
 								color: Theme.color_font_secondary
 								font.pixelSize: Theme.font_size_caption
 							}
@@ -383,7 +394,8 @@ Page {
 							Label {
 								width: parent.width
 								horizontalAlignment: Text.AlignHCenter
-								text: "Voltage"
+								// "Voltage"
+								text: CommonWords.voltage
 								color: Theme.color_font_secondary
 								font.pixelSize: Theme.font_size_caption
 							}
@@ -406,7 +418,8 @@ Page {
 							Label {
 								width: parent.width
 								horizontalAlignment: Text.AlignHCenter
-								text: "Cell max"
+								//% "Cell max"
+								text: qsTrId("dbus_serialbattery_general_cell_max")
 								color: Theme.color_font_secondary
 								font.pixelSize: Theme.font_size_caption
 							}
@@ -428,7 +441,8 @@ Page {
 							Label {
 								width: parent.width
 								horizontalAlignment: Text.AlignHCenter
-								text: "Cell min"
+								//% "Cell min"
+								text: qsTrId("dbus_serialbattery_general_cell_min")
 								color: Theme.color_font_secondary
 								font.pixelSize: Theme.font_size_caption
 							}
@@ -450,7 +464,8 @@ Page {
 							Label {
 								width: parent.width
 								horizontalAlignment: Text.AlignHCenter
-								text: "SoC"
+								//% "SoC"
+								text: qsTrId("dbus_serialbattery_general_soc")
 								color: Theme.color_font_secondary
 								font.pixelSize: Theme.font_size_caption
 							}
@@ -461,7 +476,8 @@ Page {
 
 			ListItem {
 				id: temperaturesOverviewItem
-				text: "Temperatures"
+				//% "Temperatures"
+				text: qsTrId("dbus_serialbattery_general_temperatures")
 				content.children: [
 					Row {
 						id: temperaturesContentRowOverview
@@ -488,7 +504,8 @@ Page {
 							Label {
 								width: parent.width
 								horizontalAlignment: Text.AlignHCenter
-								text: "Battery"
+								// "Battery"
+								text: CommonWords.battery
 								color: Theme.color_font_secondary
 								font.pixelSize: Theme.font_size_caption
 							}
@@ -510,7 +527,8 @@ Page {
 							Label {
 								width: parent.width
 								horizontalAlignment: Text.AlignHCenter
-								text: "MOSFET"
+								//% "MOSFET"
+								text: qsTrId("dbus_serialbattery_general_mosfet")
 								color: Theme.color_font_secondary
 								font.pixelSize: Theme.font_size_caption
 							}
@@ -530,7 +548,8 @@ Page {
 							Label {
 								width: parent.width
 								horizontalAlignment: Text.AlignHCenter
-								text: temperature1NameItem.value ?? "Temp 1"
+								//% "Temp 1"
+								text: temperature1NameItem.value ?? qsTrId("dbus_serialbattery_general_temp1")
 								color: Theme.color_font_secondary
 								font.pixelSize: Theme.font_size_caption
 							}
@@ -550,7 +569,8 @@ Page {
 							Label {
 								width: parent.width
 								horizontalAlignment: Text.AlignHCenter
-								text: temperature2NameItem.value ?? "Temp 2"
+								//% "Temp 2"
+								text: temperature2NameItem.value ?? qsTrId("dbus_serialbattery_general_temp2")
 								color: Theme.color_font_secondary
 								font.pixelSize: Theme.font_size_caption
 							}
@@ -570,7 +590,8 @@ Page {
 							Label {
 								width: parent.width
 								horizontalAlignment: Text.AlignHCenter
-								text: temperature3NameItem.value ?? "Temp 3"
+								//% "Temp 3"
+								text: temperature3NameItem.value ?? qsTrId("dbus_serialbattery_general_temp3")
 								color: Theme.color_font_secondary
 								font.pixelSize: Theme.font_size_caption
 							}
@@ -590,7 +611,8 @@ Page {
 							Label {
 								width: parent.width
 								horizontalAlignment: Text.AlignHCenter
-								text: temperature4NameItem.value ?? "Temp 4"
+								//% "Temp 4"
+								text: temperature4NameItem.value ?? qsTrId("dbus_serialbattery_general_temp4")
 								color: Theme.color_font_secondary
 								font.pixelSize: Theme.font_size_caption
 							}
@@ -601,14 +623,14 @@ Page {
 
 			ListText {
 				//% "Charge Mode"
-				text: "Charge Mode"
+				text: qsTrId("dbus_serialbattery_general_charge_mode")
 				secondaryText: chargeModeItem.valid ? chargeModeItem.value : "--"
 				preferredVisible: chargeModeItem.valid
 			}
 
 			ListQuantityGroup {
 				id: chargeLimitationFullItem
-				//% "Charge Voltage Limit (CVL)"
+				// "Charge Voltage Limit (CVL)"
 				text: qsTrId("batteryparameters_charge_voltage_limit_cvl")
 				model: QuantityObjectModel {
 					QuantityObject { object: customDataObject; key: "name" }
@@ -618,12 +640,13 @@ Page {
 
 				QtObject {
 					id: customDataObject
-					property string name: maxChargeCellVoltageItem.valid ? maxChargeCellVoltageItem.value.toFixed(3) + "V/cell" : "--"
+					//% "V/cell"
+					property string name: maxChargeCellVoltageItem.valid ? maxChargeCellVoltageItem.value.toFixed(3) + qsTrId("serialbattery_general_volt_per_cell") : "--"
 				}
 			}
 
 			ListQuantityGroup {
-				//% "Charge Voltage Limit (CVL)"
+				// "Charge Voltage Limit (CVL)"
 				text: qsTrId("batteryparameters_charge_voltage_limit_cvl")
 				model: QuantityObjectModel {
 					QuantityObject { object: maxChargeVoltageItem; unit: VenusOS.Units_Volt_DC }
@@ -632,7 +655,7 @@ Page {
 			}
 
 			ListQuantityGroup {
-				//% "Charge Current Limit (CCL)"
+				// "Charge Current Limit (CCL)"
 				text: qsTrId("batteryparameters_charge_current_limit_ccl")
 				model: QuantityObjectModel {
 					QuantityObject { object: chargeLimitationItem; defaultValue: "--" }
@@ -651,7 +674,7 @@ Page {
 			}
 
 			ListQuantityGroup {
-				//% "Discharge Current Limit (DCL)"
+				// "Discharge Current Limit (DCL)"
 				text: qsTrId("batteryparameters_discharge_current_limit_dcl")
 				model: QuantityObjectModel {
 					QuantityObject { object: dischargeLimitationItem; defaultValue: "--" }
@@ -671,13 +694,14 @@ Page {
 
 			ListItem {
 				id: allowToOverviewItem
-				text: "Allow to"
+				//% "Allow to"
+				text: qsTrId("dbus_serialbattery_general_allow_to")
 				preferredVisible: allowToChargeItem.valid || allowToDischargeItem.valid || allowToBalanceItem.valid
 				content.children: [
 					Row {
 						id: allowToContentRowOverview
 
-						readonly property real itemWidth: (width - (spacing * 2)) / 3
+						readonly property real itemWidth: allowToHeatItem.valid ? (width - (spacing * 3)) / 4 : (width - (spacing * 2)) / 3
 
 						width: allowToOverviewItem.maximumContentWidth
 						spacing: Theme.geometry_listItem_content_spacing
@@ -695,7 +719,9 @@ Page {
 							Label {
 								width: parent.width
 								horizontalAlignment: Text.AlignHCenter
-								text: "Charge"
+								//: Allow to ...
+								//% "Charge"
+								text: qsTrId("dbus_serialbattery_general_charge")
 								color: Theme.color_font_secondary
 								font.pixelSize: Theme.font_size_caption
 							}
@@ -713,7 +739,9 @@ Page {
 							Label {
 								width: parent.width
 								horizontalAlignment: Text.AlignHCenter
-								text: "Discharge"
+								//: Allow to ...
+								//% "Discharge"
+								text: qsTrId("dbus_serialbattery_general_discharge")
 								color: Theme.color_font_secondary
 								font.pixelSize: Theme.font_size_caption
 							}
@@ -731,7 +759,30 @@ Page {
 							Label {
 								width: parent.width
 								horizontalAlignment: Text.AlignHCenter
-								text: "Balance"
+								//: Allow to ...
+								//% "Balance"
+								text: qsTrId("dbus_serialbattery_general_balance")
+								color: Theme.color_font_secondary
+								font.pixelSize: Theme.font_size_caption
+							}
+						}
+						Column {
+							width: allowToHeatItem.valid ? allowToContentRowOverview.itemWidth : 0
+							visible: allowToHeatItem.valid
+
+							QuantityLabel {
+								width: parent.width
+								valueText: allowToHeatItem.valid ? CommonWords.yesOrNo(allowToHeatItem.value) : "--"
+								valueColor: allowToHeatItem.value === 0 ? "#BF4845" : Theme.color_font_primary
+								font.pixelSize: 22
+							}
+
+							Label {
+								width: parent.width
+								horizontalAlignment: Text.AlignHCenter
+								//: Allow to ...
+								//% "Heat"
+								text: qsTrId("dbus_serialbattery_general_heat")
 								color: Theme.color_font_secondary
 								font.pixelSize: Theme.font_size_caption
 							}
@@ -740,59 +791,217 @@ Page {
 				]
 			}
 
+			ListItem {
+				id: heaterOverviewItem
+				//% "Heater"
+				text: qsTrId("dbus_serialbattery_general_heater")
+				preferredVisible: heatingItem.valid || heatingCurrentItem.valid || heatingPowerItem.valid || heatingTemperatureStartItem.valid || heatingTemperatureStopItem.valid
+				content.children: [
+					Row {
+						id: heaterContentRowOverview
+
+						readonly property real itemWidth: (width - (spacing * 4)) / 5
+
+						width: heaterOverviewItem.maximumContentWidth
+						spacing: Theme.geometry_listItem_content_spacing
+
+						Column {
+							width: heaterContentRowOverview.itemWidth
+
+							Label {
+								width: parent.width
+								horizontalAlignment: Text.AlignHCenter
+								text: heatingItem.valid ? (
+									heatingItem.value === 1
+									//% "Running"
+									? qsTrId("dbus_serialbattery_general_heater_running")
+									//% "Stopped"
+									: qsTrId("dbus_serialbattery_general_heater_stopped")
+									) : "--"
+								color: Theme.color_font_primary
+								font.pixelSize: 22
+							}
+
+							Label {
+								width: parent.width
+								horizontalAlignment: Text.AlignHCenter
+								// "State"
+								text: CommonWords.state
+								color: Theme.color_font_secondary
+								font.pixelSize: Theme.font_size_caption
+							}
+
+							VeQuickItem {
+								id: heatingItem
+								uid: root.bindPrefix + "/Heating"
+							}
+						}
+						Column {
+							width: heaterContentRowOverview.itemWidth
+
+							QuantityLabel {
+								width: parent.width
+								value: heatingCurrentItem.value ?? NaN
+								unit: VenusOS.Units_Amp
+								precision: 1
+								//valueColor: Theme.color_font_primary
+								font.pixelSize: 22
+							}
+
+							Label {
+								width: parent.width
+								horizontalAlignment: Text.AlignHCenter
+								// "Current"
+								text: CommonWords.current_amps
+								color: Theme.color_font_secondary
+								font.pixelSize: Theme.font_size_caption
+							}
+
+							VeQuickItem {
+								id: heatingCurrentItem
+								uid: root.bindPrefix + "/Info/HeatingCurrent"
+							}
+						}
+						Column {
+							width: heaterContentRowOverview.itemWidth
+
+							QuantityLabel {
+								width: parent.width
+								value: heatingPowerItem.value ?? NaN
+								unit: VenusOS.Units_Watt
+								precision: 1
+								//valueColor: Theme.color_font_primary
+								font.pixelSize: 22
+							}
+
+							Label {
+								width: parent.width
+								horizontalAlignment: Text.AlignHCenter
+								// "Power"
+								text: CommonWords.power_watts
+								color: Theme.color_font_secondary
+								font.pixelSize: Theme.font_size_caption
+							}
+
+							VeQuickItem {
+								id: heatingPowerItem
+								uid: root.bindPrefix + "/Info/HeatingPower"
+							}
+						}
+						Column {
+							width: heaterContentRowOverview.itemWidth
+
+							QuantityLabel {
+								width: parent.width
+								value: heatingTemperatureStartItem.value ?? NaN
+								unit: Global.systemSettings.temperatureUnit
+								precision: 1
+								valueColor: Theme.color_font_primary
+								font.pixelSize: 22
+							}
+
+							Label {
+								width: parent.width
+								horizontalAlignment: Text.AlignHCenter
+								//: Temperature at which the heater starts
+								//% "Temp start"
+								text: qsTrId("dbus_serialbattery_general_temp_start")
+								color: Theme.color_font_secondary
+								font.pixelSize: Theme.font_size_caption
+							}
+
+							VeQuickItem {
+								id: heatingTemperatureStartItem
+								uid: root.bindPrefix + "/Info/HeatingTemperatureStart"
+							}
+						}
+						Column {
+							width: heaterContentRowOverview.itemWidth
+
+							QuantityLabel {
+								width: parent.width
+								value: heatingTemperatureStopItem.value ?? NaN
+								unit: Global.systemSettings.temperatureUnit
+								precision: 1
+								valueColor: Theme.color_font_primary
+								font.pixelSize: 22
+							}
+
+							Label {
+								width: parent.width
+								horizontalAlignment: Text.AlignHCenter
+								//: Temperature at which the heater stops
+								//% "Temp stop"
+								text: qsTrId("dbus_serialbattery_general_temp_stop")
+								color: Theme.color_font_secondary
+								font.pixelSize: Theme.font_size_caption
+							}
+
+							VeQuickItem {
+								id: heatingTemperatureStopItem
+								uid: root.bindPrefix + "/Info/HeatingTemperatureStop"
+							}
+						}
+					}
+				]
+			}
+
 			ListText {
-				text: "Alarms"
+				// "Alarms"
+				text: CommonWords.alarms
 				secondaryText: getActiveAlarmsText()
 				secondaryLabel.color: Theme.color_red
 				preferredVisible: secondaryLabel.text !== ""
 			}
 
 			SettingsListHeader {
-				text: "Support"
+				//% "Support"
+				text: qsTrId("dbus_serialbattery_general_support")
 				// show only for mr-manuel/dbus-serialbattery (productId registered at Victron)
 				preferredVisible: productId.value === 0xBA77
 			}
 
 			ListLink {
-				text: "How to troubleshoot"
+				//% "How to troubleshoot"
+				text: qsTrId("dbus_serialbattery_general_how_to_troubleshoot")
 				url: "https://mr-manuel.github.io/venus-os_dbus-serialbattery_docs/troubleshoot/"
 				// show only for mr-manuel/dbus-serialbattery (productId registered at Victron)
 				preferredVisible: productId.value === 0xBA77
 			}
 
 			ListLink {
-				text: "FAQ (Frequently Asked Questions)"
+				//% "FAQ (Frequently Asked Questions)"
+				text: qsTrId("dbus_serialbattery_general_faq")
 				url: "https://mr-manuel.github.io/venus-os_dbus-serialbattery_docs/faq/"
 				// show only for mr-manuel/dbus-serialbattery (productId registered at Victron)
 				preferredVisible: productId.value === 0xBA77
 			}
 
 			ListLink {
-				text: "GitHub"
+				//% "GitHub"
+				text: qsTrId("dbus_serialbattery_general_github")
 				url: "https://github.com/mr-manuel/venus-os_dbus-serialbattery/"
 				// show only for mr-manuel/dbus-serialbattery (productId registered at Victron)
 				preferredVisible: productId.value === 0xBA77
 			}
 
 			ListLink {
-				text: "Donate to help this project, any amount is appreciated"
+				//% "Donate to help this project, any amount is appreciated"
+				text: qsTrId("dbus_serialbattery_general_donate")
 				url: "https://www.paypal.com/donate/?hosted_button_id=3NEVZBDM5KABW"
 				// show only for mr-manuel/dbus-serialbattery (productId registered at Victron)
 				preferredVisible: productId.value === 0xBA77
 			}
 
 			SettingsListHeader {
-				text: "Driver Debug Data"
-                preferredVisible: chargeModeDebug.valid
+				//% "Driver Debug Data"
+				text: qsTrId("dbus_serialbattery_general_driver_debug_data")
+				preferredVisible: chargeModeDebug.valid && chargeModeDebug.value !== ""
 			}
 
 			ListItem {
-				text: "General Values"
-
-				VeQuickItem {
-					id: chargeModeDebug
-					uid: root.bindPrefix + "/Info/ChargeModeDebug"
-				}
+				//% "General Values"
+				text: qsTrId("dbus_serialbattery_general_values")
 
 				bottomContentChildren: [
 					PrimaryListLabel {
@@ -804,16 +1013,17 @@ Page {
 					}
 				]
 
-				preferredVisible: chargeModeDebug.valid
+				preferredVisible: chargeModeDebug.valid && chargeModeDebug.value !== ""
+
+				VeQuickItem {
+					id: chargeModeDebug
+					uid: root.bindPrefix + "/Info/ChargeModeDebug"
+				}
 			}
 
 			ListItem {
-				text: "Switch to Float Requirements"
-
-				VeQuickItem {
-					id: chargeModeDebugFloat
-					uid: root.bindPrefix + "/Info/ChargeModeDebugFloat"
-				}
+				//% "Switch to Float Requirements"
+				text: qsTrId("dbus_serialbattery_general_switch_to_float_requirements")
 
 				bottomContentChildren: [
 					PrimaryListLabel {
@@ -825,16 +1035,17 @@ Page {
 					}
 				]
 
-				preferredVisible: chargeModeDebugFloat.valid
+				preferredVisible: chargeModeDebugFloat.valid && chargeModeDebugFloat.value !== ""
+
+				VeQuickItem {
+					id: chargeModeDebugFloat
+					uid: root.bindPrefix + "/Info/ChargeModeDebugFloat"
+				}
 			}
 
 			ListItem {
-				text: "Switch to Bulk Requirements"
-
-				VeQuickItem {
-					id: chargeModeDebugBulk
-					uid: root.bindPrefix + "/Info/ChargeModeDebugBulk"
-				}
+				//% "Switch to Bulk Requirements"
+				text: qsTrId("dbus_serialbattery_general_switch_to_bulk_requirements")
 
 				bottomContentChildren: [
 					PrimaryListLabel {
@@ -846,7 +1057,12 @@ Page {
 					}
 				]
 
-				preferredVisible: chargeModeDebugBulk.valid
+				preferredVisible: chargeModeDebugBulk.valid && chargeModeDebugBulk.value !== ""
+
+				VeQuickItem {
+					id: chargeModeDebugBulk
+					uid: root.bindPrefix + "/Info/ChargeModeDebugBulk"
+				}
 			}
 
 		}
