@@ -44,10 +44,6 @@ class DbusHelper:
                 self.battery.online = True
                 self.battery.connection_info = "Connected"
 
-                # unblock charge/discharge, if it was blocked when battery went offline
-                if utils.BLOCK_ON_DISCONNECT:
-                    self.battery.block_because_disconnect = False
-
                 # reset cell voltages good
                 if self.cell_voltages_good is not None:
                     self.cell_voltages_good = None
@@ -108,7 +104,6 @@ class DbusHelper:
         logger.debug("temperature_high_charge:" + str(self.battery.protection.temperature_high_charge))
         logger.debug("temperature_low_charge: " + str(self.battery.protection.temperature_low_charge))
         logger.debug("temperature_low_discharge:" + str(self.battery.protection.temperature_low_discharge))
-        logger.debug("block_because_disconnect:" + str(self.battery.block_because_disconnect))
         logger.debug("temperature_high_internal:" + str(self.battery.protection.temperature_high_internal))
 
         # cell voltages

@@ -315,7 +315,6 @@ class Battery(ABC):
         self.discharge_fet: bool = None
         self.balance_fet: bool = None
         self.heater_fet: bool = None
-        self.block_because_disconnect: bool = False
         self.control_charge_current: int = None
         self.control_discharge_current: int = None
         self.control_allow_charge: bool = None
@@ -968,7 +967,6 @@ class Battery(ABC):
                     + f"charge_fet: {self.charge_fet} • control_allow_charge: {self.control_allow_charge}\n"
                     + f"discharge_fet: {self.discharge_fet} • "
                     + f"control_allow_discharge: {self.control_allow_discharge}\n"
-                    + f"block_because_disconnect: {self.block_because_disconnect}\n"
                     + (
                         (
                             "soc_reset_last_reached: "
@@ -1091,7 +1089,7 @@ class Battery(ABC):
                     charge_limits.update({tmp: "SoC"})
 
         # set CCL to 0, if BMS does not allow to charge or battery is disconnected
-        if self.charge_fet is False or self.block_because_disconnect:
+        if self.charge_fet is False:
             if 0 in charge_limits:
                 charge_limits.update({0: charge_limits[0] + ", BMS"})
             else:
@@ -1189,7 +1187,7 @@ class Battery(ABC):
                     discharge_limits.update({tmp: "SoC"})
 
         # set DCL to 0, if BMS does not allow to discharge or battery is disconnected
-        if self.discharge_fet is False or self.block_because_disconnect:
+        if self.discharge_fet is False:
             if 0 in discharge_limits:
                 discharge_limits.update({0: discharge_limits[0] + ", BMS"})
             else:
@@ -1911,10 +1909,10 @@ class Battery(ABC):
             return None
 
     def get_allow_to_charge(self) -> bool:
-        return True if self.charge_fet and self.control_allow_charge and self.block_because_disconnect is False else False
+        return True if self.charge_fet and self.control_allow_charge else False
 
     def get_allow_to_discharge(self) -> bool:
-        return True if self.discharge_fet and self.control_allow_discharge and self.block_because_disconnect is False else False
+        return True if self.discharge_fet and self.control_allow_discharge else False
 
     def get_allow_to_balance(self) -> bool:
         return True if self.balance_fet else False if self.balance_fet is False else None

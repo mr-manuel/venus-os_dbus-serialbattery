@@ -834,10 +834,6 @@ class DbusHelper:
                 else:
                     self.battery.connection_info = "Connected"
 
-                # unblock charge/discharge, if it was blocked when battery went offline
-                if utils.BLOCK_ON_DISCONNECT:
-                    self.battery.block_because_disconnect = False
-
                 # reset cell voltages good
                 if self.cell_voltages_good is not None:
                     self.cell_voltages_good = None
@@ -931,10 +927,6 @@ class DbusHelper:
                                 )
 
                             self.battery.init_values()
-
-                            # block charge/discharge
-                            if utils.BLOCK_ON_DISCONNECT:
-                                self.battery.block_because_disconnect = True
 
                     # set connection info
                     remaining = self.disconnect_threshold - time_since_first_error
@@ -1105,15 +1097,11 @@ class DbusHelper:
         self._dbusservice["/Alarms/HighTemperature"] = self.battery.protection.high_temperature
         self._dbusservice["/Alarms/LowTemperature"] = self.battery.protection.low_temperature
         self._dbusservice["/Alarms/BmsCable"] = (
-            2
-            if self.battery.block_because_disconnect
-            else (
-                1
-                if self.error["timestamp_last"] is not None
-                and self.error["timestamp_first"] is not None
-                and 60 < self.error["timestamp_last"] - self.error["timestamp_first"]
-                else 0
-            )
+            1
+            if self.error["timestamp_last"] is not None
+            and self.error["timestamp_first"] is not None
+            and 60 < self.error["timestamp_last"] - self.error["timestamp_first"]
+            else 0
         )
         self._dbusservice["/Alarms/HighInternalTemperature"] = self.battery.protection.high_internal_temperature
         self._dbusservice["/Alarms/FuseBlown"] = self.battery.protection.fuse_blown
