@@ -14,7 +14,7 @@ import serial
 
 
 # CONSTANTS
-DRIVER_VERSION: str = "2.1.20260105dev"
+DRIVER_VERSION: str = "2.1.20260109dev"
 """
 current version of the driver
 """
@@ -292,6 +292,10 @@ if not BLOCK_ON_DISCONNECT:
             "For safety reasons BLOCK_ON_DISCONNECT was set to True. Please check the configuration.",
         )
         BLOCK_ON_DISCONNECT = True
+
+
+# --------- BMS Cable Alarm ---------
+BMS_CABLE_ALARM: bool = get_bool_from_config("DEFAULT", "BMS_CABLE_ALARM")
 
 
 # --------- External Sensor for Current and/or SoC ---------

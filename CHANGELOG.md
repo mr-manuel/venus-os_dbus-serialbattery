@@ -40,6 +40,7 @@
 * Changed: GUIv2: Add cell diff to mean and improve calculations to reduce CPU load. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/360 by @mr-manuel
 * Changed: HLPDATA BMS - Fixed wrong charge/discharge fet assignment @mr-manuel
 * Changed: HLPDATA BMS - Fixed wrong charge/discharge fet assignment @mr-manuel
+* Changed: Improved BMS Cable Alarm Logic. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/309 by @mr-manuel
 * Changed: JK Inverter BMS - Fixed serial number lenght by @mr-manuel
 * Changed: JKBMS CAN - Correct calculation of arbitration_id for device_address > 0. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/288 with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/306 by @Hooorny
 * Changed: KS48100 BMS - Fixed charge/discharge calculation with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/343 by @kopierschnitte

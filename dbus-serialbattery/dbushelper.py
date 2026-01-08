@@ -47,6 +47,7 @@ class DbusHelper:
         self.error: dict = {"count": 0, "timestamp_first": None, "timestamp_last": None}
         self.cell_voltages_good: bool = None
         self.disconnect_threshold: int = None
+        self.bms_cable_alarm: int = 0
         self._dbusname: str = (
             "com.victronenergy.battery."
             + self.battery.port[self.battery.port.rfind("/") + 1 :]
@@ -828,6 +829,9 @@ class DbusHelper:
                     self.error["timestamp_first"] = None
                     self.error["timestamp_last"] = None
 
+                    # reset BMS cable alarm
+                    self.bms_cable_alarm = 0
+
                 self.battery.online = True
                 if self.error["count"] > 0:
                     self.battery.connection_info = f"Connected ({self.error['count']} errors in the last minute)"
@@ -934,6 +938,15 @@ class DbusHelper:
                         f"Lost for: {time_since_first_error}s | Disconnect in: {remaining}s | Threshold: {self.disconnect_threshold}s"
                     )
 
+                    # set BMS cable alarm to warning
+                    self.bms_cable_alarm = (
+                        1
+                        if self.error["timestamp_last"] is not None
+                        and self.error["timestamp_first"] is not None
+                        and 60 < self.error["timestamp_last"] - self.error["timestamp_first"]
+                        else 0
+                    )
+
                     # Exit if recovery time exceeded and
                     # if BLOCK_ON_DISCONNECT is enabled or cell voltages are unsafe
                     if time_since_first_error >= RETRY_CYCLE_LONG_COUNT and (utils.BLOCK_ON_DISCONNECT or not self.cell_voltages_good):
@@ -952,7 +965,9 @@ class DbusHelper:
             # check if recovery failed and exit the loop to restart the driver
             # do this after publishing to dbus to set the alert from warning to error state
             if recovery_failed:
-                logger.error(f">>> Battery did not recover in {time_since_first_error} s. Restarting driver...")
+                # set BMS cable alarm to error before exiting
+                self._dbusservice["/Alarms/BmsCable"] = 2
+                logger.error(f">>> Battery did not recover in {time_since_first_error} s. Exit driver...")
                 loop.quit()
 
         except Exception:
@@ -1096,13 +1111,7 @@ class DbusHelper:
         self._dbusservice["/Alarms/LowChargeTemperature"] = self.battery.protection.low_charge_temperature
         self._dbusservice["/Alarms/HighTemperature"] = self.battery.protection.high_temperature
         self._dbusservice["/Alarms/LowTemperature"] = self.battery.protection.low_temperature
-        self._dbusservice["/Alarms/BmsCable"] = (
-            1
-            if self.error["timestamp_last"] is not None
-            and self.error["timestamp_first"] is not None
-            and 60 < self.error["timestamp_last"] - self.error["timestamp_first"]
-            else 0
-        )
+        self._dbusservice["/Alarms/BmsCable"] = self.bms_cable_alarm if utils.BMS_CABLE_ALARM else 0
         self._dbusservice["/Alarms/HighInternalTemperature"] = self.battery.protection.high_internal_temperature
         self._dbusservice["/Alarms/FuseBlown"] = self.battery.protection.fuse_blown
 
