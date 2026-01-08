@@ -46,6 +46,7 @@ class DbusHelper:
         self.settings = None
         self.error: dict = {"count": 0, "timestamp_first": None, "timestamp_last": None}
         self.cell_voltages_good: bool = None
+        self.disconnect_threshold: int = None
         self._dbusname: str = (
             "com.victronenergy.battery."
             + self.battery.port[self.battery.port.rfind("/") + 1 :]
@@ -796,6 +797,7 @@ class DbusHelper:
         """
         RETRY_CYCLE_SHORT_COUNT = 10
         RETRY_CYCLE_LONG_COUNT = 60
+        recovery_failed = False
 
         try:
             # Call the battery's refresh_data function
@@ -817,15 +819,20 @@ class DbusHelper:
 
             if result:
                 # check if battery has been reconnected
-                if self.battery.online is False and self.error["count"] >= RETRY_CYCLE_SHORT_COUNT:
+                if self.battery.online is False and self.error["count"] >= 0:
                     logger.info(">>> Battery reconnected <<<")
 
                 # reset error count, if last error was more than 60 seconds ago
                 if self.error["count"] > 0 and self.error["timestamp_last"] < int(time()) - 60:
                     self.error["count"] = 0
+                    self.error["timestamp_first"] = None
+                    self.error["timestamp_last"] = None
 
                 self.battery.online = True
-                self.battery.connection_info = "Connected"
+                if self.error["count"] > 0:
+                    self.battery.connection_info = f"Connected ({self.error['count']} errors in the last minute)"
+                else:
+                    self.battery.connection_info = "Connected"
 
                 # unblock charge/discharge, if it was blocked when battery went offline
                 if utils.BLOCK_ON_DISCONNECT:
@@ -877,6 +884,19 @@ class DbusHelper:
                 if self.error["count"] > 1:
                     time_since_first_error = self.error["timestamp_last"] - self.error["timestamp_first"]
 
+                    # check if the cell voltages are good to go for some minutes
+                    if self.cell_voltages_good is None:
+                        self.cell_voltages_good = (
+                            True
+                            if self.battery.get_min_cell_voltage() > utils.BLOCK_ON_DISCONNECT_VOLTAGE_MIN
+                            and self.battery.get_max_cell_voltage() < utils.BLOCK_ON_DISCONNECT_VOLTAGE_MAX
+                            else False
+                        )
+
+                    # set disconnect threshold time
+                    if self.disconnect_threshold is None:
+                        self.disconnect_threshold = RETRY_CYCLE_LONG_COUNT if utils.BLOCK_ON_DISCONNECT else utils.BLOCK_ON_DISCONNECT_TIMEOUT_MINUTES * 60
+
                     # if the battery did not update in 10 second, it's assumed to be offline
                     if time_since_first_error >= RETRY_CYCLE_SHORT_COUNT:
 
@@ -886,15 +906,12 @@ class DbusHelper:
 
                             # reset the battery values
                             logger.error(">>> ERROR: Battery does not respond, init/reset values <<<")
+                            logger.error(
+                                f"    BLOCK_ON_DISCONNECT is {'enabled' if utils.BLOCK_ON_DISCONNECT else 'disabled'}. "
+                                + f"Exit in {self.disconnect_threshold} seconds if recovery does not occur."
+                            )
 
-                            # check if the cell voltages are good to go for some minutes
-                            if self.cell_voltages_good is None:
-                                self.cell_voltages_good = (
-                                    True
-                                    if self.battery.get_min_cell_voltage() > utils.BLOCK_ON_DISCONNECT_VOLTAGE_MIN
-                                    and self.battery.get_max_cell_voltage() < utils.BLOCK_ON_DISCONNECT_VOLTAGE_MAX
-                                    else False
-                                )
+                            if not utils.BLOCK_ON_DISCONNECT:
                                 logger.error(
                                     "    |- Cell voltages are"
                                     + ("" if self.cell_voltages_good else " NOT")
@@ -912,10 +929,6 @@ class DbusHelper:
                                     + f"Max threshold: {utils.BLOCK_ON_DISCONNECT_VOLTAGE_MAX:.3f} --> "
                                     + ("OK" if self.battery.get_max_cell_voltage() < utils.BLOCK_ON_DISCONNECT_VOLTAGE_MAX else "NOT OK")
                                 )
-                                logger.error(
-                                    "    |- Trying further for "
-                                    + f"{(60 * utils.BLOCK_ON_DISCONNECT_TIMEOUT_MINUTES if self.cell_voltages_good else 60):.0f} s, then restart the driver"
-                                )
 
                             self.battery.init_values()
 
@@ -924,27 +937,31 @@ class DbusHelper:
                                 self.battery.block_because_disconnect = True
 
                     # set connection info
+                    remaining = self.disconnect_threshold - time_since_first_error
                     self.battery.connection_info = (
-                        f"Connection lost since {time_since_first_error} s, "
-                        + "disconnect at "
-                        + f"{(60 * utils.BLOCK_ON_DISCONNECT_TIMEOUT_MINUTES if self.cell_voltages_good else 60):.0f} s"
+                        f"Lost for: {time_since_first_error}s | Disconnect in: {remaining}s | Threshold: {self.disconnect_threshold}s"
                     )
 
-                    # if the battery did not update in 60 second, it's assumed to be completely failed
+                    # Exit if recovery time exceeded and
+                    # if BLOCK_ON_DISCONNECT is enabled or cell voltages are unsafe
                     if time_since_first_error >= RETRY_CYCLE_LONG_COUNT and (utils.BLOCK_ON_DISCONNECT or not self.cell_voltages_good):
-                        logger.error(f">>> Battery did not recover in {time_since_first_error} s. Restarting driver...")
-                        loop.quit()
-
-                    # if the cells are between 3.2 and 3.3 volt we can continue for some time
-                    if time_since_first_error >= RETRY_CYCLE_LONG_COUNT * utils.BLOCK_ON_DISCONNECT_TIMEOUT_MINUTES and not utils.BLOCK_ON_DISCONNECT:
-                        logger.error(f">>> Battery did not recover in {time_since_first_error} s. Restarting driver...")
-                        loop.quit()
+                        recovery_failed = True
+                    # Exit if extended recovery time exceeded
+                    # This is only possible if cell voltages are good and BLOCK_ON_DISCONNECT is disabled else it would have exited earlier
+                    elif time_since_first_error >= self.disconnect_threshold:
+                        recovery_failed = True
 
             # publish all the data from the battery object to dbus
             self.publish_dbus()
 
             # upload telemetry data
             self.telemetry_upload()
+
+            # check if recovery failed and exit the loop to restart the driver
+            # do this after publishing to dbus to set the alert from warning to error state
+            if recovery_failed:
+                logger.error(f">>> Battery did not recover in {time_since_first_error} s. Restarting driver...")
+                loop.quit()
 
         except Exception:
             traceback.print_exc()
@@ -1087,7 +1104,17 @@ class DbusHelper:
         self._dbusservice["/Alarms/LowChargeTemperature"] = self.battery.protection.low_charge_temperature
         self._dbusservice["/Alarms/HighTemperature"] = self.battery.protection.high_temperature
         self._dbusservice["/Alarms/LowTemperature"] = self.battery.protection.low_temperature
-        self._dbusservice["/Alarms/BmsCable"] = 2 if self.battery.block_because_disconnect else 1 if not self.battery.online else 0
+        self._dbusservice["/Alarms/BmsCable"] = (
+            2
+            if self.battery.block_because_disconnect
+            else (
+                1
+                if self.error["timestamp_last"] is not None
+                and self.error["timestamp_first"] is not None
+                and 60 < self.error["timestamp_last"] - self.error["timestamp_first"]
+                else 0
+            )
+        )
         self._dbusservice["/Alarms/HighInternalTemperature"] = self.battery.protection.high_internal_temperature
         self._dbusservice["/Alarms/FuseBlown"] = self.battery.protection.fuse_blown
 

@@ -9,7 +9,7 @@ from time import sleep
 from typing import Union
 
 from dbus.mainloop.glib import DBusGMainLoop
-from gi.repository import GLib as gobject
+from gi.repository import GLib
 
 from battery import Battery
 from dbushelper import DbusHelper
@@ -510,7 +510,7 @@ def main():
 
     # Have a mainloop, so we can send/receive asynchronous calls to and from dbus
     DBusGMainLoop(set_as_default=True)
-    mainloop = gobject.MainLoop()
+    mainloop = GLib.MainLoop()
 
     # Get the initial values for the battery used by setup_vedbus
     helper = {}
@@ -538,7 +538,7 @@ def main():
         logger.info("Polling interval: active callback used")
         # add a timeout to detect lost connections/callbacks (watchdog)
         refresh_data_timeout = 5  # needs to be the same as in the battery class under refresh_data()
-        gobject.timeout_add(refresh_data_timeout * 1000, lambda: health_check_battery(mainloop))
+        GLib.timeout_add(refresh_data_timeout * 1000, lambda: health_check_battery(mainloop))
     else:
         # set poll interval from config if provided
         if POLL_INTERVAL is not None:
@@ -546,7 +546,7 @@ def main():
 
         logger.info(f"Polling interval: {battery[first_key].poll_interval/1000:.3f} s")
         # schedule periodic polling
-        gobject.timeout_add(
+        GLib.timeout_add(
             battery[first_key].poll_interval,
             lambda: poll_battery(mainloop),
         )
