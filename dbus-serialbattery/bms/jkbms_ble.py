@@ -196,13 +196,13 @@ class Jkbms_Ble(Battery):
                     logger.warning(f"Jkbms_Ble: Cell {c} voltage out of range (1 - 5 V): {st['cell_info']['voltages'][c]}")
 
             temperature_mos = st["cell_info"]["temperature_mos"]
-            self.to_temperature(0, temperature_mos if temperature_mos < 32767 else (65535 - temperature_mos) * -1)
+            self.to_temperature(0, temperature_mos if temperature_mos < 3276.7 else (6553.5 - temperature_mos) * -1)
 
             temperature_1 = st["cell_info"]["temperature_sensor_1"]
-            self.to_temperature(1, temperature_1 if temperature_1 < 32767 else (65535 - temperature_1) * -1)
+            self.to_temperature(1, temperature_1 if temperature_1 < 3276.7 else (6553.5 - temperature_1) * -1)
 
             temperature_2 = st["cell_info"]["temperature_sensor_2"]
-            self.to_temperature(2, temperature_2 if temperature_2 < 32767 else (65535 - temperature_2) * -1)
+            self.to_temperature(2, temperature_2 if temperature_2 < 3276.7 else (6553.5 - temperature_2) * -1)
 
             self.current = round(st["cell_info"]["current"], 1)
             self.voltage = round(st["cell_info"]["total_voltage"], 2)
