@@ -511,7 +511,7 @@ class Battery(ABC):
     def get_settings(self) -> bool:
         """
         Each driver must override this function to read the battery settings.
-        It's called only once after a successful connection by `DbusHelper.setup_vedbus()`.
+        Call it from test_connection().
 
         See `battery_template.py` for an example.
 

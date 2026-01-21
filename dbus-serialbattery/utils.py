@@ -5,12 +5,13 @@ import configparser
 import logging
 import sys
 from pathlib import Path
-from struct import unpack_from
+from struct import Struct, unpack_from
 from time import sleep
-from typing import List, Any, Callable, Union
+from typing import List, Any, Callable, Optional, Union
 
 # Third-party imports
 import serial
+import time
 
 
 # CONSTANTS
@@ -544,6 +545,9 @@ USE_BMS_DVCC_VALUES: bool = get_bool_from_config("DEFAULT", "USE_BMS_DVCC_VALUES
 SOC_LOW_WARNING: float = get_float_from_config("DEFAULT", "SOC_LOW_WARNING")
 SOC_LOW_ALARM: float = get_float_from_config("DEFAULT", "SOC_LOW_ALARM")
 
+# -- LltJbd_Up16s settings
+UP16S_REQUIRE_DIRECT_CONNECTION: bool = get_bool_from_config("DEFAULT", "UP16S_REQUIRE_DIRECT_CONNECTION")
+
 # -- Daly settings
 INVERT_CURRENT_MEASUREMENT: int = get_int_from_config("DEFAULT", "INVERT_CURRENT_MEASUREMENT")
 
@@ -745,6 +749,69 @@ def open_serial_port(port: str, baud: int) -> Union[serial.Serial, None]:
 
 def read_serialport_data(
     ser: serial.Serial,
+    request: bytearray,
+    timeout_seconds: float,
+    extra_length: int,
+    payload_length_pos: int,
+    payload_length_size: str = "B",
+    length_fixed: Optional[int] = None,
+) -> Optional[bytearray]:
+    """
+    Serial port read helper that fixes some shortcomings of read_serialport_data_deprecated() and is more reliable.
+
+    :param ser: Serial port
+    :param request: Data to send
+    :param timeout_seconds: Maximum time to wait for data
+    :param extra_length: Length of everything else that's not counted in the payload length value contained at payload_length_pos. For example it's
+      most likely the checksum and the header including the payload length field itself.
+    :param payload_length_pos: Position of the payload length field in the packet
+    :param payload_length_size: Size of the payload length field, e.g. "B", "H", "I", "L"
+    :param length_fixed: Total fixed length of the data to read. If set, all other length arguments are ignored. If not set, length will be read from the data
+    :return: Data read from the serial port or None on error
+    """
+
+    try:
+        ser.reset_input_buffer()
+        ser.write(request)
+
+        length_struct = Struct(">" + payload_length_size)
+        if length_fixed is None:
+            bytes_needed = payload_length_pos + length_struct.size
+            payload_length = None
+        else:
+            bytes_needed = length_fixed
+            payload_length = length_fixed
+
+        data = bytearray()
+        deadline = time.monotonic() + timeout_seconds
+        while time.monotonic() < deadline:
+            chunk = ser.read(max(1, ser.in_waiting))
+            if chunk:
+                data.extend(chunk)
+
+            # Parse length once we have enough bytes
+            if payload_length is None and len(data) >= bytes_needed:
+                payload_length = length_struct.unpack_from(data, payload_length_pos)[0]
+                # Update bytes needed for the complete message
+                bytes_needed = payload_length + extra_length
+
+            # Check if we have the complete message
+            if payload_length is not None and len(data) >= bytes_needed:
+                return data
+
+            # Sleep to prevent busy-waiting
+            sleep(0.01)
+
+        # Timeout occurred
+        return None
+
+    except Exception:
+        logger.exception("read_serialport_data exception")
+        return None
+
+
+def read_serialport_data_deprecated(
+    ser: serial.Serial,
     command: bytearray,
     length_pos: int,
     length_check: int,
@@ -753,7 +820,7 @@ def read_serialport_data(
     battery_online: bool = True,
 ) -> bytearray:
     """
-    Read data from a serial port
+    Read data from a serial port. Deprecated, use read_serialport_data() instead.
 
     :param ser: Serial port
     :param command: Command to send
@@ -855,7 +922,7 @@ def read_serial_data(
     ser = None  # Initialize ser to None
     try:
         with serial.Serial(port, baudrate=baud, timeout=0.1) as ser:
-            return read_serialport_data(ser, command, length_pos, length_check, length_fixed, length_size, battery_online)
+            return read_serialport_data_deprecated(ser, command, length_pos, length_check, length_fixed, length_size, battery_online)
 
     except serial.SerialException as e:
         logger.error(e)
