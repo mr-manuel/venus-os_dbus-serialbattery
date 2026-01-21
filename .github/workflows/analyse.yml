@@ -1,4 +1,4 @@
-name: "CodeQL, black, flake8 checks"
+name: "CodeQL, black, flake8 checks, and tests"
 
 on:
   push:
@@ -30,6 +30,11 @@ jobs:
       with:
         python-version: "3.10"
 
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest pyserial
+
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
       with:
@@ -44,3 +49,6 @@ jobs:
 
     - name: Perform flake8 lint check
       uses: py-actions/flake8@v2
+
+    - name: Run tests
+      run: pytest
