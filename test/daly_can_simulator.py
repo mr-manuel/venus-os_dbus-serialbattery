@@ -25,6 +25,7 @@ Usage:
 Author:
 - ChatGPT (prompt by user: "you are a embedded software engineer and python expert...")
 """
+
 import sys
 import os
 
@@ -32,7 +33,6 @@ sys.path.insert(1, os.path.join(os.path.dirname(__file__), "../dbus-serialbatter
 
 import can  # noqa: E402
 import struct  # noqa: E402
-
 
 # -------------------------------------------------------------------------------------
 # The driver daly_can.py defines these command -> response arbitration IDs:

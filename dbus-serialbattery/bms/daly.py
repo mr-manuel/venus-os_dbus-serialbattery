@@ -500,7 +500,7 @@ class Daly(Battery):
             logger.debug("No data received in read_capacity()")
             return False
 
-        (capacity, cell_volt) = unpack_from(">LL", capa_data)
+        capacity, cell_volt = unpack_from(">LL", capa_data)
 
         if capacity is not None and capacity > 0:
             self.capacity = capacity / 1000
@@ -516,7 +516,7 @@ class Daly(Battery):
             logger.debug("No data received in read_production_date()")
             return False
 
-        (_, _, year, month, day) = unpack_from(">BBBBB", production)
+        _, _, year, month, day = unpack_from(">BBBBB", production)
         self.production = f"{year + 2000}{month:02d}{day:02d}"
         return True
 

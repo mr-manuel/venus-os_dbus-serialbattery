@@ -16,7 +16,6 @@ from time import sleep
 from standalone_serialbattery import standalone_serialbattery
 import logging
 
-
 # "" = default = "/dev/ttyUSB0"
 # if you have another device specify here
 # DEVPATH = "/dev/ttyAMA0"  # with Waveshare CAN/RS485 HAT
