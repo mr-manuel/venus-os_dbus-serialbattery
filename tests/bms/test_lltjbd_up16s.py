@@ -154,20 +154,16 @@ PACK_PARAMS1_ADDR2_RESPONSE = bytes.fromhex("02") + PACK_PARAMS1_RESPONSE + byte
 
 
 PACK_PARAMS2_RESPONSE = bytes.fromhex(
-    "78 2000 2050 0040"
-    "7a a8 7a a8 4d 18"
+    "78 2006 2018 0012"
     "18 8d"  # high_res_soc = 6285 (62.85%)
     "00 64 00 03 00 96 00 50"
     "00 00 19 74"  # total_charge = 6516 (651.6 Ah)
     "00 00 1e ea"  # total_discharge = 7914 (791.4 Ah)
-    "00 19 0c 1c 00 14 0c 80 00 1e 0d 7a 00 50 0d de"
-    "00 5a 02 40 03 e8 01 b0 07 d0 00 10 00 42 00 04"
-    "05 db 00 7d 00 05 00 00"
 )
-PACK_PARAMS2_ADDR1_REQUEST = bytes.fromhex("01 78 2000 2050 0000 7571")
-PACK_PARAMS2_ADDR2_REQUEST = bytes.fromhex("02 78 2000 2050 0000 3564")
-PACK_PARAMS2_ADDR1_RESPONSE = bytes.fromhex("01") + PACK_PARAMS2_RESPONSE + bytes.fromhex("9c67")
-PACK_PARAMS2_ADDR2_RESPONSE = bytes.fromhex("02") + PACK_PARAMS2_RESPONSE + bytes.fromhex("d892")
+PACK_PARAMS2_ADDR1_REQUEST = bytes.fromhex("01 78 2006 2018 0000 7d67")
+PACK_PARAMS2_ADDR2_REQUEST = bytes.fromhex("02 78 2006 2018 0000 3d72")
+PACK_PARAMS2_ADDR1_RESPONSE = bytes.fromhex("01") + PACK_PARAMS2_RESPONSE + bytes.fromhex("98b0")
+PACK_PARAMS2_ADDR2_RESPONSE = bytes.fromhex("02") + PACK_PARAMS2_RESPONSE + bytes.fromhex("93f0")
 
 
 PRODUCT_INFORMATION_RESPONSE = bytes.fromhex(
