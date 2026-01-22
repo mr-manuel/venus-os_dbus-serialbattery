@@ -214,17 +214,19 @@ class PackParams1(Command):
 @dataclass
 class PackParams2(Command):
     """Returns configuration parameters (part 2). On Bluetooth/Wifi UART port this data can be requested for any battery, and on other ports it can be
-    requested only for the battery directly connected to that port."""
+    requested only for the battery directly connected to that port.
+    This version of the command requests only the minimum required information (versus requesting everything starting from address 0x2000). This is intentional,
+    and serves as a workaround for a BMS firmware bug that occasionally causes DCL to be briefly reset to 0 across all requests when the starting address is
+    0x2000. The downside is that this partial response format is only supported starting from about firmware v12 and will be ignored by older firmware."""
+
+    STRUCT: ClassVar[Struct] = Struct(">H8sII")
 
     MODBUS_FUNC = FUNC_READ
-    MODBUS_START_ADDR = 0x2000
-    MODBUS_ADDR_LEN = 0x50
+    MODBUS_START_ADDR = 0x2006
+    MODBUS_ADDR_LEN = STRUCT.size
 
-    STRUCT: ClassVar[Struct] = Struct(">6sH8sII")
-
-    unused1: bytes  # Skip fields we don't need.
     high_res_soc: int  # In difference to SOC from PackStatus, this field always contains an actual high-res non-rounded SOC
-    unused2: bytes
+    unused: bytes
     total_charge: int
     total_discharge: int
 
@@ -273,8 +275,8 @@ class SharedData:
     dbus-serialbattery process. This is fine, the aggregated CCL and CVL will still practically work as intended as long as they're applied to some battery
     instances, and command_availability_by_address must have separate instances on different ports either way."""
 
-    master_aggregated_charge_current_limit_amps: Optional[int] = None
-    master_aggregated_discharge_current_limit_amps: Optional[int] = None
+    master_aggregated_charge_current_limit_amps: Optional[float] = None
+    master_aggregated_discharge_current_limit_amps: Optional[float] = None
     master_aggregated_last_update_timestamp: int = 0
 
     # Structure: [address_int][Command.__name__] -> CommandAvailability
@@ -639,7 +641,7 @@ class LltJbd_Up16s(Battery):
             array.append(item)
 
     @staticmethod
-    def apply_aggregated_current_limit_from_master(slave_value: int, master_value: Optional[int], update_timestamp: float):
+    def apply_aggregated_current_limit_from_master(slave_value: float, master_value: Optional[float], update_timestamp: float):
         return (
             slave_value
             if master_value is None or update_timestamp < time.monotonic() - MASTER_AGGREGATED_VALUE_TIMEOUT_SECONDS
