@@ -243,6 +243,7 @@ if [ "$bluetooth_length" -gt 0 ]; then
     /etc/init.d/bluetooth stop
     sleep 2
     /etc/init.d/bluetooth start
+    sleep 2
     echo
 
     # function to install BLE battery
@@ -263,7 +264,7 @@ if [ "$bluetooth_length" -gt 0 ]; then
             exit 1
         fi
 
-        echo "Installing \"$2\" with MAC address \"$3\" as dbus-blebattery.$1"
+        echo "Installing \"$2\" with MAC address \"$3\" ${4:+using HCI $4} as dbus-blebattery.$1"
 
         mkdir -p "/service/dbus-blebattery.$1/log"
         {
@@ -283,7 +284,7 @@ if [ "$bluetooth_length" -gt 0 ]; then
             echo
             echo "# Start the main process"
             echo "exec 2>&1"
-            echo "python /data/apps/dbus-serialbattery/dbus-serialbattery.py $2 $3 &"
+            echo "python /data/apps/dbus-serialbattery/dbus-serialbattery.py $2 $3 $4 &"
             echo
             echo "# Capture the PID of the child process"
             echo "PID=\$!"
@@ -300,15 +301,39 @@ if [ "$bluetooth_length" -gt 0 ]; then
         chmod 755 "/service/dbus-blebattery.$1/run"
     }
 
+    discover_adapter_from_mac_address()
+    {
+        local hci
+
+        for hci in $(cd /sys/class/bluetooth/; shopt -s nullglob; echo hci*); do
+            if grep -q "\\s$1\$" <(dbus-send --system \
+                    --dest=org.bluez --print-reply=literal /org/bluez/$hci \
+                    org.freedesktop.DBus.Properties.Get string:"org.bluez.Adapter1" string:"Address"); then
+                echo $hci
+                return 0
+            fi
+        done
+
+        echo "WARNING: Adapter with MAC address '$1' not found - using default adapter." >&2
+    }
+
     # Example
     # install_blebattery_service 0 Jkbms_Ble C8:47:8C:00:00:00
-    # install_blebattery_service 1 Jkbms_Ble C8:47:8C:00:00:11
+    # install_blebattery_service 1 Jkbms_Ble C8:47:8C:00:00:11 hci1
+    # install_blebattery_service 1 Jkbms_Ble C8:47:8C:00:00:22 04:42:1A:00:00:11
 
     for (( i=0; i<bluetooth_length; i++ ));
     do
-        # split BMS type and MAC address
+        # split BMS type, MAC address and adapter
         IFS=' ' read -r -a bms <<< "${bms_array[$i]}"
-        install_blebattery_service $i "${bms[0]}" "${bms[1]}"
+
+        if [[ "${bms[1]}" =~ (.+)@(hci[0-9]+) ]]; then
+            bms=( ${bms[0]} ${BASH_REMATCH[@]:1} )
+        elif [[ "${bms[1]}" =~ (.+)@(..:..:..:..:..:..) ]]; then
+            bms=( ${bms[0]} ${BASH_REMATCH[1]} $(discover_adapter_from_mac_address  ${BASH_REMATCH[2]}) )
+        fi
+
+        install_blebattery_service $i "${bms[@]}"
     done
 
     echo
