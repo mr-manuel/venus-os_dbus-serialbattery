@@ -44,7 +44,7 @@ class DbusHelper:
         self.battery = battery
         self.instance: int = 1
         self.settings = None
-        self.error: dict = {"count": 0, "timestamp_first": None, "timestamp_last": None}
+        self.error: dict = {"cleared": True, "count": 0, "timestamp_first": None, "timestamp_last": None}
         self.cell_voltages_good: bool = None
         self.disconnect_threshold: int = None
         self.bms_cable_alarm: int = 0
@@ -819,18 +819,18 @@ class DbusHelper:
                     self.battery.setup_external_sensor()
 
             if result:
-                # check if battery has been reconnected
-                if self.battery.online is False and self.error["count"] >= 0:
-                    logger.info(">>> Battery reconnected <<<")
-
                 # reset error count, if last error was more than 60 seconds ago
                 if self.error["count"] > 0 and self.error["timestamp_last"] < int(time()) - 60:
+                    self.error["cleared"] = True
                     self.error["count"] = 0
                     self.error["timestamp_first"] = None
                     self.error["timestamp_last"] = None
 
                     # reset BMS cable alarm
                     self.bms_cable_alarm = 0
+
+                    # show info that battery is reconnected and stable again
+                    logger.info(">>> Battery reconnected <<<")
 
                 self.battery.online = True
                 if self.error["count"] > 0:
@@ -900,9 +900,10 @@ class DbusHelper:
                     # if the battery did not update in 10 second, it's assumed to be offline
                     if time_since_first_error >= RETRY_CYCLE_SHORT_COUNT:
 
-                        if self.battery.online:
+                        if self.battery.online and self.error["cleared"]:
                             # set battery offline
                             self.battery.online = False
+                            self.error["cleared"] = False
 
                             # reset the battery values
                             logger.error(">>> ERROR: Battery does not respond, init/reset values <<<")
