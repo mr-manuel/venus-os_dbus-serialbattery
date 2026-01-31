@@ -78,13 +78,24 @@ if [ ! -d "$serialstarter_path" ]; then
     mkdir "$serialstarter_path"
 fi
 
-# check if file exists
-if [ ! -f "$serialstarter_file" ]; then
-    {
-        echo "service   sbattery    dbus-serialbattery"
-        echo "alias     default     gps:vedirect:sbattery"
-        echo "alias     rs485       cgwacs:fzsonick:imt:modbus:sbattery"
-    } > "$serialstarter_file"
+
+# check if DISABLE_SERIAL_STARTER in config file is set to True (ignore case and trim spaces)
+serial_starter_enabled=$(awk -F "=" '/^SERIAL_STARTER_ENABLED/ {print $2}' /data/apps/dbus-serialbattery/config.ini | tr -d ' ' | tr '[:upper:]' '[:lower:]')
+
+if [[ "$serial_starter_enabled" != "false" ]]; then
+    # check if file exists
+    if [ ! -f "$serialstarter_file" ]; then
+        {
+            echo "service   sbattery    dbus-serialbattery"
+            echo "alias     default     gps:vedirect:sbattery"
+            echo "alias     rs485       cgwacs:fzsonick:imt:modbus:sbattery"
+        } > "$serialstarter_file"
+    fi
+else
+    # remove file, if it exists
+    if [ -f "$serialstarter_file" ]; then
+        rm -f "$serialstarter_file"
+    fi
 fi
 
 
@@ -544,7 +555,11 @@ echo "#################################"
 echo "# First activation instructions #"
 echo "#################################"
 echo
-echo "SERIAL battery connection: The activation is complete. You don't have to do anything more."
+if [[ "$serial_starter_enabled" != "false" ]]; then
+    echo "SERIAL battery connection: The activation is complete. You don't have to do anything more."
+else
+    echo "SERIAL battery connection: Serial connection was disabled in \"/data/apps/dbus-serialbattery/config.ini\"."
+fi
 echo
 echo "BLUETOOTH battery connection: There are a few more steps to complete activation."
 echo

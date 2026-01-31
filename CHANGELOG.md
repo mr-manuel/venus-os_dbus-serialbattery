@@ -25,6 +25,7 @@
 ### What's Changed
 
 * Added: Daren 485 BMS - Read SoH with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/344 by @kopierschnitte
+* Added: Disable serial starter if not needed by @mr-manuel
 * Added: Generic MQTT BMS by @mr-manuel
 * Added: Health check for batteries which are using the callback by @mr-manuel
 * Added: JBD CAN support by @dchervov with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/363
