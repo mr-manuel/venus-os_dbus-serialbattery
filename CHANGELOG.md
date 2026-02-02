@@ -35,6 +35,7 @@
 * Changed: Daren 485 BMS - Fixed charge/discharge calculation with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/343 by @kopierschnitte
 * Changed: Driver internals - Renamed callback variables/functions and added a better description by @mr-manuel
 * Changed: Exit behavior for excluded devices to behave like Victron services by @mr-manuel
+* Changed: Fix issue with published JsonData, where None values were published as empty strings by @mr-manuel
 * Changed: Fixed discharge current limit calculations when MOSFET temperature is not available, by @dchervov
 * Changed: Fixed problems with the `BLOCK_ON_DISCONNECT` behavior. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/309 by @mr-manuel
 * Changed: Fixed typo in activation instructions by @mr-manuel

@@ -1276,6 +1276,9 @@ class DbusHelper:
             # Set empty lists to empty string
             filtered_data = {key: "" if value == [] else value for key, value in filtered_data.items()}
 
+            # Convert all '' values to None (so they are exported as null in JSON)
+            filtered_data = {key: (None if value == "" else value) for key, value in filtered_data.items()}
+
             cascaded_data_json = json.dumps(self.cascade_data(filtered_data))
 
             # publish the data to the JsonData path
