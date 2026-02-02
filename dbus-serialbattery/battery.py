@@ -944,7 +944,7 @@ class Battery(ABC):
                 formatted_time = driver_start_time_dt.strftime("%Y.%m.%d %H:%M:%S")
 
                 self.charge_mode_debug = (
-                    f"driver started: {formatted_time} • running since: {self.get_seconds_to_string(int(time()) - self.driver_start_time)}\n"
+                    f"driver started: {formatted_time} • running since: {self.get_seconds_to_string(int(time()) - self.driver_start_time, 3)}\n"
                     + f"max_battery_voltage: {safe_number_format(self.max_battery_voltage, '{:.2f}')} V • "
                     + f"voltage: {safe_number_format(self.voltage, '{:.2f}')} V\n"
                     + f"self.control_voltage: {safe_number_format(self.control_voltage, '{:.2f}')} V + "
@@ -1739,16 +1739,18 @@ class Battery(ABC):
 
         return time_to_go_str
 
-    def get_seconds_to_string(self, seconds: int, precision: int = 3) -> str:
+    def get_seconds_to_string(self, seconds: int, precision: int = 4) -> str:
         """
         Transforms seconds to a string in the format: 1d 1h 1m 1s (Victron Style)
 
         :param seconds: The seconds to transform
         :param precision:
-            - 0 = 1d
-            - 1 = 1d 1h
-            - 2 = 1d 1h 1m
-            - 3 = 1d 1h 1m 1s
+            - 0 = 1d \n
+            - 1 = 1d 1h \n
+            - 2 = 1d 1h 1m \n
+            - 3 = 1d 1h 1m 1s \n
+            - 4 = always show the biggest non zero one and the next smaller,
+                e.g. 2h 15m, 2h 0m, 3d 4h, 3d 0h, 5m 20s
 
         This was added, since timedelta() returns strange values, if time is negative
         e.g.: seconds: -70245
@@ -1766,8 +1768,8 @@ class Battery(ABC):
 
         tmp += (str(d) + "d ") if d > 0 else ""
         tmp += (str(h) + "h ") if precision >= 1 and h > 0 else ""
-        tmp += (str(m) + "m ") if precision >= 2 and m > 0 else ""
-        tmp += (str(s) + "s ") if precision == 3 and s > 0 else ""
+        tmp += "" if precision == 4 and d > 0 else (str(m) + "m ") if precision >= 2 and m > 0 else ""
+        tmp += "" if precision == 4 and (d > 0 or h > 0) else (str(s) + "s ") if precision >= 3 and s > 0 else ""
 
         return tmp.rstrip()
 

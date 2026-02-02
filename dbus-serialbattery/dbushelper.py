@@ -834,7 +834,10 @@ class DbusHelper:
 
                 self.battery.online = True
                 if self.error["count"] > 0:
-                    self.battery.connection_info = f"Connected ({self.error['count']} errors in the last minute)"
+                    seconds_since_first_error = int(time()) - self.error["timestamp_first"]
+                    self.battery.connection_info = (
+                        f"Connected ({self.error['count']} errors in the last {self.battery.get_seconds_to_string(seconds_since_first_error, 3)})"
+                    )
                 else:
                     self.battery.connection_info = "Connected"
 
@@ -936,7 +939,9 @@ class DbusHelper:
                     # set connection info
                     remaining = self.disconnect_threshold - time_since_first_error
                     self.battery.connection_info = (
-                        f"Lost for: {time_since_first_error}s | Disconnect in: {remaining}s | Threshold: {self.disconnect_threshold}s"
+                        f"Lost for: {self.battery.get_seconds_to_string(time_since_first_error, 3)} | "
+                        + f"Disconnect in: {self.battery.get_seconds_to_string(remaining, 3)} | "
+                        + f"Threshold: {self.battery.get_seconds_to_string(self.disconnect_threshold, 3)}"
                     )
 
                     # set BMS cable alarm to warning
