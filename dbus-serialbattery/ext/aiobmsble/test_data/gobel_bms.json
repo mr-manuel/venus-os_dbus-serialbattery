@@ -1,0 +1,24 @@
+[
+  {
+    "advertisement": {
+      "local_name": "BMS-1234567890ABCDEF",
+      "rssi": -65
+    },
+    "type": "gobel_bms",
+    "_comments": [
+      "Gobel Power BLE BMS device using Modbus RTU over BLE",
+      "Device name format: BMS- followed by 16 characters",
+      "Note: Service UUID not advertised, only discoverable after connection"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "BMS-4056911A1100032P    ",
+      "rssi": -70
+    },
+    "type": "gobel_bms",
+    "_comments": [
+      "Real device example with trailing spaces in name"
+    ]
+  }
+]

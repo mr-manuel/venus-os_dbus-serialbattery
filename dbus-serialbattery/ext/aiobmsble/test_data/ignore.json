@@ -1,0 +1,48 @@
+[
+  {
+    "advertisement": {
+      "local_name": "ECO0AA8",
+      "manufacturer_data": {
+        "64590": "6661643630616138"
+      },
+      "service_uuids": [
+        "0000ff00-0000-1000-8000-00805f9b34fb",
+        "00000001-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -80
+    },
+    "reason": "classic BT device",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/282)",
+      "MAC address, no OUI, correct"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "ECOBF9F",
+      "manufacturer_data": {
+        "3053": "6365326562663966"
+      },
+      "service_uuids": [
+        "0000ff00-0000-1000-8000-00805f9b34fb",
+        "00000001-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -50
+    },
+    "reason": "classic BT device",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/317)",
+      "MAC address, no OUI, correct"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "BMS-SMART_708BFC",
+      "rssi": -78
+    },
+    "reason": "classic BT device",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/408)"
+    ]
+  }
+]

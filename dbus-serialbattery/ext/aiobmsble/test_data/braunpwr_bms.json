@@ -1,0 +1,34 @@
+[
+  {
+    "advertisement": {
+      "local_name": "HSKS-25A-118",
+      "manufacturer_data": {
+        "123": "02ffff7b"
+      },
+      "service_uuids": [
+        "0000ff00-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -70
+    },
+    "type": "braunpwr_bms",
+    "_comments": [
+      "source pcap (https://github.com/patman15/BMS_BLE-HA/issues/303)"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "BL-25F-170-118",
+      "manufacturer_data": {
+        "123": "02ffff7d"
+      },
+      "service_uuids": [
+        "0000ff00-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -76
+    },
+    "type": "braunpwr_bms",
+    "_comments": [
+      "source LOG (https://github.com/patman15/BMS_BLE-HA/issues/303)"
+    ]
+  }
+]

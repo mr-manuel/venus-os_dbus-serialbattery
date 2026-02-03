@@ -1,0 +1,26 @@
+[
+  {
+    "advertisement": {
+      "local_name": "23-01-05-034",
+      "rssi": -52,
+      "platform_data": ["10:ED:FA:7D:04:48"],
+      "service_uuids": ["0000af30-0000-1000-8000-00805f9b34fb"]
+    },
+    "type": "lipower_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/aiobmsble/issues/30)"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "24-03-20-011",
+      "platform_data": ["79:D5:EE:00:00:00"],
+      "rssi": -73,
+      "service_uuids": ["0000af30-0000-1000-8000-00805f9b34fb"]
+    },
+    "type": "lipower_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/aiobmsble/issues/572)"
+    ]
+  }
+]

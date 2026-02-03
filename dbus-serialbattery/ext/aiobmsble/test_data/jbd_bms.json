@@ -1,0 +1,564 @@
+[
+  {
+    "advertisement": {
+      "local_name": "GJ-25.6V200AH-0006",
+      "service_uuids": ["0000ff00-0000-1000-8000-00805f9b34fb"],
+      "platform_data": ["A4:C1:37:00:00:00"]
+    },
+    "type": "jbd_bms",
+    "_comments": [
+      "source LOG (https://github.com/patman15/BMS_BLE-HA/issues/88",
+      "Accurat battery"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "SX100P-B230201",
+      "manufacturer_data": {
+        "31488": "02ffff7d"
+      },
+      "service_uuids": ["0000ff00-0000-1000-8000-00805f9b34fb"],
+      "rssi": -127,
+      "platform_data": ["E1:24:50:00:00:00"]
+    },
+    "type": "jbd_bms",
+    "_comments": [
+      "source nRF (https://github.com/patman15/BMS_BLE-HA/issues/22#issuecomment-2198586195)",
+      "Supervolt battery"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "DP04S007L4S100A",
+      "manufacturer_data": {
+        "6226": "2837c2a5"
+      },
+      "service_uuids": ["0000ff00-0000-1000-8000-00805f9b34fb"],
+      "rssi": -57,
+      "platform_data": ["A5:C2:37:00:00:00"]
+    },
+    "type": "jbd_bms",
+    "_comments": [
+      "source LOG (https://github.com/patman15/BMS_BLE-HA/issues/144)",
+      "ECO-WORTHY LiFePO4 12V 100Ah",
+      "MAC address, wrong"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "DP04S007L4S100A",
+      "manufacturer_data": {
+        "8856": "2837c2a5"
+      },
+      "service_uuids": ["0000ff00-0000-1000-8000-00805f9b34fb"],
+      "rssi": -53,
+      "platform_data": ["A5:C2:37:00:00:00"]
+    },
+    "type": "jbd_bms",
+    "_comments": [
+      "source PCAP, BTctl (https://github.com/patman15/BMS_BLE-HA/issues/134)",
+      "ECO-WORTHY LiFePO4 12V 100Ah",
+      "MAC address, wrong"
+    ]
+  },
+  {
+    "advertisement": {
+      "manufacturer_data": {
+        "15984": "97d1c18c"
+      },
+      "service_uuids": ["0000ff00-0000-1000-8000-00805f9b34fb"],
+      "rssi": -53,
+      "platform_data": ["70:3E:97:00:00:00"]
+    },
+    "type": "jbd_bms",
+    "_comments": [
+      "source bluetoothctl (https://github.com/patman15/BMS_BLE-HA/issues/141)",
+      "https://liontron.com/download/german/LISMART1240LX.pdf",
+      "MAC address, correct"
+    ]
+  },
+  {
+    "advertisement": {
+      "manufacturer_data": {
+        "49572": "38991554"
+      },
+      "service_uuids": ["0000ff00-0000-1000-8000-00805f9b34fb"],
+      "rssi": -53,
+      "platform_data": ["A4:C1:38:00:00:00"]
+    },
+    "type": "jbd_bms",
+    "_comments": [
+      "source bluetoothctl (https://github.com/patman15/BMS_BLE-HA/issues/174)",
+      "LionTron XL19110253",
+      "MAC address, correct"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "LT40AH",
+      "manufacturer_data": {
+        "19011": "1b38c1a4"
+      },
+      "service_uuids": ["0000ff00-0000-1000-8000-00805f9b34fb"],
+      "rssi": -53,
+      "platform_data": ["A4:C1:38:00:00:00"]
+    },
+    "type": "jbd_bms",
+    "_comments": [
+      "source bluetoothctl (https://github.com/patman15/BMS_BLE-HA/issues/174)",
+      "LionTron LT40AH",
+      "MAC address, wrong"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "DP04S007L4S120A",
+      "manufacturer_data": {
+        "42435": "2737c2a5"
+      },
+      "service_uuids": ["0000ff00-0000-1000-8000-00805f9b34fb"],
+      "rssi": -49,
+      "platform_data": ["A5:C2:37:00:00:00"]
+    },
+    "type": "jbd_bms",
+    "_comments": [
+      "source LOG (https://github.com/patman15/BMS_BLE-HA/issues/134)",
+      "(https://github.com/patman15/BMS_BLE-HA/issues/157)",
+      "ECO-WORTHY LiFePO4 12V 150Ah, DCHOUSE FW v6.6",
+      "MAC address, wrong"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "SP17S005P17S120A",
+      "manufacturer_data": {
+        "34114": "1c1fc2a5"
+      },
+      "service_uuids": ["0000ff00-0000-1000-8000-00805f9b34fb"],
+      "rssi": -31,
+      "platform_data": ["A5:C2:37:00:00:00"]
+    },
+    "type": "jbd_bms",
+    "_comments": [
+      "source LOG (https://github.com/patman15/BMS_BLE-HA/issues/160#issuecomment-2629318416)"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "12300DE00013",
+      "manufacturer_data": {
+        "44580": "2737c2a5"
+      },
+      "service_uuids": ["0000ff00-0000-1000-8000-00805f9b34fb"],
+      "rssi": -60,
+      "platform_data": ["A5:C2:37:00:00:00"]
+    },
+    "type": "jbd_bms",
+    "_comments": [
+      "source LOG (https://github.com/patman15/BMS_BLE-HA/issues/173)",
+      "Eleksol 12V300AH",
+      "MAC address, wrong"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "AP21S002-L21S",
+      "manufacturer_data": {
+        "16089": "4237c1a4"
+      },
+      "service_uuids": ["0000ff00-0000-1000-8000-00805f9b34fb"],
+      "rssi": -84,
+      "platform_data": ["A4:C1:37:00:00:00"]
+    },
+    "type": "jbd_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/226)",
+      "A4:C1:37:42:3E:D9",
+      "MAC address, wrong"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "SBL-12330BLH1-242055",
+      "manufacturer_data": {
+        "123": "02ffff7d"
+      },
+      "service_uuids": ["0000ff00-0000-1000-8000-00805f9b34fb"],
+      "rssi": -84,
+      "platform_data": ["F9:56:0B:00:00:00"]
+    },
+    "type": "jbd_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/236)"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "SBL-12330BLH1-242049",
+      "rssi": -72,
+      "manufacturer_data": {
+        "123": "02ffff7d"
+      },
+      "service_uuids": [
+        "00001800-0000-1000-8000-00805f9b34fb",
+        "00001801-0000-1000-8000-00805f9b34fb",
+        "0000180a-0000-1000-8000-00805f9b34fb",
+        "00002600-0000-1000-8000-00805f9b34fb",
+        "0000ff00-0000-1000-8000-00805f9b34fb"
+      ],
+      "platform_data": ["C2:33:20:00:00:00"]
+    },
+    "type": "jbd_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/236)"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "162400552210210097",
+      "manufacturer_data": {
+        "49572": "375532f9"
+      },
+      "service_uuids": ["0000ff00-0000-1000-8000-00805f9b34fb"],
+      "rssi": -35,
+      "platform_data": ["A4:C1:37:00:00:00"]
+    },
+    "type": "jbd_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/236)",
+      "MAC address, correct"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "PKT2201PB121000084",
+      "manufacturer_data": {
+        "30669": "e438c1a4"
+      },
+      "service_uuids": ["0000ff00-0000-1000-8000-00805f9b34fb"],
+      "rssi": -46,
+      "platform_data": ["A4:C1:38:00:00:00"]
+    },
+    "type": "jbd_bms",
+    "_comments": [
+      "source BTctl (https://github.com/patman15/BMS_BLE-HA/issues/242)",
+      "MAC address, wrong"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "gokwh battery",
+      "manufacturer_data": {
+        "16666": "2937c2a5"
+      },
+      "service_uuids": ["0000ff00-0000-1000-8000-00805f9b34fb"],
+      "rssi": -72,
+      "platform_data": ["A5:C2:37:00:00:00"]
+    },
+    "type": "jbd_bms",
+    "_comments": [
+      "source BTctl (https://github.com/patman15/BMS_BLE-HA/issues/264)",
+      "MAC address, wrong"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "ECO-LFP48100-3U-8EC7",
+      "manufacturer_data": {
+        "49834": "37018ec700014c03"
+      },
+      "service_uuids": ["0000ff00-0000-1000-8000-00805f9b34fb"],
+      "rssi": -70,
+      "platform_data": ["AA:C2:37:00:00:00"]
+    },
+    "type": "jbd_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/284)",
+      "MAC address correct"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "OGR-48100-123456789",
+      "manufacturer_data": {
+        "13880": "13014e9a"
+      },
+      "service_uuids": [
+        "0000ff00-0000-1000-8000-00805f9b34fb",
+        "00000001-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -47,
+      "platform_data": ["38:36:13:00:00:00"]
+    },
+    "type": "jbd_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/302)",
+      "OGRPHY battery"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "JBD-SP16S020-L8S",
+      "manufacturer_data": {
+        "13880": "13014e9a"
+      },
+      "service_uuids": [
+        "00001800-0000-1000-8000-00805f9b34fb",
+        "00001801-0000-1000-8000-00805f9b34fb",
+        "0000180a-0000-1000-8000-00805f9b34fb",
+        "0000ff00-0000-1000-8000-00805f9b34fb",
+        "00010203-0405-0607-0809-0a0b0c0d1912"
+      ],
+      "rssi": -81
+    },
+    "type": "jbd_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/309)"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "DWCK00309J-029",
+      "manufacturer_data": {
+        "49148": "3437c1a4"
+      },
+      "service_uuids": ["0000ff00-0000-1000-8000-00805f9b34fb"],
+      "rssi": -46,
+      "platform_data": ["A4:C1:37:00:00:00"]
+    },
+    "type": "jbd_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/329)",
+      "Vatrer battery",
+      "MAC address, wrong"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "xiaoxiang BMS",
+      "manufacturer_data": {
+        "11313": "2037c1a4"
+      },
+      "service_uuids": ["0000ff00-0000-1000-8000-00805f9b34fb"],
+      "rssi": -43,
+      "platform_data": ["A4:C1:37:00:00:00"]
+    },
+    "type": "jbd_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/346)",
+      "MAC address, wrong"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "AL12-100-4S-B01",
+      "manufacturer_data": {
+        "36783": "3037c1a4"
+      },
+      "service_uuids": ["0000ff00-0000-1000-8000-00805f9b34fb"],
+      "rssi": -63,
+      "platform_data": ["A4:C1:37:00:00:00"]
+    },
+    "type": "jbd_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/406)",
+      "MAC address, wrong"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "AL12-100-4S-B02",
+      "manufacturer_data": {
+        "21516": "5037c1a4"
+      },
+      "service_uuids": ["0000ff00-0000-1000-8000-00805f9b34fb"],
+      "rssi": -62,
+      "platform_data": ["A4:C1:37:00:00:00"]
+    },
+    "type": "jbd_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/406)",
+      "MAC address, wrong"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "DXDB00213J-020",
+      "manufacturer_data": {
+        "58324": "3238c1a4"
+      },
+      "service_uuids": ["0000ff00-0000-1000-8000-00805f9b34fb"],
+      "rssi": -94,
+      "platform_data": ["A4:C1:38:00:00:00"]
+    },
+    "type": "jbd_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/423)"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "06201000690",
+      "manufacturer_data": {
+        "529": "000040002abb7fff2b382b43c8cb007c00bfbfbfc0000000002580"
+      },
+      "service_data": {
+        "0000262a-0000-1000-8000-00805f9b34fb": "46003e"
+      },
+      "service_uuids": [
+        "00001800-0000-1000-8000-00805f9b34fb",
+        "00001801-0000-1000-8000-00805f9b34fb",
+        "0000180a-0000-1000-8000-00805f9b34fb",
+        "0000180f-0000-1000-8000-00805f9b34fb",
+        "0000262a-0000-1000-8000-00805f9b34fb",
+        "0000fa00-0000-1000-8000-00805f9b34fb",
+        "0000ff00-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -48,
+      "platform_data": ["A4:C1:38:00:00:00"]
+    },
+    "type": "jbd_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/427)"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "BS202212-01-0168",
+      "service_uuids": ["0000ff00-0000-1000-8000-00805f9b34fb"],
+      "rssi": -91,
+      "platform_data": ["A5:C2:37:00:00:00"]
+    },
+    "type": "jbd_bms",
+    "_comments": [
+      "source pcap (https://github.com/patman15/BMS_BLE-HA/issues/444)"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "BT  LP07841",
+      "manufacturer_data": {
+        "45653": "6037c2a5"
+      },
+      "service_uuids": ["0000ff00-0000-1000-8000-00805f9b34fb"],
+      "rssi": -68,
+      "platform_data": ["A5:C2:37:00:00:00"]
+    },
+    "type": "jbd_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/463)",
+      "LANPWR 12V 100Ah LiFePO4",
+      "MAC wrong"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "DDCK01602J-003",
+      "manufacturer_data": {
+        "37637": "3337c2a5"
+      },
+      "service_uuids": ["0000ff00-0000-1000-8000-00805f9b34fb"],
+      "rssi": -68,
+      "platform_data": ["A5:C2:37:00:00:00"]
+    },
+    "type": "jbd_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/aiobmsble/pull/37)",
+      "zjdy, FW 8.1, name: sp21s001hl21s200a",
+      "MAC wrong"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "LP02555",
+      "rssi": -64,
+      "platform_data": ["A5:C2:37:00:00:00"],
+      "manufacturer_data": {
+        "407": "2e37c2a5"
+      },
+      "service_uuids": ["0000ff00-0000-1000-8000-00805f9b34fb"]
+    },
+    "type": "jbd_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/502)",
+      "LANPWR battery"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "SPCC13C3BT43000017",
+      "rssi": -82,
+      "manufacturer_data": {
+        "19446": "4037c2a5"
+      },
+      "platform_data": ["A5:C2:37:00:00:00"],
+      "service_uuids": ["0000ff00-0000-1000-8000-00805f9b34fb"]
+    },
+    "type": "jbd_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/514)"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "TZ-H006-02408-0042",
+      "manufacturer_data": {
+        "123": "02ffff7d"
+      },
+      "service_uuids": ["0000ff00-0000-1000-8000-00805f9b34fb"],
+      "rssi": -69,
+      "platform_data": ["F4:F0:3C:00:00:00"]
+    },
+    "type": "jbd_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/507)",
+      "CERRNSS battery"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "SX60U-B250016",
+      "manufacturer_data": {
+        "123": "02ffff7d"
+      },
+      "service_uuids": ["0000ff00-0000-1000-8000-00805f9b34fb"],
+      "rssi": -69,
+      "platform_data": ["E9:99:6B:00:00:00"]
+    },
+    "type": "jbd_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/522)",
+      "Supervolt Ultra LiFePO4 battery"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "5",
+      "service_uuids": ["0000ff00-0000-1000-8000-00805f9b34fb"],
+      "rssi": -93,
+      "platform_data": ["10:A5:62:00:00:00"]
+    },
+    "type": "jbd_bms",
+    "_comments": [
+      "manufacturer app (https://github.com/patman15/BMS_BLE-HA/issues/565)",
+      "CHINS 48V lifepo4 battery"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "DP04S007L4S60A",
+      "manufacturer_data": { "61774": "2739c2a5" },
+      "service_uuids": ["0000ff00-0000-1000-8000-00805f9b34fb"],
+      "rssi": -66,
+      "platform_data": ["A5:C2:39:00:00:00"]
+    },
+    "type": "jbd_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/595)",
+      "Manufacturer: DGJBD",
+      "Production date 2025-12-23",
+      "BMS model: DP04S007 V1.7",
+      "BMS version: 2.a"
+    ]
+  }
+]

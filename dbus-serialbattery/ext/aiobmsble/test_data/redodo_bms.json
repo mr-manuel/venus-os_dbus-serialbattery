@@ -1,0 +1,151 @@
+[
+  {
+    "advertisement": {
+      "local_name": "R-24100BNN160-A00643",
+      "manufacturer_data": {
+        "22618": "c8478015d834"
+      },
+      "service_uuids": [
+        "0000ffe0-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -127
+    },
+    "type": "redodo_bms",
+    "_comments": [
+      "source PCAP"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "P-24050BNNA70-A01152",
+      "manufacturer_data": {
+        "22618": "c8478018bc81"
+      },
+      "service_uuids": [
+        "0000ffe0-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -57
+    },
+    "type": "redodo_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/280)"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "PQ-24100B-A00292",
+      "manufacturer_data": {
+        "22618": "c8478010b79a"
+      },
+      "service_uuids": [
+        "0000ffe0-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -65
+    },
+    "type": "redodo_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/301)",
+      "PowerQueen"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "L-12100BNNA70-A09683",
+      "manufacturer_data": {
+        "22618": "c8478015de04"
+      },
+      "service_uuids": [
+        "0000ffe0-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -46
+    },
+    "type": "redodo_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/370)"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "RO-24100B-A00162",
+      "manufacturer_data": {
+        "22618": "c8478012d5e7"
+      },
+      "service_uuids": [
+        "0000ffe0-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -45
+    },
+    "type": "redodo_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/367)"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "LT-51230BGC-A00229",
+      "manufacturer_data": {
+        "22618": "c8478012d64e"
+      },
+      "service_uuids": [
+        "0000ffe0-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -64
+    },
+    "type": "redodo_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/360)",
+      "MAC address"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "LT-12100BG-A07700",
+      "manufacturer_data": {
+        "22618": "c8478012b3b8"
+      },
+      "service_uuids": [
+        "0000ffe0-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -87
+    },
+    "type": "redodo_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/402)",
+      "-A07248"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "L-51030GBNGC2-A00263",
+      "manufacturer_data": {
+        "22618": "c8478014ec68"
+      },
+      "service_uuids": [
+        "0000ffe0-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -66
+    },
+    "type": "redodo_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/439)"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "LT-24100B-A00473",
+      "manufacturer_data": {
+        "22618": "c847800fad8b"
+      },
+      "service_uuids": [
+        "0000ffe0-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -48
+    },
+    "type": "redodo_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/472)",
+      "LiTime LFP 24V / 100Ah",
+      "MAC correct"
+    ]
+  }
+]

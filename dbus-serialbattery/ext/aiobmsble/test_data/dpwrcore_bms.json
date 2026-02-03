@@ -1,0 +1,18 @@
+[
+  {
+    "advertisement": {
+      "local_name": "TBA-13500277",
+      "service_uuids": [
+        "00001800-0000-1000-8000-00805f9b34fb",
+        "00001801-0000-1000-8000-00805f9b34fb",
+        "0000180a-0000-1000-8000-00805f9b34fb",
+        "0000fff0-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -72
+    },
+    "type": "dpwrcore_bms",
+    "_comments": [
+      "source BTctl (https://github.com/patman15/BMS_BLE-HA/issues/52#issuecomment-2390048120)"
+    ]
+  }
+]

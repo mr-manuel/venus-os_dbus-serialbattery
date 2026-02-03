@@ -1,0 +1,41 @@
+[
+  {
+    "advertisement": {
+      "local_name": "BP02",
+      "service_uuids": [
+        "0000ff00-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -81
+    },
+    "type": "seplos_v2_bms",
+    "_comments": []
+  },
+  {
+    "advertisement": {
+      "local_name": "BP21",
+      "service_uuids": [
+        "0000ff00-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -62
+    },
+    "type": "seplos_v2_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/418)"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "BP00",
+      "service_uuids": [
+        "00001800-0000-1000-8000-00805f9b34fb",
+        "00001801-0000-1000-8000-00805f9b34fb",
+        "0000ff00-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -62
+    },
+    "type": "seplos_v2_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/418)"
+    ]
+  }
+]

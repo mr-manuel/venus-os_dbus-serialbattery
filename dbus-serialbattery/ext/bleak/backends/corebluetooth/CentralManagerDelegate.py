@@ -16,14 +16,7 @@ if TYPE_CHECKING:
 import asyncio
 import logging
 from collections.abc import Callable
-from typing import Any, Optional
-
-if sys.version_info < (3, 11):
-    from async_timeout import timeout as async_timeout
-    from typing_extensions import Self
-else:
-    from asyncio import timeout as async_timeout
-    from typing import Self
+from typing import Any, Optional, TypedDict, cast
 
 import objc
 from CoreBluetooth import (
@@ -42,14 +35,20 @@ from CoreBluetooth import (
 from Foundation import (
     NSUUID,
     NSArray,
+    NSData,
     NSDictionary,
     NSError,
     NSKeyValueChangeNewKey,
     NSKeyValueObservingOptionNew,
+    NSNumber,
     NSObject,
+    NSString,
 )
 from libdispatch import DISPATCH_QUEUE_SERIAL, dispatch_queue_create
 
+from bleak._compat import Self
+from bleak._compat import timeout as async_timeout
+from bleak.backends._utils import try_call_soon_threadsafe
 from bleak.exc import (
     BleakBluetoothNotAvailableError,
     BleakBluetoothNotAvailableReason,
@@ -63,6 +62,17 @@ CBCentralManagerDelegate = objc.protocolNamed("CBCentralManagerDelegate")
 DisconnectCallback = Callable[[], None]
 
 
+class CBAdvertisementData(TypedDict, total=False):
+    kCBAdvDataLocalName: NSString
+    kCBAdvDataManufacturerData: NSData
+    kCBAdvDataServiceData: dict[CBUUID, NSData]
+    kCBAdvDataServiceUUIDs: NSArray[CBUUID]
+    kCBAdvertisementDataOverflowServiceUUIDsKey: NSArray[CBUUID]
+    kCBAdvDataTxPowerLevel: NSNumber
+    kCBAdvertisementDataIsConnectable: NSNumber
+    kCBAdvDataOverflowServiceUUIDs: NSArray[CBUUID]
+
+
 class ObjcCentralManagerDelegate(NSObject, protocols=[CBCentralManagerDelegate]):
     """
     CoreBluetooth central manager delegate for bridging callbacks to asyncio.
@@ -72,7 +82,7 @@ class ObjcCentralManagerDelegate(NSObject, protocols=[CBCentralManagerDelegate])
         self, py_delegate: CentralManagerDelegate
     ) -> Optional[Self]:
         """macOS init function for NSObject"""
-        self = objc.super(ObjcCentralManagerDelegate, self).init()
+        self = objc.super(ObjcCentralManagerDelegate, self).init()  # type: ignore[assignment]
 
         if self is None:
             return None
@@ -84,7 +94,11 @@ class ObjcCentralManagerDelegate(NSObject, protocols=[CBCentralManagerDelegate])
     # User defined functions
 
     def observeValueForKeyPath_ofObject_change_context_(
-        self, keyPath: str, object: Any, change: NSDictionary, context: int
+        self,
+        keyPath: NSString,
+        object: Any,
+        change: NSDictionary[str, Any],
+        context: int,
     ) -> None:
         logger.debug("'%s' changed", keyPath)
 
@@ -92,13 +106,11 @@ class ObjcCentralManagerDelegate(NSObject, protocols=[CBCentralManagerDelegate])
             return
 
         is_scanning = bool(change[NSKeyValueChangeNewKey])
-        try:
-            self.py_delegate.event_loop.call_soon_threadsafe(
-                self.py_delegate.changed_is_scanning, is_scanning
-            )
-        except RuntimeError as e:
-            # Likely caused by loop being closed
-            logger.debug("unraisable exception", exc_info=e)
+        try_call_soon_threadsafe(
+            self.py_delegate.event_loop,
+            self.py_delegate.changed_is_scanning,
+            is_scanning,
+        )
 
     # Protocol Functions
 
@@ -117,49 +129,40 @@ class ObjcCentralManagerDelegate(NSObject, protocols=[CBCentralManagerDelegate])
         elif centralManager.state() == CBManagerStatePoweredOn:
             logger.debug("Bluetooth powered on")
 
-        try:
-            self.py_delegate.event_loop.call_soon_threadsafe(
-                self.py_delegate.did_update_state_event.set
-            )
-        except RuntimeError as e:
-            # Likely caused by loop being closed
-            logger.debug("unraisable exception", exc_info=e)
+        try_call_soon_threadsafe(
+            self.py_delegate.event_loop,
+            self.py_delegate.did_update_state_event.set,
+        )
 
     def centralManager_didDiscoverPeripheral_advertisementData_RSSI_(
         self,
         central: CBCentralManager,
         peripheral: CBPeripheral,
-        advertisementData: NSDictionary,
-        RSSI: int,
+        advertisementData: NSDictionary[str, Any],
+        RSSI: NSNumber,
     ) -> None:
         logger.debug("centralManager_didDiscoverPeripheral_advertisementData_RSSI_")
 
-        try:
-            self.py_delegate.event_loop.call_soon_threadsafe(
-                self.py_delegate.did_discover_peripheral,
-                central,
-                peripheral,
-                advertisementData,
-                RSSI,
-            )
-        except RuntimeError as e:
-            # Likely caused by loop being closed
-            logger.debug("unraisable exception", exc_info=e)
+        try_call_soon_threadsafe(
+            self.py_delegate.event_loop,
+            self.py_delegate.did_discover_peripheral,
+            central,
+            peripheral,
+            advertisementData,
+            RSSI,
+        )
 
     def centralManager_didConnectPeripheral_(
         self, central: CBCentralManager, peripheral: CBPeripheral
     ) -> None:
         logger.debug("centralManager_didConnectPeripheral_")
 
-        try:
-            self.py_delegate.event_loop.call_soon_threadsafe(
-                self.py_delegate.did_connect_peripheral,
-                central,
-                peripheral,
-            )
-        except RuntimeError as e:
-            # Likely caused by loop being closed
-            logger.debug("unraisable exception", exc_info=e)
+        try_call_soon_threadsafe(
+            self.py_delegate.event_loop,
+            self.py_delegate.did_connect_peripheral,
+            central,
+            peripheral,
+        )
 
     def centralManager_didFailToConnectPeripheral_error_(
         self,
@@ -169,16 +172,13 @@ class ObjcCentralManagerDelegate(NSObject, protocols=[CBCentralManagerDelegate])
     ) -> None:
         logger.debug("centralManager_didFailToConnectPeripheral_error_")
 
-        try:
-            self.py_delegate.event_loop.call_soon_threadsafe(
-                self.py_delegate.did_fail_to_connect_peripheral,
-                centralManager,
-                peripheral,
-                error,
-            )
-        except RuntimeError as e:
-            # Likely caused by loop being closed
-            logger.debug("unraisable exception", exc_info=e)
+        try_call_soon_threadsafe(
+            self.py_delegate.event_loop,
+            self.py_delegate.did_fail_to_connect_peripheral,
+            centralManager,
+            peripheral,
+            error,
+        )
 
     def centralManager_didDisconnectPeripheral_error_(
         self,
@@ -188,16 +188,13 @@ class ObjcCentralManagerDelegate(NSObject, protocols=[CBCentralManagerDelegate])
     ) -> None:
         logger.debug("centralManager_didDisconnectPeripheral_error_")
 
-        try:
-            self.py_delegate.event_loop.call_soon_threadsafe(
-                self.py_delegate.did_disconnect_peripheral,
-                central,
-                peripheral,
-                error,
-            )
-        except RuntimeError as e:
-            # Likely caused by loop being closed
-            logger.debug("unraisable exception", exc_info=e)
+        try_call_soon_threadsafe(
+            self.py_delegate.event_loop,
+            self.py_delegate.did_disconnect_peripheral,
+            central,
+            peripheral,
+            error,
+        )
 
 
 class CentralManagerDelegate:
@@ -219,7 +216,7 @@ class CentralManagerDelegate:
 
         self.callbacks: dict[
             int,
-            Callable[[CBPeripheral, NSDictionary, int], None] | None,
+            Callable[[CBPeripheral, CBAdvertisementData, NSNumber], None] | None,
         ] = {}
         self._disconnect_callbacks: dict[NSUUID, DisconnectCallback] = {}
         self._disconnect_futures: dict[NSUUID, asyncio.Future[None]] = {}
@@ -376,8 +373,8 @@ class CentralManagerDelegate:
         self,
         central: CBCentralManager,
         peripheral: CBPeripheral,
-        advertisementData: NSDictionary,
-        RSSI: int,
+        advertisementData: NSDictionary[str, Any],
+        RSSI: NSNumber,
     ) -> None:
         # Note: this function might be called several times for same device.
         # This can happen for instance when an active scan is done, and the
@@ -397,7 +394,7 @@ class CentralManagerDelegate:
 
         for callback in self.callbacks.values():
             if callback:
-                callback(peripheral, advertisementData, RSSI)
+                callback(peripheral, cast(CBAdvertisementData, advertisementData), RSSI)
 
         logger.debug(
             "Discovered device %s: %s @ RSSI: %d (kCBAdvData %r) and Central: %r",

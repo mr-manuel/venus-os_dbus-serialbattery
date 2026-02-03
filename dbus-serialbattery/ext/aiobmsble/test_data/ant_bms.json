@@ -1,0 +1,18 @@
+[
+  {
+    "advertisement": {
+      "local_name": "ANT-BLE24C-001",
+      "manufacturer_data": {
+        "8979": "88a0aabbcc900001"
+      },
+      "service_uuids": [
+        "0000ffe0-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -70
+    },
+    "type": "ant_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/366)"
+    ]
+  }
+]

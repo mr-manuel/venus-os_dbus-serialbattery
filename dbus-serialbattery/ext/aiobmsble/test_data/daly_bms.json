@@ -1,0 +1,113 @@
+[
+  {
+    "advertisement": {
+      "local_name": "DL-46640102XXXX",
+      "manufacturer_data": {
+        "25670": "010209ac"
+      },
+      "service_uuids": [
+        "0000fff0-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -58
+    },
+    "type": "daly_bms",
+    "_comments": [
+      "source LOG (https://github.com/patman15/BMS_BLE-HA/issues/89)"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "DL-401710015C9B",
+      "manufacturer_data": {
+        "770": "16401710015c9b444c"
+      },
+      "rssi": -36
+    },
+    "type": "daly_bms",
+    "_comments": [
+      "source LOG, proxy (https://github.com/patman15/BMS_BLE-HA/issues/160)"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "JHB-501812XXXXXX",
+      "manufacturer_data": {
+        "260": "0150181201a3b34a4842"
+      },
+      "rssi": -46
+    },
+    "type": "daly_bms",
+    "_comments": [
+      "source BTctl (https://github.com/patman15/BMS_BLE-HA/issues/145)"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "Randomname",
+      "manufacturer_data": {
+        "260": "0150181201a4944a4842"
+      },
+      "rssi": -36
+    },
+    "type": "daly_bms",
+    "_comments": [
+      "source LOG (https://github.com/patman15/BMS_BLE-HA/issues/160#issuecomment-2629318416)",
+      "JHB-50181201A494"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "BT270-2",
+      "manufacturer_data": {
+        "770": "16401712011197444c"
+      },
+      "rssi": -60
+    },
+    "type": "daly_bms",
+    "_comments": [
+      "source BTctl (https://github.com/patman15/BMS_BLE-HA/issues/174#issuecomment-2637936795)"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "DL-40160901534C",
+      "manufacturer_data": {
+        "258": "04"
+      },
+      "rssi": -87
+    },
+    "type": "daly_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/204)",
+      "16S LiFePo 250A BMS"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "DL-FB4C2E0000000",
+      "manufacturer_data": {
+        "771": "00b4c2e0000000444c00"
+      },
+      "rssi": -81
+    },
+    "type": "daly_bms",
+    "_comments": [
+      "proxy LOG (https://github.com/patman15/BMS_BLE-HA/issues/85)",
+      "Bulltron battery",
+      "MAC address (Bouffalo Lab)"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "JHB-D2190701C66E",
+      "rssi": -46,
+      "manufacturer_data": {
+        "1026": "27d2190701c66e4a4842"
+      }
+    },
+    "type": "daly_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/510)"
+    ]
+  }
+]

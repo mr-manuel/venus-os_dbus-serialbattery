@@ -1,0 +1,74 @@
+[
+  {
+    "advertisement": {
+      "local_name": "BatteryOben-00",
+      "manufacturer_data": {
+        "2917": "88a0c847800fd5c5"
+      },
+      "service_uuids": [
+        "0000ffe0-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -83
+    },
+    "type": "jikong_bms",
+    "_comments": []
+  },
+  {
+    "advertisement": {
+      "local_name": "BatterieUnten-01",
+      "manufacturer_data": {
+        "2917": "88a0c847800d086b"
+      },
+      "service_uuids": [
+        "0000ffe0-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -68
+    },
+    "type": "jikong_bms",
+    "_comments": [
+      "source LOG"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "JK_B2A8S20P",
+      "manufacturer_data": {
+        "2917": "88a0c847801488b7"
+      },
+      "service_uuids": [
+        "00001800-0000-1000-8000-00805f9b34fb",
+        "00001801-0000-1000-8000-00805f9b34fb",
+        "0000180a-0000-1000-8000-00805f9b34fb",
+        "0000180f-0000-1000-8000-00805f9b34fb",
+        "0000fee7-0000-1000-8000-00805f9b34fb",
+        "0000ffe0-0000-1000-8000-00805f9b34fb",
+        "f000ffc0-0451-4000-b000-000000000000"
+      ],
+      "rssi": -67
+    },
+    "type": "jikong_bms",
+    "_comments": [
+      "source LOG"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "506036N46002293-00",
+      "rssi": -84,
+      "platform_data": [
+        "A4:C1:38:00:00:00"
+      ],
+      "manufacturer_data": {
+        "2917": "88a0a4c13801085a"
+      },
+      "service_uuids": [
+        "0000ffe0-0000-1000-8000-00805f9b34fb",
+        "0000fee7-0000-1000-8000-00805f9b34fb"
+      ]
+    },
+    "type": "jikong_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/527)"
+    ]
+  }
+]
