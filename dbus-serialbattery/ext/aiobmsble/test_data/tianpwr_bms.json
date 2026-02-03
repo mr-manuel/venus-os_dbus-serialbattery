@@ -1,0 +1,14 @@
+[
+  {
+    "advertisement": {
+      "local_name": "TP_123456",
+      "rssi": -87,
+      "platform_data": ["90:a6:bf:00:00:00"]
+    },
+    "type": "tianpwr_bms",
+    "_comments": [
+      "source PCAP (https://github.com/patman15/BMS_BLE-HA/issues/412)",
+      "OUI: 90:a6:bf"
+    ]
+  }
+]

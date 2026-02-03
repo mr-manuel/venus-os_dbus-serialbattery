@@ -1,0 +1,104 @@
+[
+  {
+    "advertisement": {
+      "local_name": "170R000121",
+      "manufacturer_data": {
+        "21330": "2134ba03ec110cb4010500010000"
+      },
+      "service_uuids": [
+        "00001800-0000-1000-8000-00805f9b34fb",
+        "00001801-0000-1000-8000-00805f9b34fb",
+        "0000180a-0000-1000-8000-00805f9b34fb",
+        "0000fd00-0000-1000-8000-00805f9b34fb",
+        "0000ff90-0000-1000-8000-00805f9b34fb",
+        "0000ffb0-0000-1000-8000-00805f9b34fb",
+        "0000ffc0-0000-1000-8000-00805f9b34fb",
+        "0000ffd0-0000-1000-8000-00805f9b34fb",
+        "0000ffe0-0000-1000-8000-00805f9b34fb",
+        "0000ffe5-0000-1000-8000-00805f9b34fb",
+        "0000fff0-0000-1000-8000-00805f9b34fb"
+      ],
+      "tx_power": 0,
+      "rssi": -75,
+      "platform_data": ["38:AB:41:00:00:00"]
+    },
+    "type": "cbtpwr_bms",
+    "_comments": [
+      "source LOG, https://github.com/patman15/BMS_BLE-HA/issues/59"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "170R000086",
+      "manufacturer_data": {
+        "21330": "2134ba03ec110cf8010500010000"
+      },
+      "service_uuids": [
+        "00001800-0000-1000-8000-00805f9b34fb",
+        "00001801-0000-1000-8000-00805f9b34fb",
+        "0000180a-0000-1000-8000-00805f9b34fb",
+        "0000fd00-0000-1000-8000-00805f9b34fb",
+        "0000ff90-0000-1000-8000-00805f9b34fb",
+        "0000ffb0-0000-1000-8000-00805f9b34fb",
+        "0000ffc0-0000-1000-8000-00805f9b34fb",
+        "0000ffd0-0000-1000-8000-00805f9b34fb",
+        "0000ffe0-0000-1000-8000-00805f9b34fb",
+        "0000ffe5-0000-1000-8000-00805f9b34fb",
+        "0000fff0-0000-1000-8000-00805f9b34fb"
+      ],
+      "tx_power": 0,
+      "rssi": -73
+    },
+    "type": "cbtpwr_bms",
+    "_comments": ["source LOG"]
+  },
+  {
+    "advertisement": {
+      "local_name": "140R000288",
+      "manufacturer_data": {
+        "0": "ffffffff6400ff000000000000000000"
+      },
+      "service_uuids": ["0000fff0-0000-1000-8000-00805f9b34fb"],
+      "rssi": -82,
+      "platform_data": ["38:AB:41:00:00:00"]
+    },
+    "type": "cbtpwr_bms",
+    "_comments": [
+      "source BT monitor (https://github.com/patman15/BMS_BLE-HA/issues/176)"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "100R0002E3",
+      "manufacturer_data": {
+        "21330": "2134ba03ec110909010500010000"
+      },
+      "service_uuids": ["000003c1-0000-1000-8000-00805f9b34fb"],
+      "tx_power": 0,
+      "rssi": -76,
+      "platform_data": ["BA:03:EC:00:00:00"]
+    },
+    "type": "cbtpwr_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/197)",
+      "Creabest"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "170C000E56",
+      "platform_data": ["68:5E:1C:00:00:00"],
+      "rssi": -78,
+      "manufacturer_data": { "16963": "545e0111" },
+      "service_uuids": [
+        "0000fff0-0000-1000-8000-00805f9b34fb",
+        "0000ffb0-0000-1000-8000-00805f9b34fb"
+      ]
+    },
+    "type": "cbtpwr_bms",
+    "_comments": [
+      "source log (https://github.com/patman15/BMS_BLE-HA/issues/561)",
+      "CREABEST 200A LiFePO4"
+    ]
+  }
+]

@@ -1,0 +1,54 @@
+[
+  {
+    "advertisement": {
+      "local_name": " B12100A 220600016 ",
+      "manufacturer_data": {
+        "424": "88a0126c143922b8"
+      },
+      "service_uuids": [
+        "0000ffe0-0000-1000-8000-00805f9b34fb",
+        "0000ffe7-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -87
+    },
+    "type": "roypow_bms",
+    "_comments": [
+      "source pcap (https://github.com/patman15/BMS_BLE-HA/issues/186)",
+      "Epoch, BMS: RoyPow SPB22-TI04"
+    ]
+  },
+  {
+    "advertisement": {
+      "manufacturer_data": {
+        "2865": "88a0126c1439281f"
+      },
+      "service_uuids": [
+        "0000ffe0-0000-1000-8000-00805f9b34fb",
+        "0000fee7-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -50
+    },
+    "type": "roypow_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/186)",
+      "no name advertised"
+    ]
+  },
+  {
+    "advertisement": {
+      "manufacturer_data": {
+        "35579": "88a0c66c1508a7e9"
+      },
+      "service_uuids": [
+        "0000ffe0-0000-1000-8000-00805f9b34fb",
+        "0000fee7-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -66
+    },
+    "type": "roypow_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/186)",
+      "no name advertised"
+    ]
+  }
+]

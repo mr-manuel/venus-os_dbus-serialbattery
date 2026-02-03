@@ -1,8 +1,8 @@
-# -*- coding: utf-8 -*-
-
 """Top-level package for bleak."""
 
 from __future__ import annotations
+
+from bleak.args import SizedBuffer
 
 __author__ = """Henrik Blidh"""
 __email__ = "henrik.blidh@gmail.com"
@@ -18,19 +18,9 @@ from collections.abc import AsyncGenerator, Awaitable, Callable, Iterable
 from types import TracebackType
 from typing import Any, Literal, Optional, TypedDict, Union, cast, overload
 
-if sys.version_info < (3, 12):
-    from typing_extensions import Buffer
-else:
-    from collections.abc import Buffer
-
-if sys.version_info < (3, 11):
-    from async_timeout import timeout as async_timeout
-    from typing_extensions import Never, Self, Unpack, assert_never
-else:
-    from asyncio import timeout as async_timeout
-    from typing import Never, Self, Unpack, assert_never
-
-from bleak.args.bluez import BlueZScannerArgs
+from bleak._compat import Never, Self, Unpack, assert_never
+from bleak._compat import timeout as async_timeout
+from bleak.args.bluez import BlueZNotifyArgs, BlueZScannerArgs
 from bleak.args.corebluetooth import CBScannerArgs, CBStartNotifyArgs
 from bleak.args.winrt import WinRTClientArgs
 from bleak.backends import BleakBackend
@@ -153,7 +143,7 @@ class BleakScanner:
         return self._backend_id
 
     async def __aenter__(self) -> Self:
-        await self._backend.start()
+        await self.start()
         return self
 
     async def __aexit__(
@@ -162,7 +152,7 @@ class BleakScanner:
         exc_val: BaseException,
         exc_tb: TracebackType,
     ) -> None:
-        await self._backend.stop()
+        await self.stop()
 
     async def start(self) -> None:
         """
@@ -237,6 +227,10 @@ class BleakScanner:
         """
         Used to override the automatically selected backend (i.e. for a
             custom backend).
+        """
+        adapter: str | None
+        """
+        Name of adapter to use (BlueZ specific), e.g. hci0.
         """
 
     @overload
@@ -460,7 +454,7 @@ class BleakClient:
             These can be 16-bit or 128-bit UUIDs.
         timeout:
             Timeout in seconds passed to the implicit ``discover`` call when
-            ``address_or_ble_device`` is not a :class:`BLEDevice`. Defaults to 10.0.
+            ``address_or_ble_device`` is not a :class:`BLEDevice`. Defaults to 30.
         pair:
             Attempt to pair with the the device before connecting, if it is not
             already paired. This has no effect on macOS since pairing is initiated
@@ -502,6 +496,9 @@ class BleakClient:
 
     .. versionchanged:: 1.0
         Added ``pair`` parameter.
+
+    .. versionchanged:: 2.1.1
+        Changed default connect timeout from 10 to 30 seconds.
     """
 
     def __init__(
@@ -510,7 +507,7 @@ class BleakClient:
         disconnected_callback: Optional[Callable[[BleakClient], None]] = None,
         services: Optional[Iterable[str]] = None,
         *,
-        timeout: float = 10.0,
+        timeout: float = 30,
         pair: bool = False,
         winrt: WinRTClientArgs = {},
         backend: Optional[type[BaseBleakClient]] = None,
@@ -716,7 +713,7 @@ class BleakClient:
     async def write_gatt_char(
         self,
         char_specifier: Union[BleakGATTCharacteristic, int, str, uuid.UUID],
-        data: Buffer,
+        data: SizedBuffer,
         response: Optional[bool] = None,
     ) -> None:
         r"""
@@ -786,6 +783,7 @@ class BleakClient:
             [BleakGATTCharacteristic, bytearray], Union[None, Awaitable[None]]
         ],
         *,
+        bluez: BlueZNotifyArgs = {},
         cb: CBStartNotifyArgs = {},
         **kwargs: Any,
     ) -> None:
@@ -810,8 +808,10 @@ class BleakClient:
             callback:
                 The function to be called on notification. Can be regular
                 function or async function.
+            bluez:
+                BlueZ backend-specific arguments.
             cb:
-                CoreBluetooth specific arguments.
+                CoreBluetooth backend-specific arguments.
 
         Raises:
             BleakCharacteristicNotFoundError: if a characteristic with the
@@ -821,8 +821,12 @@ class BleakClient:
         .. versionchanged:: 0.18
             The first argument of the callback is now a :class:`BleakGATTCharacteristic`
             instead of an ``int``.
+
         .. versionchanged:: 1.0
             Added the ``cb`` parameter.
+
+        .. versionchanged:: 2.1
+            Added the ``bluez`` parameter.
         """
         if not self.is_connected:
             raise BleakError("Not connected")
@@ -837,10 +841,10 @@ class BleakClient:
                 task.add_done_callback(_background_tasks.discard)
 
         else:
-            wrapped_callback = functools.partial(callback, characteristic)
+            wrapped_callback = functools.partial(callback, characteristic)  # type: ignore
 
         await self._backend.start_notify(
-            characteristic, wrapped_callback, cb=cb, **kwargs
+            characteristic, wrapped_callback, bluez=bluez, cb=cb, **kwargs
         )
 
     async def stop_notify(
@@ -894,7 +898,7 @@ class BleakClient:
     async def write_gatt_descriptor(
         self,
         desc_specifier: Union[BleakGATTDescriptor, int],
-        data: Buffer,
+        data: SizedBuffer,
     ) -> None:
         """
         Perform a write operation on the specified GATT descriptor.
@@ -913,26 +917,3 @@ class BleakClient:
         """
         descriptor = _resolve_descriptor(desc_specifier, self.services)
         await self._backend.write_gatt_descriptor(descriptor, data)
-
-
-def cli() -> None:
-    import argparse
-
-    parser = argparse.ArgumentParser(
-        description="Perform Bluetooth Low Energy device scan"
-    )
-    parser.add_argument("-i", dest="adapter", default=None, help="HCI device")
-    parser.add_argument(
-        "-t", dest="timeout", type=int, default=5, help="Duration to scan for"
-    )
-    args = parser.parse_args()
-
-    out = asyncio.run(
-        BleakScanner.discover(adapter=args.adapter, timeout=float(args.timeout))
-    )
-    for o in out:
-        print(str(o))
-
-
-if __name__ == "__main__":
-    cli()

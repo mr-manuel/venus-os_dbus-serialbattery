@@ -1,7 +1,7 @@
 # This module contains mock functions for some of the functionality in gobject.
 # You can use this to create unit tests on code using gobject timers without having to wait for those timer.
 # Use the patch functions to replace the original gobject functions. The timer_manager object defined here
-# allows you to set a virtual time stamp, which will invoke all timers that would normally run in the 
+# allows you to set a virtual time stamp, which will invoke all timers that would normally run in the
 # specified interval.
 
 from datetime import datetime as dt
@@ -35,7 +35,7 @@ class MockTimerManager(object):
 		return self._add_resource(MockTimer(self._time, timeout, callback, *args, **kwargs))
 
 	def add_idle(self, callback, *args, **kwargs):
-		return self.add_timer(self._time, callback, *args, **kwargs)
+		return self.add_timer(0, callback, *args, **kwargs)
 
 	def remove_resouce(self, id):
 		for rid, rr in self._resources:

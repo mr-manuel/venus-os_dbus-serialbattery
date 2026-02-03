@@ -1,0 +1,19 @@
+[
+  {
+    "advertisement": {
+      "local_name": "ANT-BLE16S",
+      "manufacturer_data": {
+        "1623": "88a0aabbcca12345"
+      },
+      "service_uuids": [
+        "0000ffe0-0000-1000-8000-00805f9b34fb",
+        "0000fee7-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -31
+    },
+    "type": "ant_leg_bms",
+    "_comments": [
+      "source HA Bluetooth"
+    ]
+  }
+]

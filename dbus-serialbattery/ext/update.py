@@ -11,6 +11,8 @@ files = [
     # url: URL to the file
     {"path": "/", "url": "https://raw.githubusercontent.com/pyhys/minimalmodbus/refs/heads/master/minimalmodbus.py"},
     {"path": "/", "url": "https://raw.githubusercontent.com/python/typing_extensions/refs/heads/main/src/typing_extensions.py"},
+    # needed for aiobmsble
+    {"path": "/", "url": "https://raw.githubusercontent.com/bcbcarl/python-statistics/refs/heads/master/statistics.py"},
 ]
 
 modules = [
@@ -18,12 +20,17 @@ modules = [
     # user/repository: GitHub user/repository
     # extract: extract only this folder from the tarball
     {"name": "aenum", "user/repository": "ethanfurman/aenum", "extract": "/aenum"},
-    {"name": "bleak", "user/repository": "hbldh/bleak", "extract": "/bleak"},
     {"name": "can", "user/repository": "hardbyte/python-can", "extract": "/can"},
     {"name": "velib_python", "user/repository": "victronenergy/velib_python", "extract": ""},
     {"name": "venus-os_dbus-serialbattery_gui-v2", "user/repository": "mr-manuel/venus-os_dbus-serialbattery_gui-v2", "extract": ""},
     {"name": "venus-os_overlay-fs", "user/repository": "mr-manuel/venus-os_overlay-fs", "extract": ""},
     {"name": "wrapt", "user/repository": "GrahamDumpleton/wrapt", "extract": "/src/wrapt"},
+    # needed for aiobmsble
+    {"name": "aiobmsble", "user/repository": "patman15/aiobmsble", "extract": "/aiobmsble"},
+    {"name": "aiooui", "user/repository": "Bluetooth-Devices/aiooui", "extract": "/src/aiooui"},
+    {"name": "bleak_retry_connector", "user/repository": "Bluetooth-Devices/bleak-retry-connector", "extract": "/src/bleak_retry_connector"},
+    {"name": "bleak", "user/repository": "hbldh/bleak", "extract": "/bleak"},
+    {"name": "bluetooth_adapters", "user/repository": "Bluetooth-Devices/bluetooth-adapters", "extract": "/src/bluetooth_adapters"},
 ]
 
 root_dir = "./dbus-serialbattery/ext"

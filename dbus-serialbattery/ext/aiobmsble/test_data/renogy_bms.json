@@ -1,0 +1,32 @@
+[
+  {
+    "advertisement": {
+      "local_name": "BT-TH-66EDFC11",
+      "manufacturer_data": {
+        "39008": "66edfc11"
+      },
+      "service_uuids": ["0000ffd0-0000-1000-8000-00805f9b34fb"],
+      "rssi": -65,
+      "platform_data": ["60:98:66:00:00:00"]
+    },
+    "type": "renogy_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/247)",
+      "MAC address correct"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "BT-TH-E3383D0E    ",
+      "rssi": -66,
+      "platform_data": ["C4:64:E3:00:00:00"],
+      "manufacturer_data": { "25796": "e3383d0e" },
+      "service_uuids": ["0000ffd0-0000-1000-8000-00805f9b34fb"]
+    },
+    "type": "renogy_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/558)",
+      "MAC address correct"
+    ]    
+  }
+]

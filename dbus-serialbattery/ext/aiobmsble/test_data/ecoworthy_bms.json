@@ -1,0 +1,100 @@
+[
+  {
+    "advertisement": {
+      "local_name": "ECO-WORTHY 02_B8EF",
+      "manufacturer_data": {
+        "49844": "e0fab8f0"
+      },
+      "service_uuids": [
+        "00001800-0000-1000-8000-00805f9b34fb",
+        "00001801-0000-1000-8000-00805f9b34fb",
+        "0000fff0-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -50
+    },
+    "type": "ecoworthy_bms",
+    "_comments": [
+      "source LOG, proxy (https://github.com/patman15/BMS_BLE-HA/issues/164#issue-2825586172)",
+      "MAC address, correct, public"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "ECO-WORTHY 02_50DB",
+      "manufacturer_data": {
+        "47912": "ed0050dc"
+      },
+      "rssi": -49
+    },
+    "type": "ecoworthy_bms",
+    "_comments": [
+      "source BTctl (https://github.com/patman15/BMS_BLE-HA/issues/253)",
+      "MAC address, correct, public"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "ECO-WORTHY 0B_5AD4",
+      "manufacturer_data": {
+        "57570": "5a783c31"
+      },
+      "service_uuids": [
+        "0000fff0-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -86
+    },
+    "type": "ecoworthy_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/286)",
+      "MAC address, correct, private"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "ECO-WORTHY 02_3DDF",
+      "manufacturer_data": {
+        "15996": "821c3de0"
+      },
+      "rssi": -49
+    },
+    "type": "ecoworthy_bms",
+    "_comments": [
+      "source proxy LOG (https://github.com/patman15/BMS_BLE-HA/issues/295)",
+      "MAC address, correct, public"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "DCHOUSE 01_4F9F",
+      "manufacturer_data": {
+        "57570": "5a72a745"
+      },
+      "service_uuids": [
+        "0000fff0-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -68
+    },
+    "type": "ecoworthy_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/326)",
+      "MAC address correct"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "ECO-WORTHY 0B_198D",
+      "manufacturer_data": {
+        "59362": "798e373d"
+      },
+      "service_uuids": [
+        "0000fff0-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -50
+    },
+    "type": "ecoworthy_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/386)",
+      "MAC address, correct, private"
+    ]
+  }
+]

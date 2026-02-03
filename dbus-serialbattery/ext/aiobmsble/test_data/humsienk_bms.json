@@ -1,0 +1,18 @@
+[
+  {
+    "advertisement": {
+      "local_name": "HS30A3",
+      "platform_data": ["13:C2:A7:00:00:00"],
+      "rssi": -62,
+      "manufacturer_data": { "49683": "a70330a3" },
+      "service_uuids": [
+        "0000ff00-0000-1000-8000-00805f9b34fb",
+        "00000001-0000-1000-8000-00805f9b34fb"
+      ]
+    },
+    "type": "humsienk_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/aiobmsble/issues/65)"
+    ]
+  }
+]

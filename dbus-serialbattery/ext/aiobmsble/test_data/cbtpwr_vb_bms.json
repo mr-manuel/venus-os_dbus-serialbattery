@@ -1,0 +1,21 @@
+[
+  {
+    "advertisement": {
+      "local_name": "VB024000390",
+      "manufacturer_data": {
+        "16963": "545e0211f82e0ca88942"
+      },
+      "service_uuids": [
+        "0000fff0-0000-1000-8000-00805f9b34fb",
+        "0000ffb0-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -73,
+      "platform_data": ["F8:2E:0C:00:00:00"]
+    },
+    "type": "cbtpwr_vb_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/240)",
+      "Creabest"
+    ]
+  }
+]

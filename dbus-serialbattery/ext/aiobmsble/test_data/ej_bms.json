@@ -1,0 +1,107 @@
+[
+  {
+    "advertisement": {
+      "local_name": "LT-12V-1544",
+      "manufacturer_data": {
+        "33384": "0102000781b54e"
+      },
+      "rssi": -71
+    },
+    "type": "ej_bms",
+    "_comments": [
+      "source LOG"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "L-12V100AH-0902",
+      "tx_power": 5,
+      "rssi": -87
+    },
+    "type": "ej_bms",
+    "_comments": [
+      "proxy LOG (https://github.com/patman15/BMS_BLE-HA/issues/187)"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "LT-12V-0002\r\n",
+      "tx_power": 5,
+      "rssi": -94
+    },
+    "type": "ej_bms",
+    "_comments": [
+      "proxy LOG (https://github.com/patman15/BMS_BLE-HA/issues/187)"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "LT-24100B-A00249",
+      "manufacturer_data": {
+        "22618": "c847800bb654"
+      },
+      "rssi": -55
+    },
+    "type": "ej_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/350)"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "V-12V200Ah-0215",
+      "rssi": -74
+    },
+    "type": "ej_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/241)"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "SV12V150224041",
+      "manufacturer_data": {
+        "33384": "01020007a030f7"
+      },
+      "rssi": -39
+    },
+    "type": "ej_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/314)"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "LT-12100BG-A06359",
+      "manufacturer_data": {
+        "22618": "36342462a26b"
+      },
+      "service_uuids": [
+        "0000ffe0-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -87
+    },
+    "type": "ej_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/346)"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "libattU12E9",
+      "manufacturer_data": {
+        "21320": "38343238303839643132653936343030"
+      },
+      "service_uuids": [
+        "00001800-0000-1000-8000-00805f9b34fb",
+        "00001801-0000-1000-8000-00805f9b34fb",
+        "6e400001-b5a3-f393-e0a9-e50e24dcca9e"
+      ],
+      "rssi": -62
+    },
+    "type": "ej_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/358)"
+    ]
+  }
+]

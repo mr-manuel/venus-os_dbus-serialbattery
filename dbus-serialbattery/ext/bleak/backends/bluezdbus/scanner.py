@@ -10,13 +10,9 @@ from collections.abc import Callable, Coroutine
 from typing import Any, Literal, Optional
 from warnings import warn
 
-if sys.version_info < (3, 12):
-    from typing_extensions import override
-else:
-    from typing import override
-
 from dbus_fast import Variant
 
+from bleak._compat import override
 from bleak.args.bluez import BlueZDiscoveryFilters as _BlueZDiscoveryFilters
 from bleak.args.bluez import BlueZScannerArgs as _BlueZScannerArgs
 from bleak.backends.bluezdbus.defs import Device1
@@ -80,7 +76,7 @@ class BleakScannerBlueZDBus(BaseBleakScanner):
         bluez: _BlueZScannerArgs,
         **kwargs: Any,
     ):
-        super(BleakScannerBlueZDBus, self).__init__(detection_callback, service_uuids)
+        super().__init__(detection_callback, service_uuids)
 
         self._scanning_mode = scanning_mode
 
@@ -180,7 +176,7 @@ class BleakScannerBlueZDBus(BaseBleakScanner):
             elif k == "Pattern":
                 self._filters[k] = Variant("s", v)
             else:
-                logger.warning("Filter '%s' is not currently supported." % k)
+                logger.warning("Filter '%s' is not currently supported.", k)
 
     # Helper methods
 

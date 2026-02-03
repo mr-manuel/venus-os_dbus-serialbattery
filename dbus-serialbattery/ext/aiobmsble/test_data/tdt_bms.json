@@ -1,0 +1,14 @@
+[
+  {
+    "advertisement": {
+      "manufacturer_data": {
+        "54976": "3c4fac50ff"
+      },
+      "rssi": -127
+    },
+    "type": "tdt_bms",
+    "_comments": [
+      "source PCAP"
+    ]
+  }
+]

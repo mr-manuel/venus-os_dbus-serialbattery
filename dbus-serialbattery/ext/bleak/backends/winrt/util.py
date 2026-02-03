@@ -1,5 +1,5 @@
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     if sys.platform != "win32":
@@ -10,22 +10,18 @@ import ctypes
 from ctypes import wintypes
 from enum import IntEnum
 
+from bleak._compat import timeout as async_timeout
 from bleak.exc import BleakError
 
-if sys.version_info < (3, 11):
-    from async_timeout import timeout as async_timeout
-else:
-    from asyncio import timeout as async_timeout
 
-
-def _check_result(result: int, func, args):
+def _check_result(result: int, func: Any, args: Any) -> Any:
     if not result:
         raise ctypes.WinError()
 
     return args
 
 
-def _check_hresult(result: int, func, args):
+def check_hresult(result: int, func: Any, args: Any) -> Any:
     if result:
         raise ctypes.WinError(result)
 
@@ -53,7 +49,7 @@ _SET_TIMER_PARAM_FLAGS = (
 _SetTimer = _SET_TIMER_PROTOTYPE(
     ("SetTimer", ctypes.windll.user32), _SET_TIMER_PARAM_FLAGS
 )
-_SetTimer.errcheck = _check_result
+_SetTimer.errcheck = _check_result  # type: ignore[assignment]
 
 # https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-killtimer
 _KILL_TIMER_PROTOTYPE = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, _UINT_PTR)
@@ -78,7 +74,7 @@ _CO_GET_APARTMENT_TYPE_PARAM_FLAGS = (
 _CoGetApartmentType = _CO_GET_APARTMENT_TYPE_PROTOTYPE(
     ("CoGetApartmentType", ctypes.windll.ole32), _CO_GET_APARTMENT_TYPE_PARAM_FLAGS
 )
-_CoGetApartmentType.errcheck = _check_hresult
+_CoGetApartmentType.errcheck = check_hresult  # type: ignore[assignment]
 
 _CO_E_NOTINITIALIZED = -2147221008
 
@@ -155,7 +151,7 @@ async def assert_mta() -> None:
 
     event = asyncio.Event()
 
-    def wait_event(*_):
+    def wait_event(hwnd: int, uidevent: int, uelapse: int, dwtime: int) -> None:
         event.set()
 
     # have to keep a reference to the callback or it will be garbage collected
@@ -186,7 +182,7 @@ async def assert_mta() -> None:
         _KillTimer(None, timer)
 
 
-def allow_sta():
+def allow_sta() -> None:
     """
     Suppress check for MTA thread type and allow STA.
 
@@ -201,7 +197,7 @@ def allow_sta():
 
     .. versionadded:: 0.22.1
     """
-    allow_sta._allowed = True
+    setattr(allow_sta, "_allowed", True)
 
 
 def uninitialize_sta():

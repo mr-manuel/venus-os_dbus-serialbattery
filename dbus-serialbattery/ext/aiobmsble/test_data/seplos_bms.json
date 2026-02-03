@@ -1,0 +1,88 @@
+[
+  {
+    "advertisement": {
+      "local_name": "SP05B2312190075       ",
+      "service_uuids": ["0000fff0-0000-1000-8000-00805f9b34fb"],
+      "rssi": -76
+    },
+    "type": "seplos_bms",
+    "_comments": ["source LOG"]
+  },
+  {
+    "advertisement": {
+      "local_name": "SP51B2407270006       ",
+      "service_uuids": [
+        "00001800-0000-1000-8000-00805f9b34fb",
+        "00001801-0000-1000-8000-00805f9b34fb",
+        "0000fff0-0000-1000-8000-00805f9b34fb",
+        "02f00000-0000-0000-8000-00000000fe00"
+      ],
+      "rssi": -46
+    },
+    "type": "seplos_bms",
+    "_comments": [
+      "source BTctl (https://github.com/patman15/BMS_BLE-HA/issues/142)"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "SP66B2404270002       ",
+      "service_uuids": ["0000fff0-0000-1000-8000-00805f9b34fb"],
+      "rssi": -81
+    },
+    "type": "seplos_bms",
+    "_comments": ["source LOG"]
+  },
+  {
+    "advertisement": {
+      "local_name": "SP47B-A2410230006",
+      "service_uuids": ["0000fff0-0000-1000-8000-00805f9b34fb"],
+      "rssi": -81
+    },
+    "type": "seplos_bms",
+    "_comments": ["advmon (https://github.com/patman15/BMS_BLE-HA/issues/214)"]
+  },
+  {
+    "advertisement": {
+      "local_name": "CSY012405290042",
+      "service_uuids": ["0000fff0-0000-1000-8000-00805f9b34fb"],
+      "rssi": -78
+    },
+    "type": "seplos_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/231)"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "SP95B-B2503190001",
+      "service_uuids": ["0000fff0-0000-1000-8000-00805f9b34fb"],
+      "rssi": -65
+    },
+    "type": "seplos_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/454)"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "SP112B2409100524      ",
+      "service_uuids": ["0000fff0-0000-1000-8000-00805f9b34fb"],
+      "rssi": -96
+    },
+    "type": "seplos_bms",
+    "_comments": ["source LOG"]
+  },
+  {
+    "advertisement": {
+      "local_name": "XZHXLD012404120010    ",
+      "service_uuids": ["0000fff0-0000-1000-8000-00805f9b34fb"],
+      "rssi": -80,
+      "platform_data": ["C0:D6:3C:00:00:00"]
+    },
+    "type": "seplos_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/547)"
+    ]
+  }
+]

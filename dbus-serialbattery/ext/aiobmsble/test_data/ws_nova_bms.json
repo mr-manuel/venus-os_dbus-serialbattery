@@ -1,0 +1,16 @@
+[
+  {
+    "advertisement": {
+      "local_name": "Power-1",
+      "rssi": -63,
+      "platform_data": ["60:6E:41:00:00:00"],
+      "manufacturer_data": { "28256": "41855571" },
+      "service_uuids": ["0000fff0-0000-1000-8000-00805f9b34fb"]
+    },
+    "type": "ws_nova_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/537)",
+      "variable name"
+    ]
+  }
+]

@@ -1,0 +1,15 @@
+[
+  {
+    "advertisement": {
+      "local_name": "Epsilon-201007664",
+      "rssi": -68,
+      "platform_data": [
+        "60:8A:10:00:00:00"
+      ]
+    },
+    "type": "superb_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/518)"
+    ]
+  }
+]

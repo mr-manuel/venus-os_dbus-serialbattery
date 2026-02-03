@@ -1,0 +1,16 @@
+[
+  {
+    "advertisement": {
+      "local_name": "RNGRBP1228000830",
+      "manufacturer_data": {
+        "57676": "7457947b"
+      },
+      "rssi": -44
+    },
+    "type": "renogy_pro_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/390)",
+      "MAC address, correct"
+    ]
+  }
+]

@@ -1,0 +1,65 @@
+[
+  {
+    "advertisement": {
+      "local_name": "GW-24Srenamed1",
+      "manufacturer_data": {
+        "34952": "8888bf9501113638"
+      },
+      "service_uuids": [
+        "0000ffe0-0000-1000-8000-00805f9b34fb",
+        "0000fee7-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -88
+    },
+    "type": "neey_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/291)"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "GW-24Srenamed2",
+      "service_uuids": [
+        "0000ffe0-0000-1000-8000-00805f9b34fb",
+        "0000fee7-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -88
+    },
+    "type": "neey_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/291)"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "GW-24Srenamed3",
+      "manufacturer_data": {
+        "55769": "88a02b8003f2fc9b"
+      },
+      "service_uuids": [
+        "0000ffe0-0000-1000-8000-00805f9b34fb",
+        "0000fee7-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -73
+    },
+    "type": "neey_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/291)",
+      "MAC address"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "EK-16S2EB",
+      "service_uuids": [
+        "0000ffe0-0000-1000-8000-00805f9b34fb",
+        "0000fee7-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -73
+    },
+    "type": "neey_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/454)"
+    ]
+  }
+]

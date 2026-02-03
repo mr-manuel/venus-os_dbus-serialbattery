@@ -10,11 +10,6 @@ import logging
 from typing import Literal, NamedTuple, Optional
 from uuid import UUID
 
-if sys.version_info < (3, 12):
-    from typing_extensions import override
-else:
-    from typing import override
-
 from winrt.windows.devices.bluetooth import BluetoothAdapter
 from winrt.windows.devices.bluetooth.advertisement import (
     BluetoothLEAdvertisementReceivedEventArgs,
@@ -27,6 +22,7 @@ from winrt.windows.devices.bluetooth.advertisement import (
 from winrt.windows.devices.radios import RadioState
 from winrt.windows.foundation import EventRegistrationToken
 
+from bleak._compat import override
 from bleak.assigned_numbers import AdvertisementDataType
 from bleak.backends.scanner import (
     AdvertisementData,
@@ -97,7 +93,7 @@ class BleakScannerWinRT(BaseBleakScanner):
         scanning_mode: Literal["active", "passive"],
         **kwargs: Any,
     ):
-        super(BleakScannerWinRT, self).__init__(detection_callback, service_uuids)
+        super().__init__(detection_callback, service_uuids)
 
         self.watcher: Optional[BluetoothLEAdvertisementWatcher] = None
         self._advertisement_pairs: dict[str, RawAdvData] = {}
@@ -245,8 +241,9 @@ class BleakScannerWinRT(BaseBleakScanner):
         # there is nothing pumping a Windows message loop.
         await assert_mta()
 
+        # TODO: need to fix return type of get_default_async() in PyWinRT
         adapter = await BluetoothAdapter.get_default_async()
-        if adapter is None:
+        if adapter is None:  # pyright: ignore[reportUnnecessaryComparison]
             raise BleakBluetoothNotAvailableError(
                 "No Bluetooth adapter found",
                 BleakBluetoothNotAvailableReason.NO_BLUETOOTH,

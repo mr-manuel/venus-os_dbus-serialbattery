@@ -1,0 +1,24 @@
+[
+  {
+    "advertisement": {
+      "local_name": "F100011002424470238",
+      "rssi": -56
+    },
+    "type": "felicity_bms",
+    "_comments": [
+      "source BTctl (https://github.com/patman15/BMS_BLE-HA/issues/161)",
+      "Felicity Solar LUX-Y-48300LG01"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "F074204831425240169",
+      "rssi": -69
+    },
+    "type": "felicity_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/466)",
+      "Felicity FLB48314TG1"
+    ]
+  }
+]
