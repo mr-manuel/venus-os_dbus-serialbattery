@@ -476,6 +476,16 @@ def main():
         # check if BMS_TYPE is not empty and all BMS types in the list are supported
         check_bms_types(supported_bms_types, "serial")
 
+        # check if serial port exists
+        if not os.path.exists(port):
+            logger.error(f">>> Serial port {port} does not exist")
+            exit_driver(None, None, 1)
+
+        # check if serial port is accessible
+        if not os.access(port, os.R_OK | os.W_OK):
+            logger.error(f">>> Serial port {port} is not accessible (no read/write permission)")
+            exit_driver(None, None, 1)
+
         # wait some seconds to be sure that the serial connection is ready
         # else the error throw a lot of timeouts
         sleep(16)
