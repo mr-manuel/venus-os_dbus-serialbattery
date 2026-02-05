@@ -119,10 +119,12 @@ def main():
         if "mainloop" in globals() and mainloop is not None:
             mainloop.quit()
 
-        # For BLE connections, disconnect from the BLE device
-        if port.endswith("_Ble"):
-            if battery and len(battery) > 0 and hasattr(battery[0], "disconnect") and callable(battery[0].disconnect):
-                battery[0].disconnect()
+        # For BLE and AIOBMSBLE connections, disconnect from the BLE device
+        # Else it's very likely that the next connection attempt fails
+        if port.endswith("_Ble") or port.lower().startswith("aiobmsble_"):
+            for key_address in battery:
+                if hasattr(battery[key_address], "disconnect") and callable(battery[key_address].disconnect):
+                    battery[key_address].disconnect()
 
         # Stop the CanReceiverThread
         elif port.startswith(("can", "vecan", "vcan")):
@@ -366,6 +368,34 @@ def main():
             if testbms.test_connection():
                 logger.info("-- Connection established to " + testbms.__class__.__name__)
                 battery[0] = testbms
+
+    # BLUETOOTH AIOBMSBLE
+    # https://github.com/patman15/aiobmsble
+    elif port.lower().startswith("aiobmsble_"):
+        """
+        Import BLE classes only if it's a BLE port; otherwise, the driver won't start due to missing Python modules.
+        This prevents issues when using the driver exclusively with a serial connection.
+        """
+
+        if len(sys.argv) <= 2:
+            logger.error(">>> Bluetooth address is missing in the command line arguments")
+            exit_driver(None, None, 1)
+        else:
+            """
+            /etc/init.d/bluetooth stop; sleep 5; /etc/init.d/bluetooth start
+            python /data/apps/dbus-serialbattery/dbus-serialbattery.py aiobmsble_jikong_bms C8:47:80:1C:4D:D2
+            python /data/apps/dbus-serialbattery/dbus-serialbattery.py aiobmsble_ecoworthy_bms E2:E7:79:89:18:2B
+            """
+            from bms.generic_aiobmsble import Generic_AioBmsBle  # noqa: F401
+
+            ble_address = sys.argv[2]
+
+            # do not remove ble_ prefix, since the dbus service cannot be only numbers
+            testbms = Generic_AioBmsBle(port.replace("aiobmsble_", ""), None, ble_address)
+
+            if testbms.test_connection():
+                logger.info("-- Connection established to " + port)
+                battery[ble_address.replace(":", "").lower()] = testbms
 
     # CAN
     elif port.startswith(("can", "vecan", "vcan")):
