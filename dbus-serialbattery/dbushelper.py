@@ -171,7 +171,7 @@ class DbusHelper:
         device_instance = "1"
         device_instances_used = []
         found_bms = False
-        self.path_battery = "/Settings/Devices/serialbattery" + "_" + str(self.bms_id)
+        self.path_battery = "/Settings/Devices/serialbattery" + "_" + str(self.bms_id).upper()
 
         # prepare settings class
         self.settings = SettingsDevice(get_bus(), self.EMPTY_DICT, self.handle_changed_setting)
