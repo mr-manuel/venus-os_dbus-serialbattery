@@ -26,7 +26,6 @@
 
 * Added: aiobmsble library (https://github.com/patman15/aiobmsble), which adds a lot of Bluetooth batteries to Venus OS by @mr-manuel
 * Added: Daren 485 BMS - Read SoH with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/344 by @kopierschnitte
-* Added: dbus caching to reduce writes and therefore CPU consumption with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/397 by @cgoudie
 * Added: Disable serial starter if not needed by @mr-manuel
 * Added: Generic MQTT BMS by @mr-manuel
 * Added: Health check for batteries which are using the callback by @mr-manuel
@@ -34,14 +33,10 @@
 * Added: JBD UP16S series support, including daisy-chaining, with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/375 by @dmitrych5
 * Added: JK Inverter BMS - Heating informations with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/367 by @BitSeb
 * Added: KS48100 BMS - Read SoH with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/344 by @kopierschnitte
-* Added: Prevent GUI modification installations by setting `GUI_INSTALL_CUSTOMIZATIONS` to `False` by @mr-manuel
-* Added: Set SOC manually via GUI if SOC_CALCULATION is enabled by @mr-manuel
 * Added: Venus OS 3.7x GUIv2 support by @mr-manuel
-* Changed: Added integer conversion for Daly Can BMS Set SOC GUI method by @lex2k0
 * Changed: Daren 485 BMS - Fixed charge/discharge calculation with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/343 by @kopierschnitte
 * Changed: Driver internals - Renamed callback variables/functions and added a better description by @mr-manuel
 * Changed: Exit behavior for excluded devices to behave like Victron services by @mr-manuel
-* Changed: Fix dbus connection leak which fixes problems on systems which multiple batteries with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/402 by @cgoudie
 * Changed: Fix issue with published JsonData, where None values were published as empty strings by @mr-manuel
 * Changed: Fixed discharge current limit calculations when MOSFET temperature is not available, by @dmitrych5
 * Changed: Fixed problems with the `BLOCK_ON_DISCONNECT` behavior. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/309 by @mr-manuel
@@ -56,11 +51,9 @@
 * Changed: KS48100 BMS - Fixed charge/discharge calculation with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/343 by @kopierschnitte
 * Changed: LLT/JBD BLE BMS - Fixed wrong charge/discharge fet assignment @mr-manuel
 * Changed: Made some dbus settings silent to not flood the localsettings service log by @mr-manuel
-* Changed: Mechanism to reset SOC via GUI, since it was not possible to set the same SOC twice by @mr-manuel
 * Changed: RV-C CAN BMS - Fixed wrong charge/discharge fet assignment @mr-manuel
 * Changed: Seplos BMS - Fix problems with unique identifier when daisy chained by @KoljaWindeler
 * Changed: Use Bluetooth MAC address as unique identifier for all Bluetooth BMS by @mr-manuel
-* Changed: Use correct temperature sensors for Daly CAN BMS instead of min/max values by @lex2k0
 * Changed: Use port and address as unique identifier is now available for all serial BMS by @mr-manuel
 
 ## v2.0.20250729
