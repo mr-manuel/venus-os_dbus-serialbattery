@@ -50,6 +50,7 @@
 * Changed: JKBMS CAN - Correct calculation of arbitration_id for device_address > 0. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/288 with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/306 by @Hooorny
 * Changed: KS48100 BMS - Fixed charge/discharge calculation with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/343 by @kopierschnitte
 * Changed: LLT/JBD BLE BMS - Fixed wrong charge/discharge fet assignment @mr-manuel
+* Changed: Made some dbus settings silent to not flood the localsettings service log by @mr-manuel
 * Changed: RV-C CAN BMS - Fixed wrong charge/discharge fet assignment @mr-manuel
 * Changed: Seplos BMS - Fix problems with unique identifier when daisy chained by @KoljaWindeler
 * Changed: Use Bluetooth MAC address as unique identifier for all Bluetooth BMS by @mr-manuel

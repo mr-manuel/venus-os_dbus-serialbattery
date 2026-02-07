@@ -397,6 +397,7 @@ class DbusHelper:
                 (self.battery.soc_calc if self.battery.soc_calc is not None else ""),
                 0,
                 0,
+                1,  # set setting as silent, this prevents logging ing localsettings service
             ],
             "SocResetLastReached": [
                 self.path_battery + "/SocResetLastReached",
@@ -409,6 +410,7 @@ class DbusHelper:
                 "",
                 0,
                 0,
+                1,  # set setting as silent, this prevents logging ing localsettings service
             ],
             "UniqueIdentifier": [
                 self.path_battery + "/UniqueIdentifier",
