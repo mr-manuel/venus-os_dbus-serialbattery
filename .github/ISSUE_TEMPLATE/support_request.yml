@@ -140,11 +140,13 @@ body:
         - EG4 LiFePower (Revov, Tian Power)
         - EG4 LL
         - Felicity
+        - Generic AioBmsBle
+        - Generic MQTT
         - Hektec Modbus SmartBMS / YanYang BMS
         - HLPdata BMS4S
         - Jiabaida JBD BMS (LLT Power, Overkill Solar, Smart BMS)
         - JKBMS (Heltec BMS)
-        - JKBMS Inverter (JKBMS PB Model)
+        - JK Inverter BMS (JKBMS PB Model)
         - Kilovault
         - KS48100
         - LiTime
@@ -213,8 +215,26 @@ body:
     attributes:
       label: Config file
       description: |
-        Paste your `config.ini` file here. See [here](https://mr-manuel.github.io/venus-os_dbus-serialbattery_docs/general/install#settings-locationpath) where you can find it. DO NOT COPY the `config.default.ini` here. The content will be automatically formatted into code, so no need for backticks.
+        Paste your `config.ini` file here. See [here](https://mr-manuel.github.io/venus-os_dbus-serialbattery_docs/general/install#settings-locationpath) where you can find it. DO NOT COPY the `config.default.ini` here.
+
+        The content will be automatically formatted into code, so no need for backticks.
       render: ini
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs_header
+    attributes:
+      label: Driver startup log
+      description: |
+        Please copy and paste the driver startup log here. This goes from `Starting dbus-serialbattery` to `Serial Number/Unique Identifier:`.
+
+        See [here](https://mr-manuel.github.io/venus-os_dbus-serialbattery_docs/troubleshoot/#driver-log-files) how to get the driver log files.
+
+        ⚠️ **IMPORTANT:** Do not forget to pipe the output through `tai64nlocal`, if you don't copy the commands from the documentation.
+
+        The content will be automatically formatted into code, so no need for tripple backticks.
+      render: shell
     validations:
       required: true
 
@@ -223,8 +243,13 @@ body:
     attributes:
       label: Relevant log output
       description: |
-        Please copy and paste any relevant log output here. See [here](https://mr-manuel.github.io/venus-os_dbus-serialbattery_docs/troubleshoot/#driver-log-files) how to get the driver log files. The content will be automatically formatted into code, so no need for backticks.
+        Please copy and paste any relevant log output here.
+
+        See [here](https://mr-manuel.github.io/venus-os_dbus-serialbattery_docs/troubleshoot/#driver-log-files) how to get the driver log files.
+
         ⚠️ **IMPORTANT:** Do not forget to pipe the output through `tai64nlocal`, if you don't copy the commands from the documentation.
+
+        The content will be automatically formatted into code, so no need for tripple backticks.
       render: shell
     validations:
       required: true
