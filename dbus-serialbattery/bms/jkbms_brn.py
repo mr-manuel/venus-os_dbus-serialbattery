@@ -148,8 +148,9 @@ class Jkbms_Brn:
     # translate info placeholder, since it depends on the bms_max_cell_count
     translate_cell_info = []
 
-    def __init__(self, addr, reset_bt_callback=None):
+    def __init__(self, addr, reset_bt_callback=None, **kwargs):
         self.address = addr
+        self.adapter = kwargs.get("adapter")
         self.bt_thread = None
         self.bt_thread_monitor = threading.Thread(target=self.monitor_scraping, name="Thread-JKBMS-Monitor")
         self.bt_reset = reset_bt_callback
@@ -449,11 +450,11 @@ class Jkbms_Brn:
         logger.debug("--> asy_connect_and_scrape(): connect and scrape on address: " + self.address)
         self.run = True
         while self.run and self.main_thread.is_alive():  # autoreconnect
-            self.bt_client = BleakClient(self.address)
+            self.bt_client = BleakClient(self.address, adapter=self.adapter)
             logger.debug("--> asy_connect_and_scrape(): btloop")
 
             try:
-                logger.info("|- Try to connect to Jkbms_Ble at " + self.address)
+                logger.info("|- Try to connect to Jkbms_Ble at " + self.address + " using " + (self.adapter or "default") + " adapter")
                 await self.bt_client.connect()  # default timeout 10s
                 logger.info("|- Device connected, check if it's really a JKBMS")
 
