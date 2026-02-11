@@ -311,14 +311,14 @@ class Daly_Can(Battery):
                 # Temperature min/max data
                 # elif normalized_arbitration_id in self.CAN_FRAMES[self.RESPONSE_MINMAX_TEMP]:
 
-                    # max_temp, max_no, min_temp, min_no = unpack_from(">BBBB", data)
+                # max_temp, max_no, min_temp, min_no = unpack_from(">BBBB", data)
 
-                    # store temperatures in a dict to assign the temperature to the correct sensor
-                    # temperatures = {min_no: (min_temp - self.TEMP_ZERO_CONSTANT), max_no: (max_temp - self.TEMP_ZERO_CONSTANT)}
+                # store temperatures in a dict to assign the temperature to the correct sensor
+                # temperatures = {min_no: (min_temp - self.TEMP_ZERO_CONSTANT), max_no: (max_temp - self.TEMP_ZERO_CONSTANT)}
 
-                    # Inactive due to correct temperature values in next elif
-                    # self.to_temperature(1, temperatures[min_no])
-                    # self.to_temperature(2, temperatures[max_no])
+                # Inactive due to correct temperature values in next elif
+                # self.to_temperature(1, temperatures[min_no])
+                # self.to_temperature(2, temperatures[max_no])
 
                 # Temperature range data
                 elif normalized_arbitration_id in self.CAN_FRAMES[self.RESPONSE_TEMP]:
