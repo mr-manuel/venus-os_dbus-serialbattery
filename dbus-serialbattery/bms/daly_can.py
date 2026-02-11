@@ -327,7 +327,7 @@ class Daly_Can(Battery):
                     if frameNr == 1:
                         raw_temps = [t1, t2, t3, t4, t5, t6, t7]
 
-                        count = getattr(self, 'temperature_sensors_count', 4)
+                        count = getattr(self, "temperature_sensors_count", 4)
 
                         for i in range(count):
                             self.to_temperature(i + 1, raw_temps[i] - self.TEMP_ZERO_CONSTANT)
