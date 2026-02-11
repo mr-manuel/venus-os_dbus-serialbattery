@@ -196,8 +196,9 @@ class Daly_Can(Battery):
             self.can_transport_interface.can_bus.send(message, timeout=0.2)
             message = Message(arbitration_id=(self.CAN_FRAMES[self.COMMAND_MINMAX_CELL_VOLTS][0] & 0xFFFF00FF) | (self.device_address << 8), data=data)
             self.can_transport_interface.can_bus.send(message, timeout=0.2)
-            message = Message(arbitration_id=(self.CAN_FRAMES[self.COMMAND_MINMAX_TEMP][0] & 0xFFFF00FF) | (self.device_address << 8), data=data)
-            self.can_transport_interface.can_bus.send(message, timeout=0.2)
+            # Unused due to COMMAND_TEMP
+            # message = Message(arbitration_id=(self.CAN_FRAMES[self.COMMAND_MINMAX_TEMP][0] & 0xFFFF00FF) | (self.device_address << 8), data=data)
+            # self.can_transport_interface.can_bus.send(message, timeout=0.2)
             message = Message(arbitration_id=(self.CAN_FRAMES[self.COMMAND_FET][0] & 0xFFFF00FF) | (self.device_address << 8), data=data)
             self.can_transport_interface.can_bus.send(message, timeout=0.2)
             message = Message(arbitration_id=(self.CAN_FRAMES[self.COMMAND_STATUS][0] & 0xFFFF00FF) | (self.device_address << 8), data=data)
@@ -308,12 +309,12 @@ class Daly_Can(Battery):
                     self.cell_min_voltage = cell_min_voltage / 1000
 
                 # Temperature min/max data
-                elif normalized_arbitration_id in self.CAN_FRAMES[self.RESPONSE_MINMAX_TEMP]:
+                # elif normalized_arbitration_id in self.CAN_FRAMES[self.RESPONSE_MINMAX_TEMP]:
 
-                    max_temp, max_no, min_temp, min_no = unpack_from(">BBBB", data)
+                    # max_temp, max_no, min_temp, min_no = unpack_from(">BBBB", data)
 
                     # store temperatures in a dict to assign the temperature to the correct sensor
-                    temperatures = {min_no: (min_temp - self.TEMP_ZERO_CONSTANT), max_no: (max_temp - self.TEMP_ZERO_CONSTANT)}
+                    # temperatures = {min_no: (min_temp - self.TEMP_ZERO_CONSTANT), max_no: (max_temp - self.TEMP_ZERO_CONSTANT)}
 
                     # Inactive due to correct temperature values in next elif
                     # self.to_temperature(1, temperatures[min_no])
