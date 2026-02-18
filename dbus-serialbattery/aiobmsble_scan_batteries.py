@@ -7,7 +7,7 @@ import sys
 import os
 
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), "ext"))
-# export PYTHONPATH="/data/apps/aiobmsble:/data/apps/ble-le-test/venus_modules:$PYTHONPATH"
+# export PYTHONPATH="/data/apps/dbus-serialbattery/ext:$PYTHONPATH"
 
 from bleak import BleakScanner  # noqa: E402
 from bleak.backends.device import BLEDevice  # noqa: E402
@@ -25,6 +25,13 @@ logging.basicConfig(
 logger: logging.Logger = logging.getLogger(__package__)
 
 
+def format_dict_multiline(data: dict) -> str:
+    """Format a dictionary into a multi-line string for better readability in logs."""
+    if not data:
+        return "Nothing received from BMS"
+    return repr(dict(sorted(data.items()))).replace("{", "\n\t").replace("}", "").replace("'", '"').replace(', "', ',\n\t"')
+
+
 async def scan_devices() -> dict[str, tuple[BLEDevice, AdvertisementData]]:
     """Scan for BLE devices and return results."""
     logger.info("Starting BLE device scan ...")
@@ -39,7 +46,7 @@ async def scan_devices() -> dict[str, tuple[BLEDevice, AdvertisementData]]:
     return scan_result
 
 
-async def detect_bms() -> None:
+async def detect_bms(args: argparse.Namespace) -> None:
     """Query a Bluetooth device based on the provided arguments."""
 
     scan_result: dict[str, tuple[BLEDevice, AdvertisementData]] = await scan_devices()
@@ -50,6 +57,10 @@ async def detect_bms() -> None:
         logger.info("BLE device found:")
         logger.info(f"|- Name: {ble_dev.name}")
         logger.info(f"|- Address: {ble_dev.address}")
+        if args.advertisement:
+            # Format the advertisement string for better readability
+            adv_str = repr(advertisement).replace("AdvertisementData(", "\n\t").replace(")", "").replace(", ", ",\n\t")
+            logger.info(f"|- Advertisement: {adv_str}")
 
         if bms_cls := await bms_identify(advertisement, ble_dev.address):
             bms_module = bms_cls.__module__  # e.g., 'aiobmsble.bms.jikong_bms'
@@ -67,19 +78,11 @@ async def detect_bms() -> None:
 
                 logger.info(
                     "BMS info: %s",
-                    (
-                        repr(dict(sorted(info.items()))).replace("{", "\n\t").replace("}", "").replace("'", '"').replace(', "', ',\n\t"')
-                        if info
-                        else "Nothing received from BMS"
-                    ),
+                    format_dict_multiline(info),
                 )
                 logger.info(
                     "BMS data: %s",
-                    (
-                        repr(dict(sorted(data.items()))).replace("{", "\n\t").replace("}", "").replace("'", '"').replace(', "', ',\n\t"')
-                        if data
-                        else "Nothing received from BMS"
-                    ),
+                    format_dict_multiline(data),
                 )
 
             except (BleakError, TimeoutError) as exc:
@@ -114,10 +117,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Reference script for 'aiobmsble' to show all recognized BMS in range.")
     parser.add_argument("-l", "--logfile", type=str, help="Path to the log file")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable debug logging")
+    parser.add_argument("-a", "--advertisement", action="store_true", help="Show raw BLE advertisement data (for debugging)")
 
-    setup_logging(parser.parse_args())
+    args = parser.parse_args()
+    setup_logging(args)
 
-    asyncio.run(detect_bms())
+    asyncio.run(detect_bms(args))
 
 
 if __name__ == "__main__":

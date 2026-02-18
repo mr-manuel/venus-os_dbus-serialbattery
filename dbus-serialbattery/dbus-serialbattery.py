@@ -383,11 +383,6 @@ def main():
             logger.error(">>> Bluetooth address is missing in the command line arguments")
             exit_driver(None, None, 1)
         else:
-            """
-            /etc/init.d/bluetooth stop; sleep 5; /etc/init.d/bluetooth start
-            python /data/apps/dbus-serialbattery/dbus-serialbattery.py aiobmsble_jikong_bms C8:47:80:1C:4D:D2
-            python /data/apps/dbus-serialbattery/dbus-serialbattery.py aiobmsble_ecoworthy_bms E2:E7:79:89:18:2B
-            """
             from bms.generic_aiobmsble import Generic_AioBmsBle  # noqa: F401
 
             ble_address = sys.argv[2]

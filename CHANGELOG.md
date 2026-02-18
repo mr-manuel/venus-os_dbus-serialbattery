@@ -56,6 +56,7 @@
 * Changed: Use Bluetooth MAC address as unique identifier for all Bluetooth BMS by @mr-manuel
 * Changed: Use port and address as unique identifier is now available for all serial BMS by @mr-manuel
 * Changed: Added integer conversion for Daly Can BMS Set SOC GUI method by @lex2k0
+* Changed: Use correct temperature sensors for Daly CAN BMS instead of min/max values by @lex2k0
 
 ## v2.0.20250729
 
