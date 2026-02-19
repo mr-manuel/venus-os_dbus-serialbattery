@@ -508,7 +508,7 @@ class Daly_Can(Battery):
             return False
 
         data = bytearray(8)
-        pack_into(">Hxxxxxx", data, 0, self.soc_to_set * 10)
+        pack_into(">Hxxxxxx", data, 0, int(self.soc_to_set * 10))
 
         message = Message(arbitration_id=(0x161E0080 | (self.device_address << 8)), data=data)
         self.can_transport_interface.can_bus.send(message, timeout=0.2)
