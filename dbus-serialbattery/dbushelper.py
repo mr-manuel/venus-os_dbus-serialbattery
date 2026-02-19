@@ -19,6 +19,43 @@ from ve_utils import get_vrm_portal_id  # noqa: E402
 from settingsdevice import SettingsDevice  # noqa: E402
 
 
+_SENTINEL = object()
+
+
+class _CachedDbusProxy:
+    """Thin proxy around VeDbusService that suppresses redundant D-Bus writes.
+
+    Every ``__setitem__`` call on a ``VeDbusService`` triggers a D-Bus
+    property-change signal even when the value has not changed.  On a
+    resource-constrained device (e.g. Cerbo GX) the resulting IPC
+    overhead is significant: each battery instance publishes ~100
+    properties every poll cycle.
+
+    This proxy keeps a lightweight in-process cache and only forwards
+    the write to the real service when the new value differs from the
+    last written one, eliminating the majority of D-Bus traffic while
+    remaining fully transparent for reads and method calls.
+    """
+
+    __slots__ = ("_svc", "_cache")
+
+    def __init__(self, svc):
+        self._svc = svc
+        self._cache: dict = {}
+
+    def __setitem__(self, path, value):
+        prev = self._cache.get(path, _SENTINEL)
+        if prev is not value and prev != value:
+            self._cache[path] = value
+            self._svc[path] = value
+
+    def __getitem__(self, path):
+        return self._svc[path]
+
+    def __getattr__(self, name):
+        return getattr(self._svc, name)
+
+
 class SystemBus(dbus.bus.BusConnection):
     def __new__(cls):
         return dbus.bus.BusConnection.__new__(cls, dbus.bus.BusConnection.TYPE_SYSTEM)
@@ -53,7 +90,7 @@ class DbusHelper:
             + self.battery.port[self.battery.port.rfind("/") + 1 :]
             + ("__" + str(bms_address) if bms_address is not None and bms_address != 0 else "")
         )
-        self._dbusservice: VeDbusService = VeDbusService(self._dbusname, get_bus(), register=False)
+        self._dbusservice = _CachedDbusProxy(VeDbusService(self._dbusname, get_bus(), register=False))
         self.bms_id: str = (
             "".join(
                 # remove all non alphanumeric characters except underscore from the identifier
