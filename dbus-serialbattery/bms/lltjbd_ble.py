@@ -198,7 +198,7 @@ class LltJbd_Ble(LltJbd):
                 return
 
             length = data[self.LENGTH_POS]
-            if len(data) <= length + self.LENGTH_POS + 1:
+            if len(data) <= length + self.LENGTH_POS + 3:
                 return
             if not future.done():
                 future.set_result(data)
