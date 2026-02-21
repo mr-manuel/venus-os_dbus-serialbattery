@@ -153,7 +153,7 @@ class TestSentinel:
         assert _SENTINEL is not None
         assert _SENTINEL != None  # noqa: E711
         assert _SENTINEL is not False
-        assert _SENTINEL is not 0
+        assert _SENTINEL != 0
 
     def test_first_none_write_not_suppressed(self, proxy, mock_svc):
         """If sentinel were None, the first write of None would be wrongly skipped."""
