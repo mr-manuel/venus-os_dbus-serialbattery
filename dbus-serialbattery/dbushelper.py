@@ -65,10 +65,17 @@ class SessionBus(dbus.bus.BusConnection):
         return dbus.bus.BusConnection.__new__(cls, dbus.bus.BusConnection.TYPE_SESSION)
 
 
-_bus_instance: dbus.bus.BusConnection = None
+# Cached bus connection shared by all call sites in this process.
+#
+# BusConnection objects created with DBusGMainLoop as the default main loop
+# are pinned in memory by C-level GLib watch/timeout references that Python's
+# GC cannot reach.  Without caching, every get_bus() call leaks a connection
+# to the D-Bus daemon, eventually exhausting the per-UID connection limit.
+_bus_instance = None
 
 
 def get_bus() -> dbus.bus.BusConnection:
+    """Return the shared bus connection, creating it on first use."""
     global _bus_instance
     if _bus_instance is None:
         _bus_instance = SessionBus() if "DBUS_SESSION_BUS_ADDRESS" in os.environ else SystemBus()
