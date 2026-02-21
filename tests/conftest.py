@@ -22,11 +22,15 @@ def _stub(name, **attrs):
     return sys.modules[name]
 
 
-_BusConnection = type("BusConnection", (), {
-    "TYPE_SYSTEM": 0,
-    "TYPE_SESSION": 1,
-    "__new__": lambda cls, *a, **kw: object.__new__(cls),
-})
+_BusConnection = type(
+    "BusConnection",
+    (),
+    {
+        "TYPE_SYSTEM": 0,
+        "TYPE_SESSION": 1,
+        "__new__": lambda cls, *a, **kw: object.__new__(cls),
+    },
+)
 
 _dbus_bus = _stub("dbus.bus", BusConnection=_BusConnection)
 _dbus_svc = _stub("dbus.service")
@@ -37,6 +41,21 @@ _stub("dbus.mainloop.glib")
 _gi_repo = _stub("gi.repository", GLib=MagicMock())
 _stub("gi", repository=_gi_repo)
 
+_stub("requests")
+
+try:
+    import serial  # noqa: F401
+except ImportError:
+    _stub(
+        "serial",
+        Serial=MagicMock,
+        SerialException=type("SerialException", (IOError,), {}),
+        EIGHTBITS=8,
+        PARITY_NONE="N",
+        STOPBITS_ONE=1,
+    )
+    _stub("serial.tools")
+    _stub("serial.tools.list_ports", comports=lambda: [])
 _stub("vedbus", VeDbusService=MagicMock)
 _stub("ve_utils", get_vrm_portal_id=lambda: "stub")
 _stub("settingsdevice", SettingsDevice=MagicMock)

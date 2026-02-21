@@ -18,7 +18,6 @@ from vedbus import VeDbusService  # noqa: E402
 from ve_utils import get_vrm_portal_id  # noqa: E402
 from settingsdevice import SettingsDevice  # noqa: E402
 
-
 _SENTINEL = object()
 
 
