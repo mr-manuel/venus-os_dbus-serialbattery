@@ -41,7 +41,7 @@ _bus_instance = None
 def get_bus() -> dbus.bus.BusConnection:
     """Return the shared bus connection, creating it on first use."""
     global _bus_instance
-    if _bus_instance is None:
+    if _bus_instance is None or not _bus_instance.get_is_connected():
         _bus_instance = SessionBus() if "DBUS_SESSION_BUS_ADDRESS" in os.environ else SystemBus()
     return _bus_instance
 
@@ -1271,7 +1271,7 @@ class DbusHelper:
             self.history_calculated_last_time = int(time())
 
         # save settings every 15 seconds to dbus
-        if int(time()) % 15:
+        if int(time()) % 15 == 0:
             self.save_current_battery_state()
 
         if self.battery.soc is not None:
