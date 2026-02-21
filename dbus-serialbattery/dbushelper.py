@@ -65,8 +65,14 @@ class SessionBus(dbus.bus.BusConnection):
         return dbus.bus.BusConnection.__new__(cls, dbus.bus.BusConnection.TYPE_SESSION)
 
 
+_bus_instance: dbus.bus.BusConnection = None
+
+
 def get_bus() -> dbus.bus.BusConnection:
-    return SessionBus() if "DBUS_SESSION_BUS_ADDRESS" in os.environ else SystemBus()
+    global _bus_instance
+    if _bus_instance is None:
+        _bus_instance = SessionBus() if "DBUS_SESSION_BUS_ADDRESS" in os.environ else SystemBus()
+    return _bus_instance
 
 
 class DbusHelper:
