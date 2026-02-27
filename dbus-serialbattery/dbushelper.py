@@ -550,7 +550,7 @@ class DbusHelper:
             "/CustomName",
             self.settings["CustomName"],
             writeable=True,
-            onchangecallback=self.custom_name_callback,
+            onchangecallback=self.callback_custom_name,
         )
         self._dbusservice.add_path("/Serial", self.bms_id, writeable=True)
         self._dbusservice.add_path("/DeviceName", self.battery.custom_field, writeable=True)
@@ -1518,7 +1518,7 @@ class DbusHelper:
             else:
                 dict1[key] = dict2[key]
 
-    def custom_name_callback(self, path, value) -> str:
+    def callback_custom_name(self, path, value) -> str:
         """
         Callback function to set a custom name for the battery.
 
