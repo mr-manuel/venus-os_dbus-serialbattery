@@ -175,8 +175,12 @@ if [ -d "$pathGuiV2" ]; then
             sourceQmlDir="3.6x"
             installGuiV2Check=0
         elif (( $venusVersionNumber <= $(versionStringToNumber "v3.79") )); then
-            # echo "|- Venus OS $(head -n 1 /opt/victronenergy/version) is part of v3.6x."
+            # echo "|- Venus OS $(head -n 1 /opt/victronenergy/version) is part of v3.7x."
             sourceQmlDir="3.7x"
+            installGuiV2Check=0
+        elif (( $venusVersionNumber <= $(versionStringToNumber "v3.89") )); then
+            # echo "|- Venus OS $(head -n 1 /opt/victronenergy/version) is part of v3.8x."
+            sourceQmlDir="3.8x"
             installGuiV2Check=0
         else
             echo "|- >>> WARNING: GUIv2 installation for local display NOT SUPPORTED"
@@ -334,6 +338,11 @@ elif (( $venusVersionNumber <= $(versionStringToNumber "v3.69") )); then
     installGuiV2WasmCheck=0
 elif (( $venusVersionNumber <= $(versionStringToNumber "v3.79") )); then
     # echo "Venus OS $(head -n 1 /opt/victronenergy/version) is part of v3.7x."
+    webAssemblyPath="/data/apps/dbus-serialbattery/ext/venus-os_dbus-serialbattery_gui-v2/archive/venus-os_v3.7x"
+    webAssemblyBeta=0
+    installGuiV2WasmCheck=0
+elif (( $venusVersionNumber <= $(versionStringToNumber "v3.89") )); then
+    # echo "Venus OS $(head -n 1 /opt/victronenergy/version) is part of v3.8x."
     webAssemblyPath="/data/apps/dbus-serialbattery/ext/venus-os_dbus-serialbattery_gui-v2/"
     webAssemblyBeta=1
     installGuiV2WasmCheck=0
@@ -342,7 +351,7 @@ else
 fi
 
 
-# Only check for online version, if the Venus OS version matches the v3.7x (current Venus OS beta)
+# Only check for online version, if the Venus OS version matches the v3.8x (current Venus OS beta)
 if [ $webAssemblyBeta -eq 1 ]; then
     hash_online=$(curl -s "https://raw.githubusercontent.com/mr-manuel/venus-os_dbus-serialbattery_gui-v2/refs/heads/master/venus-gui-v2.wasm.sha256")
 
