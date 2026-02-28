@@ -12,7 +12,7 @@ files = [
     {"path": "/", "url": "https://raw.githubusercontent.com/pyhys/minimalmodbus/refs/heads/master/minimalmodbus.py"},
     {"path": "/", "url": "https://raw.githubusercontent.com/python/typing_extensions/refs/heads/main/src/typing_extensions.py"},
     # needed for aiobmsble
-    {"path": "/", "url": "https://raw.githubusercontent.com/bcbcarl/python-statistics/refs/heads/master/statistics.py"},
+    {"path": "/", "url": "https://raw.githubusercontent.com/python/cpython/refs/heads/3.14/Lib/statistics.py"},
 ]
 
 modules = [

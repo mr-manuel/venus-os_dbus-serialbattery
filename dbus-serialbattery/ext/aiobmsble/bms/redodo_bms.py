@@ -35,7 +35,7 @@ class BMS(BaseBMS):
         BMSDp("cycles", 96, 4, False),
         BMSDp("balancer", 84, 4, False, int),
         BMSDp("heater", 68, 4, False, bool),
-        BMSDp("problem_code", 76, 4, False),
+        BMSDp("problem_code", 76, 8, False),
     )
 
     def __init__(self, ble_device: BLEDevice, keep_alive: bool = True) -> None:

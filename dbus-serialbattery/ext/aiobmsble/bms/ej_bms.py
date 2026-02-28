@@ -23,7 +23,11 @@ class Cmd(IntEnum):
 
 
 class BMS(BaseBMS):
-    """E&J Technology BMS implementation."""
+    """E&J Technology BMS implementation.
+
+    - Standard E&J (two-command protocol: RT + CAP)
+    - Metrisun / Chins (single-frame protocol, 140 bytes)
+    """
 
     INFO: BMSInfo = {
         "default_manufacturer": "E&J Technology",
@@ -33,6 +37,7 @@ class BMS(BaseBMS):
     _IGNORE_CRC: Final[str] = "libattU"
     _HEAD: Final[bytes] = b"\x3a"
     _TAIL: Final[bytes] = b"\x7e"
+    _CELL_POS: Final[int] = 12
     _MAX_CELLS: Final[int] = 16
     _FIELDS: Final[tuple[BMSDp, ...]] = (
         BMSDp(
@@ -50,6 +55,8 @@ class BMS(BaseBMS):
         BMSDp("dischrg_mosfet", 52, 1, False, lambda x: bool(x & 0x10), Cmd.RT),
         BMSDp("chrg_mosfet", 52, 1, False, lambda x: bool(x & 0x20), Cmd.RT),
         BMSDp("balancer", 55, 2, False, int, idx=Cmd.RT),
+        BMSDp("heater", 54, 1, False, bool, Cmd.RT),
+        BMSDp("design_capacity", 66, 2, False, lambda x: x // 10, Cmd.RT),
     )
 
     def __init__(self, ble_device: BLEDevice, keep_alive: bool = True) -> None:
@@ -87,6 +94,9 @@ class BMS(BaseBMS):
                     "manufacturer_id": 22618,
                     "connectable": True,
                 }
+            ]
+            + [  # Chins Battery "G-{voltage}V{capacity}Ah-{serial}"
+                MatcherPattern(local_name="G-[0-9]*V[0-9]*Ah-[0-9]*", connectable=True),
             ]
         )
 
@@ -175,26 +185,34 @@ class BMS(BaseBMS):
         self._msg = bytes.fromhex(self._frame[1:-1].decode())
         self._msg_event.set()
 
-    async def _async_update(self) -> BMSSample:
-        """Update battery status information."""
+    async def _query_bms(self) -> dict[int, bytes]:
+        """Return query result for RT (and optionally CAP) data."""
         raw_data: dict[int, bytes] = {}
-
-        # query real-time information and capacity
         for cmd in (b":000250000E03~", b":001031000E05~"):
             await self._await_msg(cmd)
             rsp: int = self._msg[1] & 0x7F
             raw_data[rsp] = self._msg
             if rsp == Cmd.RT and len(self._msg) == 0x45:
-                # handle metrisun version
+                # handle single-frame variants (metrisun, Chins)
                 self._log.debug("single frame protocol detected")
                 raw_data[Cmd.CAP] = bytes(7) + self._msg[62:]
                 break
+        return raw_data
+
+    async def _async_update(self) -> BMSSample:
+        """Update battery status information."""
+        raw_data: Final[dict[int, bytes]] = await self._query_bms()
 
         if len(raw_data) != len(list(Cmd)) or not all(raw_data.values()):
             return {}
 
-        return self._decode_data(BMS._FIELDS, raw_data) | BMSSample(
+        result: BMSSample = self._decode_data(BMS._FIELDS, raw_data) | BMSSample(
             cell_voltages=BMS._cell_voltages(
-                raw_data[Cmd.RT], cells=BMS._MAX_CELLS, start=12
+                raw_data[Cmd.RT], cells=BMS._MAX_CELLS, start=BMS._CELL_POS
             )
         )
+        # design_capacity only available in single-frame (140-byte) variants
+        if not result.get("design_capacity"):
+            result.pop("design_capacity")
+
+        return result

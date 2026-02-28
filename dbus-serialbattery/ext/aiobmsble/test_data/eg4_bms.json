@@ -1,0 +1,32 @@
+[
+  {
+    "advertisement": {
+      "local_name": "Z122002264",
+      "rssi": -84,
+      "platform_data": ["80:6F:B0:00:00:00"],
+      "manufacturer_data": {
+        "28544": "b0155e71"
+      },
+      "service_uuids": ["00001000-0000-1000-8000-00805f9b34fb"]
+    },
+    "type": "eg4_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/509)",
+      "MAC address correct"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "Z121004265",
+      "platform_data": ["80:6F:B0:00:00:00"],
+      "rssi": -53,
+      "manufacturer_data": { "28544": "b0154870" },
+      "service_uuids": ["00001000-0000-1000-8000-00805f9b34fb"]
+    },
+    "type": "eg4_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/509)",
+      "MAC address correct"
+    ]
+  }
+]

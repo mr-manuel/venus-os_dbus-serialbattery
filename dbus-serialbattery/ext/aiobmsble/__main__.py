@@ -14,7 +14,7 @@ from bleak.backends.device import BLEDevice
 from bleak.backends.scanner import AdvertisementData
 from bleak.exc import BleakError
 
-from aiobmsble import BMSInfo, BMSSample
+from aiobmsble import BMSInfo, BMSSample, __version__
 from aiobmsble.basebms import BaseBMS
 from aiobmsble.utils import bms_identify
 
@@ -83,6 +83,7 @@ def setup_logging(args: argparse.Namespace) -> None:
         logger.addHandler(file_handler)
 
     logger.setLevel(loglevel)
+    logger.info("%s version %s", __package__, __version__)
 
 
 def main() -> None:

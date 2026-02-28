@@ -1,0 +1,15 @@
+[
+  {
+    "advertisement": {
+      "local_name": "AG100L21021805",
+      "manufacturer_data": {
+        "21320": "84280836070d6400"
+      },
+      "rssi": -83
+    },
+    "type": "ag_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/625)"
+    ]
+  }
+]

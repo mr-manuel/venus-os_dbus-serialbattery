@@ -11,8 +11,14 @@ License: Apache-2.0, http://www.apache.org/licenses/
 """
 
 from collections.abc import Callable
+from contextlib import suppress
 from enum import IntEnum
+from importlib.metadata import PackageNotFoundError, version
 from typing import Any, Literal, NamedTuple, TypedDict
+
+__version__: str = "0.0.0.dev0"
+with suppress(PackageNotFoundError):
+    __version__ = version("aiobmsble")
 
 type BMSValue = Literal[
     "battery_charging",
@@ -90,7 +96,7 @@ class BMSSample(TypedDict, total=False):
     pack_count: int  # [#]
     temp_sensors: int  # [#]
     temp_values: list[int | float]  # [°C]
-    problem_code: int  # BMS specific code, 0 no problem
+    problem_code: int  # BMS specific code, 0 no problem, max. 64 bit
 
     # BMS switches
     chrg_mosfet: bool  # True: enabled

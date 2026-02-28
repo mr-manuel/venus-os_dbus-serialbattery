@@ -23,7 +23,7 @@ from bleak.exc import (
 )
 from bleak_retry_connector import BLEAK_TIMEOUT, establish_connection
 
-from aiobmsble import BMSDp, BMSInfo, BMSSample, BMSValue, MatcherPattern
+from aiobmsble import BMSDp, BMSInfo, BMSSample, BMSValue, MatcherPattern, __version__
 
 
 class BaseBMS(ABC):
@@ -97,7 +97,10 @@ class BaseBMS(ABC):
         )
 
         self._log.debug(
-            "initializing %s, BT address: %s", self.bms_id(), ble_device.address
+            "%s: initializing %s, BT address: %s",
+            __version__,
+            self.bms_id(),
+            ble_device.address,
         )
         self._client: BleakClient = BleakClient(
             self._ble_device,

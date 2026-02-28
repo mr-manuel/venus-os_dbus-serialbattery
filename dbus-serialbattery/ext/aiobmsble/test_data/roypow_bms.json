@@ -50,5 +50,22 @@
       "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/186)",
       "no name advertised"
     ]
+  },
+  {
+    "advertisement": {
+      "local_name": " UT1300 BT 2207B00434",
+      "rssi": -74,
+      "platform_data": ["C6:6C:15:00:00:00"],
+      "manufacturer_data": { "34889": "88a0c66c15000000" },
+      "service_uuids": [
+        "0000ffe0-0000-1000-8000-00805f9b34fb",
+        "0000fee7-0000-1000-8000-00805f9b34fb"
+      ]
+    },
+    "type": "roypow_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/618)",
+      "Lion Energy Safari UT1300"
+    ]
   }
 ]

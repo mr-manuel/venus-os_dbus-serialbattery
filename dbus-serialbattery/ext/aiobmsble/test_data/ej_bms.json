@@ -8,9 +8,7 @@
       "rssi": -71
     },
     "type": "ej_bms",
-    "_comments": [
-      "source LOG"
-    ]
+    "_comments": ["source LOG"]
   },
   {
     "advertisement": {
@@ -76,9 +74,7 @@
       "manufacturer_data": {
         "22618": "36342462a26b"
       },
-      "service_uuids": [
-        "0000ffe0-0000-1000-8000-00805f9b34fb"
-      ],
+      "service_uuids": ["0000ffe0-0000-1000-8000-00805f9b34fb"],
       "rssi": -87
     },
     "type": "ej_bms",
@@ -102,6 +98,19 @@
     "type": "ej_bms",
     "_comments": [
       "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/358)"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "G-12V300Ah-0345",
+      "service_uuids": [
+        "6e400001-b5a3-f393-e0a9-e50e24dcca9e"
+      ],
+      "rssi": -50
+    },
+    "type": "ej_bms",
+    "_comments": [
+      "Chins Battery, tested on Cerbo GX"
     ]
   }
 ]

@@ -31,7 +31,7 @@ class BMS(BaseBMS):
         BMSDp("current", 158, 4, True, lambda x: x / 1000),
         BMSDp("problem_code", 166, 4, False),
         BMSDp("balance_current", 170, 2, True, lambda x: x / 1000),
-        BMSDp("balancer", 201, 1, False, bool),
+        BMSDp("balancer", 172, 1, False, bool),
         BMSDp("battery_level", 173, 1, False),
         BMSDp("cycle_charge", 174, 4, False, lambda x: x / 1000),
         BMSDp("design_capacity", 178, 4, False, lambda x: x // 1000),

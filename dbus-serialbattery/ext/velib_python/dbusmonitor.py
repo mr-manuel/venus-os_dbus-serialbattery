@@ -564,9 +564,12 @@ class AsyncDbusMonitor(DbusMonitor):
 		# Do a legacy scan on services that could not be scanned with GetItems
 		for name in errors:
 			logging.info(f"Doing legacy scan on {name}")
-			if self.scan_dbus_service_legacy(name) and \
-						  self.deviceAddedCallback is not None:
-				self.deviceAddedCallback(name, self.get_device_instance(name))
+			try:
+				if self.scan_dbus_service_legacy(name) and \
+							self.deviceAddedCallback is not None:
+					self.deviceAddedCallback(name, self.get_device_instance(name))
+			except dbus.exceptions.DBusException:
+				logging.exception("scan_dbus_service_legacy")
 
 		if startup:
 			logger.info('===== Async scan complete =====')

@@ -16,7 +16,11 @@ from aiobmsble.basebms import BaseBMS, b2str, crc_sum
 
 
 class BMS(BaseBMS):
-    """Dummy BMS implementation."""
+    """Humsienk BMS implementation.
+
+    Protocol verified against a live device. See docs/humsienk_bms.md for
+    the full register map, frame format, and bit-level field definitions.
+    """
 
     INFO: BMSInfo = {
         "default_manufacturer": "Humsienk",
@@ -24,15 +28,21 @@ class BMS(BaseBMS):
     }
     _HEAD: Final[bytes] = b"\xaa"  # beginning of frame
     _MIN_LEN: Final[int] = 5  # minimal frame len
+    _ALARM_MASK: Final[int] = 0xFF7F7F7F  # exclude MOSFET, balance status bits
     _FIELDS: Final[tuple[BMSDp, ...]] = (
-        BMSDp("voltage", 3, 2, False, lambda x: x / 1000, 0x21),
+        BMSDp("voltage", 3, 4, False, lambda x: x / 1000, 0x21),
         BMSDp("current", 7, 4, True, lambda x: x / 1000, 0x21),
         BMSDp("battery_level", 11, 1, False, idx=0x21),
         BMSDp("battery_health", 12, 1, False, idx=0x21),
-        BMSDp("chrg_mosfet", 9, 1, False, bool, 0x20),
-        BMSDp("dischrg_mosfet", 7, 1, False, bool, 0x20),
+        BMSDp("cycle_charge", 13, 4, False, lambda x: x / 1000, 0x21),
+        BMSDp("design_capacity", 17, 4, False, lambda x: round(x / 1000), 0x21),
+        BMSDp("cycles", 21, 2, False, idx=0x21),
+        BMSDp("chrg_mosfet", 7, 1, False, lambda x: bool(x & 0x80), 0x20),
+        BMSDp("dischrg_mosfet", 9, 1, False, lambda x: bool(x & 0x80), 0x20),
+        BMSDp("balancer", 8, 1, False, lambda x: bool(x & 0x80), 0x20),
+        BMSDp("problem_code", 7, 4, False, lambda x: x & BMS._ALARM_MASK, 0x20),
     )
-    _CMDS: Final = frozenset({b"\x20", b"\x21", b"\x22", b"\x23"})
+    _CMDS: Final = frozenset({b"\x20", b"\x21", b"\x22"})
 
     def __init__(self, ble_device: BLEDevice, keep_alive: bool = True) -> None:
         """Initialize BMS."""
@@ -116,15 +126,9 @@ class BMS(BaseBMS):
     @staticmethod
     @cache
     def _cmd(cmd: bytes) -> bytes:
-        """Assemble a Seplos BMS command."""
-        assert len(cmd) == 1
+        """Assemble a Humsienk BMS command."""
         frame: Final[bytes] = cmd[:1] + b"\x00"
-        # head, cmd, length, 16-bit sum
-        return (
-            BMS._HEAD
-            + frame
-            + crc_sum(frame).to_bytes(2, byteorder="little")
-        )
+        return BMS._HEAD + frame + crc_sum(frame).to_bytes(2, byteorder="little")
 
     async def _await_msg(
         self,
@@ -152,5 +156,9 @@ class BMS(BaseBMS):
         result["temp_values"] = BMS._temp_values(
             self._msg[0x21], values=6, start=23, size=1, byteorder="little"
         )
+
+        # Add problem for cell disconnect bitmap
+        if any(self._msg[0x20][14:17]):
+            result["problem"] = True
 
         return result
