@@ -339,6 +339,7 @@ def main():
             exit_driver(None, None, 1)
         else:
             ble_address = sys.argv[2]
+            ble_adapter = sys.argv[3] if len(sys.argv) > 3 else None
 
             if port == "Jkbms_Ble":
                 # noqa: F401 --> ignore flake "imported but unused" error
@@ -365,7 +366,7 @@ def main():
             class_ = eval(port)
 
             # do not remove ble_ prefix, since the dbus service cannot be only numbers
-            testbms = class_("ble_" + ble_address.replace(":", "").lower(), 9600, ble_address)
+            testbms = class_("ble_" + ble_address.replace(":", "").lower(), 9600, ble_address, adapter=ble_adapter)
 
             if testbms.test_connection():
                 logger.info("-- Connection established to " + testbms.__class__.__name__)
