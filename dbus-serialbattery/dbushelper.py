@@ -130,6 +130,15 @@ class DbusHelper:
         self.telemetry_upload_last: int = 0
         self.telemetry_upload_running: bool = False
 
+        self.callback_value_reset_soc_to: int = 100
+        """
+        Stores the last value written to the dbus path /Settings/ResetSocTo.
+        This is used to detect changes and ensure that the apply callback
+        (for /Settings/ResetSocToApply) can trigger even if the same SOC value
+        is set multiple times in a row. Without this, setting the same value
+        repeatedly would not invoke the callback, preventing repeated SoC resets.
+        """
+
     def create_pid_file(self) -> bool:
         """
         Create a pid file for the driver with the device instance as file name suffix.
@@ -825,9 +834,15 @@ class DbusHelper:
             if "callback_soc_reset_to" in self.battery.callbacks_available:
                 self._dbusservice.add_path(
                     "/Settings/ResetSocTo",
+                    self.callback_value_reset_soc_to,
+                    writeable=True,
+                    onchangecallback=self.callback_soc_reset_to,
+                )
+                self._dbusservice.add_path(
+                    "/Settings/ResetSocToApply",
                     0,
                     writeable=True,
-                    onchangecallback=self.battery.callback_soc_reset_to,
+                    onchangecallback=self.callback_soc_reset_to_apply,
                 )
 
         self._dbusservice.add_path("/JsonData", None, writeable=False)
@@ -1539,6 +1554,41 @@ class DbusHelper:
         )
         logger.debug(f'CustomName changed to "{value}" for {self.path_battery}: {result}')
         return value if result else None
+
+    def callback_soc_reset_to(self, path, value) -> int:
+        """
+        Callback function to set the value to reset the state of charge (SoC) to.
+
+        This function sets the value to reset the SoC to by updating the settings on the D-Bus.
+
+        :param path: The D-Bus path where the SoC reset value should be set.
+        :param value: The SoC value to reset to.
+        :return: The SoC value to reset to, constrained between 0 and 100
+        """
+        self.callback_value_reset_soc_to = min(max(value, 0), 100)
+        return self.callback_value_reset_soc_to
+
+    def callback_soc_reset_to_apply(self, path, value) -> int:
+        """
+        Callback function to reset the state of charge (SoC) to a specific value.
+
+        This function resets the SoC to a specific value by updating the settings on the D-Bus.
+        It logs the result of the operation and returns the new value if the operation was successful,
+        otherwise it returns None.
+
+        :param path: The D-Bus path where the SoC reset should be applied.
+        :param value: The SoC value to reset to.
+        :return: The SoC value if the operation was successful, otherwise None.
+        """
+        if value != 0:
+            if utils.SOC_CALCULATION:
+                self.soc_calc = self.callback_value_reset_soc_to
+                self.soc_calc_capacity_remain = None  # reset SOC calculation cache, since SOC was force set
+                logger.info(f"SOC reset to {self.soc_calc}% by user")
+            else:
+                self.battery.callback_soc_reset_to(path, value)
+
+        return 0
 
     # save current battery states to dbus
     def save_current_battery_state(self) -> bool:

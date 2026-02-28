@@ -301,7 +301,7 @@ class Battery(ABC):
         # max battery charge/discharge current
         self.max_battery_charge_current: float = utils.MAX_BATTERY_CHARGE_CURRENT
         self.max_battery_discharge_current: float = utils.MAX_BATTERY_DISCHARGE_CURRENT
-        self.has_settings: bool = False
+        self.has_settings: bool = True if utils.SOC_CALCULATION else False
 
         # this values should only be initialized once,
         # else the BMS turns off the inverter on disconnect
@@ -381,6 +381,8 @@ class Battery(ABC):
 
         # list of available callbacks, in order to display the buttons in the GUI
         self.callbacks_available: List[str] = []
+        if utils.SOC_CALCULATION:
+            self.callbacks_available.append("callback_soc_reset_to")
 
         # display errors in the GUI
         # https://github.com/victronenergy/veutil/blob/master/inc/veutil/ve_regs_payload.h

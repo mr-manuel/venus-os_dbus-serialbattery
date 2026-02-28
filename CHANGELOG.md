@@ -34,6 +34,7 @@
 * Added: JBD UP16S series support, including daisy-chaining, with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/375 by @dmitrych5
 * Added: JK Inverter BMS - Heating informations with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/367 by @BitSeb
 * Added: KS48100 BMS - Read SoH with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/344 by @kopierschnitte
+* Added: Set SOC manually via GUI if SOC_CALCULATION is enabled by @mr-manuel
 * Added: Venus OS 3.7x GUIv2 support by @mr-manuel
 * Changed: Added integer conversion for Daly Can BMS Set SOC GUI method by @lex2k0
 * Changed: Daren 485 BMS - Fixed charge/discharge calculation with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/343 by @kopierschnitte
@@ -54,6 +55,7 @@
 * Changed: KS48100 BMS - Fixed charge/discharge calculation with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/343 by @kopierschnitte
 * Changed: LLT/JBD BLE BMS - Fixed wrong charge/discharge fet assignment @mr-manuel
 * Changed: Made some dbus settings silent to not flood the localsettings service log by @mr-manuel
+* Changed: Mechanism to reset SOC via GUI, since it was not possible to set the same SOC twice by @mr-manuel
 * Changed: RV-C CAN BMS - Fixed wrong charge/discharge fet assignment @mr-manuel
 * Changed: Seplos BMS - Fix problems with unique identifier when daisy chained by @KoljaWindeler
 * Changed: Use Bluetooth MAC address as unique identifier for all Bluetooth BMS by @mr-manuel

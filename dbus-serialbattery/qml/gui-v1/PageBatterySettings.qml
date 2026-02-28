@@ -57,13 +57,24 @@ MbPage {
                         show: valid
                 }
 
-
                 MbSpinBox {
                         description: "Reset SoC to"
-                        item.bind: Utils.path(bindPrefix, "/Settings/ResetSoc")
+                        item.bind: Utils.path(bindPrefix, "/Settings/ResetSocTo")
                         item.min: 0
                         item.max: 100
                         item.step: 1
+                        show: item.seen
+                }
+
+                MbOK {
+                        id: resetSocToApply
+
+                        property VBusItem resetSocToApplyItem: VBusItem { bind: Utils.path(bindPrefix, "/Settings/ResetSocToApply") }
+
+                        description: "Apply \"Reset SoC to\""
+                        value: "Apply"
+                        onClicked: resetSocToApplyItem.setValue(1)
+                        show: resetSocToApplyItem.seen
                 }
 
 

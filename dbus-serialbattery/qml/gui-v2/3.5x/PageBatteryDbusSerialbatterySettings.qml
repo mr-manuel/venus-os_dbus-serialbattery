@@ -11,6 +11,11 @@ Page {
 
 	property string bindPrefix
 
+	VeQuickItem {
+		id: hasSettingsItem
+		uid: root.bindPrefix + "/Settings/HasSettings"
+	}
+
 	GradientListView {
 		model: ObjectModel {
 
@@ -39,39 +44,62 @@ Page {
 				secondaryText: CommonWords.yesOrNo(dataItem.value)
 			}
 
+			ListTextItem {
+				text: "Allow to heat"
+				dataItem.uid: root.bindPrefix + "/Io/AllowToHeat"
+				allowed: dataItem.isValid
+				secondaryText: CommonWords.yesOrNo(dataItem.value)
+			}
+
+			ListLabel {
+				text: "Settings"
+				allowed: hasSettingsItem.isValid && hasSettingsItem.value === 1
+			}
+
 			ListSwitch {
 				text: "Force charging off"
-				dataItem.uid: root.bindPrefix + "/Io/ForceChargingOff"
+				dataItem.uid: root.bindPrefix + "/Settings/ForceChargingOff"
 				allowed: dataItem.isValid
 			}
 
 			ListSwitch {
 				text: "Force discharging off"
-				dataItem.uid: root.bindPrefix + "/Io/ForceDischargingOff"
+				dataItem.uid: root.bindPrefix + "/Settings/ForceDischargingOff"
 				allowed: dataItem.isValid
 			}
 
 			ListSwitch {
 				text: "Turn balancing off"
-				dataItem.uid: root.bindPrefix + "/Io/TurnBalancingOff"
+				dataItem.uid: root.bindPrefix + "/Settings/TurnBalancingOff"
 				allowed: dataItem.isValid
 			}
 
-			ListLabel {
-				text: "Settings"
-				allowed: resetSocSpinBoxItem.visible
+			ListSwitch {
+				text: "Turn heating off"
+				dataItem.uid: root.bindPrefix + "/Settings/TurnHeatingOff"
+				allowed: dataItem.isValid
 			}
 
 			ListSpinBox {
-				id: resetSocSpinBoxItem
-				//% "Reset SoC to"
 				text: "Reset SoC to"
-				dataItem.uid: root.bindPrefix + "/Settings/ResetSoc"
+				dataItem.uid: root.bindPrefix + "/Settings/ResetSocTo"
 				allowed: dataItem.isValid
 				suffix: "%"
 				from: 0
 				to: 100
 				stepSize: 1
+			}
+
+			ListButton {
+				text: "Apply \"Reset SoC to\""
+				secondaryText: "Apply"
+				onClicked: resetSocToApplyItem.setValue(1)
+				allowed: resetSocToApplyItem.isValid
+
+				VeQuickItem {
+					id: resetSocToApplyItem
+					uid: root.bindPrefix + "/Settings/ResetSocToApply"
+				}
 			}
 		}
 	}
