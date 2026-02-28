@@ -216,7 +216,7 @@ class History:
         Total charged energy in Kilowatt-hour.
         """
 
-    def reset_values(self, attributes: list = []) -> None:
+    def reset_values(self, attributes: list = None) -> None:
         """
         Reset all calculated values that are not excluded.
 
@@ -856,7 +856,7 @@ class Battery(ABC):
 
                     # If control voltage is the same as max battery voltage, reset control_voltage_last_limit_time
                     if allowed_voltage == self.max_battery_voltage:
-                        self.control_voltage_last_limit_time is None
+                        self.control_voltage_last_limit_time = None
 
                     self.control_voltage = round(allowed_voltage, 6)
 
@@ -1320,7 +1320,7 @@ class Battery(ABC):
             file = exception_traceback.tb_frame.f_code.co_filename
             line = exception_traceback.tb_lineno
             logger.error(f"Non blocking exception occurred: {repr(exception_object)} of type {exception_type} in {file} line #{line}")
-            return self.max_battery_charge_current
+            return self.max_battery_discharge_current
 
     def calc_max_charge_current_from_temperature(self) -> float:
         """
@@ -2307,7 +2307,7 @@ class Battery(ABC):
             if self.history.full_discharges is None:
                 self.history.full_discharges = 0
             else:
-                if self.soc_calc == 0:
+                if self.soc_calc == 0 and not self.full_discharge_active:
                     self.history.full_discharges += 1
                     self.full_discharge_active = True
 
