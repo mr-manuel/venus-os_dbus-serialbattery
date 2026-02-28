@@ -3,66 +3,52 @@
 # Notes
 # Added by https://github.com/tuxntoast
 
-# from batters import Protection
-from battery import Battery, Cell
-from datetime import datetime
-from pprint import pformat
-from struct import pack
-from time import sleep
-from utils import get_connection_error_message, logger, MIN_CELL_VOLTAGE, MAX_CELL_VOLTAGE
+import datetime
 import serial
+import struct
 import sys
+import time
+import utils
+from pprint import pformat
+from time import sleep
+
+from battery import Battery, Cell
+from utils import logger
 
 #    Author: Pfitz
-#    Date: 07 Mar 2025
+#    Date: 31 Jan 2026
 #    Features:
-#     UI reporting for all BMS in Communication chain
-#     Multi BMS communication Chain Support
-#     Cell Voltage Implemented
-#     Hardware Name / Version / Serial Implemented
-#     Error / Warn / Protection Implemented
-#        - Looks like the Code might not be totally correct OR the BMS has
-#          moments where a random is returned but only during one BMS poll
-#     SoH / SoC State Implemented
-#     Temp Implemented
-#     Balancing Support
-#     Battery Voltage / Current
+#     DBus-Serial Multi Battery Monitoring Support
+#     Driver Error, Protect and Warning Alerting
+#     Driver Balancing Monitoring
+#     BMS Config Polling on Startup for Alert Values
 #     Support for 12v/24v/48v BMS
 
-# Battery Tested on:
+# Driver Developed On:
 # 2x Eg4 LL 12v 400 AH
-# Venus OS v3.52 running on Cerbo GX - dbus-serialbattery v2.0.20250228dev
-# One RS232 Cable to USB is needed to connect Cerbo GX to the master BMS
-# A Cat5/Cat6 cable can be used to connected the Master BMS RS485 secondary port to the
+# Venus OS v3.67 running on Cerbo GX - dbus-serialbattery v2.0.20250729
 # first port of the BMS below it. BMS units can be "Daisy Chained" until your full bank is connected
-# In config.ini set line 167 "BATTERY_ADDRESSES with the hex ID of each unit in your BMS chain
-# BATTERY_ADDRESSES = 0x10, 0x01
-# would collect and report on BMS ID 16 and 01 in a Daisy Chained montioring setup
-#
-# The master unit or first unit should have a Dip Switch ID set to 16 or 64 depending on your unit and version
-# All other BMS in the communication chain should have a Dip switch setting of 1 - 15 or 1 - 63 depending on your units
-#
+# Update BATTERY_ADDRESSES in config.ini to define the BMS ID in your communication chain
+# Example: BATTERY_ADDRESSES = 0x10, 0x01 would be to conect and report on BMS ID 16 and 1
 
 
 class EG4_LL(Battery):
     def __init__(self, port, baud, address):
-
         super(EG4_LL, self).__init__(port, baud, address)
-        self.cell_min_voltage = 0
-        self.cell_max_voltage = None
         self.has_settings = 0
-        self.soc_reset_to = 0
+        self.reset_soc = 0
         self.soc_to_set = None
         self.type = self.BATTERYTYPE
         self.runtime = 0  # TROUBLESHOOTING for no reply errors
+        self.data = {}
 
-    statuslogger = False
-    # When BMS returns a Warning/Error/Protection Alarm, Print that Error code
-    # and BMS Stats to Driver Log file. This would help a user figure out what might be happening
-    protectionLogger = False
+    statuslogger = False  # Prints to STDOut After Each BMS Poll
+    LoadBMSSettings = True  # Load BMS Config on Startup && Use Driver Based Alarms
+    protectionLogger = True  # Print to STDOut when BMS raises an error
+    crcchecksumlogger = False  # Print to stdout when the BMS Reply fails the CRC checksum
 
     battery_stats = {}
-    serialTimeout = 2
+    serialTimeout = 2  # Serial Connection timeout
 
     BATTERYTYPE = "EG4-LL"
 
@@ -73,15 +59,19 @@ class EG4_LL(Battery):
     def unique_identifier(self):
         return self.serial_number
 
-    def custom_name(self):
-        self.custom_name = self.BATTERYTYPE + "_ID:" + str(self.Id)
-        return self.custom_name
+    def custom_name(self) -> str:
+        return f"{self.BATTERYTYPE}:{self.Id}" if hasattr(self, "Id") else self.BATTERYTYPE
 
     def open_serial(self):
         ser = serial.Serial(
-            self.port, baudrate=self.baud_rate, timeout=self.serialTimeout, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS
+            self.port,
+            baudrate=self.baud_rate,
+            timeout=self.serialTimeout,
+            parity=serial.PARITY_NONE,
+            stopbits=serial.STOPBITS_ONE,
+            bytesize=serial.EIGHTBITS,
         )
-        if ser.isOpen() is True:
+        if ser.isOpen():
             return ser
         else:
             return False
@@ -91,17 +81,22 @@ class EG4_LL(Battery):
             self.battery_stats = {}
             self.Id = int.from_bytes(self.address, "big")
             self.ser = self.open_serial()
-            BMS_list = self.discovery_pack(self.Id)
-            if BMS_list is False:
+            logger.info(f"Waiting for BMS ID {self.Id} to initialize...")
+            sleep(1.0)
+            self.ser.reset_input_buffer()
+            self.ser.reset_output_buffer()
+            command = self.eg4CommandGen((self.Id.to_bytes(1, "big") + self.hwCommandRoot))
+            reply = self.read_eg4ll_command(command)
+            if reply is False:
                 return False
             else:
-                logger.info(f"Connected to BMS ID: {pformat(BMS_list)}")
-                self.poll_interval = ((self.serialTimeout) * 1000) * 3
-                self.custom_field = self.BATTERYTYPE + ":" + str(self.Id)
+                serial = reply[33:48].decode("utf-8") + str(self.Id)
+                logger.error(f"Connected to BMS ID: {pformat(serial)}")
+                self.serial_number = serial
+                self.poll_interval = (self.serialTimeout * 1000) * 3
+                self.custom_field = self.BATTERYTYPE + ":" + format(self.Id, "02d")
                 cell_poll = self.read_battery_bank()
-                self.cell_count = int(self.battery_stats[self.Id]["cell_count"])
-                if cell_poll is not False:
-                    self.status_logger()
+                if cell_poll is True:
                     return True
                 else:
                     return False
@@ -114,36 +109,97 @@ class EG4_LL(Battery):
             file = exception_traceback.tb_frame.f_code.co_filename
             line = exception_traceback.tb_lineno
             logger.error(f"Exception occurred: {repr(exception_object)} of type {exception_type} in {file} line #{line}")
-
-    def read_battery_bank(self):
-        cell_reply = self.read_cell_details(self.Id)
-        if cell_reply is not False:
-            if self.Id in self.battery_stats:
-                self.battery_stats[self.Id] = {**self.battery_stats[self.Id], **cell_reply}
-            else:
-                hw_reply = self.read_hw_details(self.Id)
-                if hw_reply is not False:
-                    self.cell_count = int(cell_reply["cell_count"])
-                    self.min_battery_voltage = float(MIN_CELL_VOLTAGE * self.cell_count)
-                    self.max_battery_voltage = float(MAX_CELL_VOLTAGE * self.cell_count)
-                    self.capacity = cell_reply["capacity"]
-                    self.battery_stats[self.Id] = {**cell_reply, **hw_reply}
-                else:
-                    return False
-        else:
             return False
-        result = self.reportBatteryBank()
-        if self.statuslogger is True:
-            self.status_logger()
-        if result is True:
+
+    def read_battery_bank(self) -> bool:
+        cell_reply = self.read_cell_details(self.Id)
+        if not cell_reply:
+            return False
+        bank_stats = self.battery_stats.get(self.Id)
+        first_run = bank_stats is None
+        protection_status = self.lookup_protection(cell_reply)
+        cell_reply["protection"] = protection_status
+        warning_status = self.lookup_warning(cell_reply)
+        cell_reply["warning"] = warning_status
+        error_status = self.lookup_error(cell_reply)
+        cell_reply["error"] = error_status
+        bms_status = self.lookup_status(cell_reply)
+        cell_reply["status"] = bms_status
+        heater_status = self.lookup_heater(cell_reply)
+        cell_reply["heater_state"] = heater_status
+
+        # First-time initialization → fetch static HW/BMS data once
+        if first_run:
+            if self.LoadBMSSettings is True:
+                extra_reply = self.read_bms_config()
+                if extra_reply is False:
+                    self.LoadBMSSettings = False
+                    extra_reply = self.read_hw_details(self.Id)
+            else:
+                extra_reply = self.read_hw_details(self.Id)
+            if not extra_reply:
+                return False
+            else:
+                bank_stats = {**extra_reply, **cell_reply}
+                if self.LoadBMSSettings is True:
+                    self.alarm_mgr = EG4AlarmManager(self.data, eg4ll_logger_cb=self.eg4ll_logger)
+
+            self.cell_count = int(cell_reply["cell_count"])
+            self.min_battery_voltage = utils.MIN_CELL_VOLTAGE * cell_reply["cell_count"]
+            self.max_battery_voltage = utils.MAX_CELL_VOLTAGE * cell_reply["cell_count"]
+            self.capacity = bank_stats["capacity"]
+            self.serial_number = bank_stats["hw_serial"]
+            self.version = bank_stats["hw_make"]
+            self.hardware_version = bank_stats["hw_version"]
+        else:
+            # Battery already initialized → only update cell data
+            bank_stats.update(cell_reply)
+        # ---- Balancing state ----
+        balancing_map = {0: "Off", 1: "Balancing", 2: "Finished"}
+        code = self.balancingStat(bank_stats)
+        bank_stats["balancing_code"] = code
+        bank_stats["balancing_text"] = balancing_map.get(code, "UNKNOWN")
+        self.reportBatteryBank(bank_stats)
+        # Evaluate alarms
+        alarm_status = {}
+        if self.LoadBMSSettings is True:
+            alarm_status = self.alarm_mgr.evaluate(new_data=bank_stats)
+            # update_alarm_dbus must come before any logging so protection attributes
+            # reflect the current alarm state when the logger reads them
+            self.update_alarm_dbus(alarm_status)
+            self.battery_stats[self.Id] = bank_stats = {**bank_stats, **alarm_status}
+        else:
+            self.battery_stats[self.Id] = bank_stats
+        # Print Stats of Packs when first connected
+        if first_run and not getattr(self, "_initial_status_logged", False):
+            self.eg4ll_logger(bank_stats, 1, alarm_status)
+            self._initial_status_logged = True
             return True
-        return False
+        # Log when driver-level alarm state changes (after update_alarm_dbus so protection attrs are current)
+        if self.LoadBMSSettings is True and self.alarm_mgr._alarms_changed:
+            active_alarms = {k: v for k, v in alarm_status.items() if v != 0}
+            if active_alarms:
+                logger.error("** BMS Error, Protect or Warning Event Code Found In Polling Cycle **")
+                self.eg4ll_logger(bank_stats, 2, active_alarms)
+                return True
+        # Call BMS_stats when BMS hardware registers report an event
+        elif any(bank_stats.get(k, "0000") != "0000" for k in ["protection_hex", "warning_hex", "error_hex"]):
+            if self.protectionLogger is True:
+                logger.error("** BMS Error, Protect or Warning Event Code Found In Polling Cycle **")
+                self.eg4ll_logger(bank_stats, 2, alarm_status)
+                return True
+        # Call logger if the status is not normal
+        elif bank_stats.get("status_hex", "0000") not in {"0000", "0200", "0100"}:
+            self.eg4ll_logger(bank_stats, 3, alarm_status)
+            return True
+        elif self.statuslogger is True:
+            self.eg4ll_logger(bank_stats, 1, alarm_status)
+        return True
 
     def get_settings(self):
         result = self.read_battery_bank()
         if result is not True:
             return False
-        self.status_logger()
         return True
 
     def refresh_data(self):
@@ -159,481 +215,713 @@ class EG4_LL(Battery):
             return False
         return True
 
-    def discovery_pack(self, Id):
-        bmsChain = {}
-        command = self.eg4CommandGen((Id.to_bytes(1, "big") + self.hwCommandRoot))
-        reply = self.read_eg4ll_command(command)
-        if reply is not False:
-            serial = reply[33:48].decode("utf-8") + str(Id)
-            bmsChain.update({Id: serial})
-            self.serial_number = serial
-            return bmsChain
-        else:
-            return False
-
     def read_hw_details(self, id):
         battery = {}
         command = self.eg4CommandGen((id.to_bytes(1, "big") + self.hwCommandRoot))
         result = self.read_eg4ll_command(command)
         if result is False:
             return False
-
         battery.update({"hw_make": result[2:25].decode("utf-8")})
         battery.update({"hw_version": result[27:33].decode("utf-8")})
-        battery.update({"hw_serial": (result[33:48].decode("utf-8") + str(id))})
-        battery.update({"hwLastPoll": (datetime.now())})
-        self.serial_number = battery["hw_serial"]
-        self.version = battery["hw_make"]
-        self.hardware_version = battery["hw_version"]
-
+        battery.update({"hw_serial": result[33:48].decode("utf-8") + str(id)})
+        battery.update({"hwLastPoll": (datetime.datetime.now())})
         return battery
 
     def read_cell_details(self, id):
-
-        battery = {}
-        command = self.eg4CommandGen((id.to_bytes(1, "big") + self.cellCommandRoot))
+        """Modified version with cell voltage validation"""
+        command = self.eg4CommandGen(id.to_bytes(1, "big") + self.cellCommandRoot)
         packet = self.read_eg4ll_command(command)
-        if packet is False:
+        if not packet:
             return False
-        battery.update({"voltage": int.from_bytes(packet[3:5], "big") / 100})
-        battery.update({"current": int.from_bytes(packet[5:7], "big", signed=True) / 100})
-        battery.update({"capacity_remain": int.from_bytes(packet[45:47], "big")})
-        battery.update({"capacity": int.from_bytes(packet[65:69], "big") / 3600 / 1000})
-        battery.update({"max_battery_charge_current": int.from_bytes(packet[47:49], "big")})
-        battery.update({"soc": int.from_bytes(packet[51:53], "big")})
-        battery.update({"soh": int.from_bytes(packet[49:51], "big")})
-        battery.update({"cycles": int.from_bytes(packet[61:65], "big")})
-        battery.update({"temp1": int.from_bytes(packet[69:70], "big", signed=True)})
-        battery.update({"temp2": int.from_bytes(packet[70:71], "big", signed=True)})
-        battery.update({"temp_mos": int.from_bytes(packet[39:41], "big", signed=True)})
-        battery.update({"temp_max": max(battery["temp1"], battery["temp2"])})
-        battery.update({"temp_min": min(battery["temp1"], battery["temp2"])})
-        battery.update({"cell_count": int.from_bytes(packet[75:77], "big")})
-        battery.update({"status_hex": packet[54:56].hex().upper()})
-        battery.update({"warning_hex": packet[55:57].hex().upper()})
-        battery.update({"protection_hex": packet[57:59].hex().upper()})
-        battery.update({"error_hex": packet[59:61].hex().upper()})
-        battery.update({"heater_status": packet[53:54].hex().upper()})
-        battery.update({"cellLastPoll": (datetime.now())})
-        startByte = 7
-        endByte = 9
-        cellId = 1
-        cellVoltageList = []
-        cellVoltageSum = 0
-        # Debug Cell Mis Reporting
-        if battery["cell_count"] != self.cell_count:
-            logger.error(f"Battery: {id.to_bytes(1, 'big')} Cell Count: {battery['cell_count']}")
-            logger.error(f"BMS Reply: {packet.hex().upper()}")
-        while cellId <= battery["cell_count"]:
-            cellNum = "cell" + str(cellId)
-            cellVolt = int.from_bytes(packet[startByte:endByte], "big") / 1000
-            battery.update({cellNum: cellVolt})
-            cellVoltageSum += float(battery[cellNum])
-            cellVoltageList.append(battery.get(cellNum))
-            startByte += 2
-            endByte += 2
-            cellId += 1
-        battery.update({"cell_voltage": cellVoltageSum})
-        battery.update({"cell_max": max(cellVoltageList)})
-        battery.update({"cell_min": min(cellVoltageList)})
 
-        balancing_code = self.balancingStat(min(cellVoltageList), max(cellVoltageList))
-        battery.update({"balancing_code": balancing_code})
-        if balancing_code == 2:
-            battery.update({"balancing_text": "Finished"})
-        elif balancing_code == 1:
-            battery.update({"balancing_text": "Balancing"})
-        elif balancing_code == 0:
-            battery.update({"balancing_text": "Off"})
+        # Parsing helpers
+        def u16(o):
+            return int.from_bytes(packet[o : o + 2], "big")
+
+        def s16(o):
+            return int.from_bytes(packet[o : o + 2], "big", signed=True)
+
+        def u32(o):
+            return int.from_bytes(packet[o : o + 4], "big")
+
+        def s8(o):
+            return int.from_bytes(packet[o : o + 1], "big", signed=True)
+
+        CELL_START = 7
+        MAX_CELLS = 16
+        # Basic battery info
+        battery = {
+            "voltage": u16(3) / 100,
+            "current": s16(5) / 100,
+            "capacity_remain": u16(45),
+            "capacity": u32(65) / 3600 / 1000,
+            "max_battery_charge_current": u16(47),
+            "soc": u16(51),
+            "soh": u16(49),
+            "cycles": u32(61),
+            "temperature_mos": s16(39),
+            "cell_count": min(u16(75), MAX_CELLS),
+            "status_hex": packet[54:56].hex().upper(),
+            "warning_hex": packet[55:57].hex().upper(),
+            "protection_hex": packet[57:59].hex().upper(),
+            "error_hex": packet[59:61].hex().upper(),
+            "heater_hex": packet[53:54].hex().upper(),
+            "cellLastPoll": datetime.datetime.now(),
+            "BMS_Id": id,
+        }
+        # Parse cell voltages
+        cells = []
+        for i in range(battery["cell_count"]):
+            raw = u16(CELL_START + i * 2)
+            voltage = raw / 1000
+            battery[f"cell{i+1}"] = voltage
+            cells.append(voltage)
+        # Calculate cell stats
+        valid_cells = [v for v in cells if v > 0.0]
+        if valid_cells:
+            battery["cell_voltage"] = round(sum(valid_cells), 3)
+            battery["cell_max"] = max(valid_cells)
+            battery["cell_min"] = min(valid_cells)
         else:
-            battery.update({"balancing_text": "UNKNOWN"})
-
+            battery["cell_voltage"] = 0.0
+            battery["cell_max"] = 0.0
+            battery["cell_min"] = 0.0
+        # Temperature handling
+        temp1 = s8(69)
+        temp2 = s8(70)
+        temp3 = s8(71)
+        temp4 = s8(72)
+        battery["temp1"] = temp1
+        battery["temp2"] = temp2
+        temps = [temp1, temp2]
+        if temp3 != 0:
+            battery["temp3"] = temp3
+            temps.append(temp3)
+        if temp4 != 0:
+            battery["temp4"] = temp4
+            temps.append(temp4)
+        battery["temp_min"] = min(temps)
+        battery["temp_max"] = max(temps)
         return battery
 
-    def reportBatteryBank(self):
-        self.voltage = self.battery_stats[self.Id]["cell_voltage"]
-        self.current = self.battery_stats[self.Id]["current"]
-        self.capacity_remain = self.battery_stats[self.Id]["capacity_remain"]
-        self.soc = self.battery_stats[self.Id]["soc"]
-        self.soh = self.battery_stats[self.Id]["soh"]
-        self.cycles = self.battery_stats[self.Id]["cycles"]
-        self.temp1 = self.battery_stats[self.Id]["temp1"]
-        self.temp2 = self.battery_stats[self.Id]["temp2"]
-        self.temp_mos = self.battery_stats[self.Id]["temp_mos"]
-        self.cell_min_voltage = self.battery_stats[self.Id]["cell_min"]
-        self.cell_max_voltage = self.battery_stats[self.Id]["cell_max"]
-        self.lookup_protection(self.battery_stats)
-        self.lookup_warning(self.battery_stats)
-        self.lookup_error(self.battery_stats)
-        self.temp_max = max(self.temp1, self.temp2)
-        self.temp_min = min(self.temp1, self.temp2)
+    def reportBatteryBank(self, packet):
+        self.voltage = packet["cell_voltage"]
+        self.current = packet["current"]
+        self.capacity_remain = packet["capacity_remain"]
+        self.soc = packet["soc"]
+        self.soh = packet["soh"]
+        self.cycles = packet["cycles"]
+        self.temperature_1 = packet["temp1"]
+        self.temperature_2 = packet["temp2"]
+        if not (self.temperature_3 == 0) and (self.temperature_4 == 0):
+            self.temperature_3 = packet["temp3"]
+            self.temperature_4 = packet["temp4"]
+        self.temperature_mos = packet["temperature_mos"]
+        self.cell_min_voltage = packet["cell_min"]
+        self.cell_max_voltage = packet["cell_max"]
+        self.temp_min = min(self.temperature_1, self.temperature_2)
+        self.temp_max = max(self.temperature_1, self.temperature_2)
         self.cells = [Cell(True) for _ in range(0, self.cell_count)]
         for i, cell in enumerate(self.cells):
-            self.cells[int(i)].voltage = self.battery_stats[self.Id]["cell" + str(i + 1)]
-
+            self.cells[int(i)].voltage = packet["cell" + str(i + 1)]
         return True
 
-    def bms_stats(self):
-        logger.info("== Pack Details =====")
-        logger.info(f"  == BMS ID-{self.Id} ===")
-        logger.info("    == Temp ==")
-        logger.info(f"      Temp 1: {self.temp1}c | Temp 2: {self.temp2}c | Temp Mos: {self.temp_mos}c")
-        logger.info("     == BMS Data ==")
-        logger.info("       Voltage: " + "%.3fv" % self.voltage + " | Current: " + str(self.current) + "A")
-        logger.info(f"       Capacity Left: {self.capacity_remain} of {self.capacity} AH")
-        logger.info(f"       Balancing State: {self.battery_stats[self.Id]['balancing_text']}")
-        logger.info(f"       State: {self.lookup_status(self.battery_stats[self.Id]['status_hex'])}")
-        logger.info(f"       Last Update: {self.battery_stats[self.Id]['cellLastPoll']}")
-        logger.info("     == Cell Stats ==")
-        cellId = 1
-        while cellId <= self.battery_stats[self.Id]["cell_count"]:
-            logger.info(f"       Cell {str(cellId)} Voltage: {self.battery_stats[self.Id]['cell'+str(cellId)]}")
-            cellId += 1
-        logger.info(
-            f"       Cell Max/Min/Diff: ({self.battery_stats[self.Id]['cell_max']}/{self.battery_stats[self.Id]['cell_min']}/"
-            + f"{round((self.battery_stats[self.Id]['cell_max'] - self.battery_stats[self.Id]['cell_min']), 3)})v"
-        )
-        return True
+    def _state_str(self, val):
+        if val == 0:
+            return "Ok"
+        elif val == 1:
+            return "Warning"
+        elif val == 2:
+            return "Protect"
+        return f"UNKNOWN({val})"
 
-    def status_logger(self):
+    def _fet_str(self, val):
+        return "Enabled" if val else "Disabled"
+
+    def eg4ll_logger(self, packet, logLevel, alarm_msg=None):
         logger.info("===== HW Info =====")
-        logger.info(f'Battery Make/Model: {self.battery_stats[self.Id]["hw_make"]}')
-        logger.info(f'Hardware Version: {self.battery_stats[self.Id]["hw_version"]}')
-        logger.info(f'Serial Number: {self.battery_stats[self.Id]["hw_serial"]}')
-        logger.info("===== Temp =====")
-        logger.info(f"Temp 1: {self.temp1}c | Temp 2: {self.temp2}c | Temp Mos: {self.temp_mos}c")
-        logger.info(f"Temp Max: {self.temp_max} | Temp Min: {self.temp_min}")
-        logger.info(f"Heater {self.Id} Status: {self.lookup_heater(self.battery_stats[self.Id]['heater_status'])}")
-        logger.info("===== BMS Data =====")
-        logger.info("Voltage: " + "%.3fv" % self.voltage + " | Current: " + str(self.current) + "A")
-        logger.info(f"Capacity Left: {self.capacity_remain} of {self.capacity} AH")
-        logger.info(f"SoC: {self.soc}%")
-        logger.info(f"SoH: {self.soh}% | Cycle Count: {self.cycles}")
-        logger.info(f"Balancing State: {self.battery_stats[self.Id]['balancing_text']}")
-        logger.info("===== Warning/Alarms =====")
-        logger.info(f"  {self.lookup_warning(self.battery_stats)}")
-        logger.info(f"  {self.lookup_protection(self.battery_stats)}")
-        logger.info(f"  {self.lookup_error(self.battery_stats)}")
-        logger.info("===== Pack Details =====")
-        logger.info(f"  === BMS ID-{self.Id} ===")
-        logger.info(f"  State: {self.lookup_status(self.battery_stats[self.Id]['status_hex'])}")
-        logger.info(f"  Pack Balancing: {self.battery_stats[self.Id]['balancing_text']}")
-        logger.info(f"  Last Update: {self.battery_stats[self.Id]['cellLastPoll']}")
-        logger.info(
-            f"  Pack Voltage: {round((self.battery_stats[self.Id]['cell_voltage']), 3)}v | Pack Current: {round((self.battery_stats[self.Id]['current']), 2)}a"
-        )
-        logger.info("    = Cell Stats =")
-        cellId = 1
-        while cellId <= self.battery_stats[self.Id]["cell_count"]:
-            logger.info(f"  Cell {str(cellId)} Voltage: {self.battery_stats[self.Id]['cell'+str(cellId)]}")
-            cellId += 1
-        logger.info(
-            f"  Cell Max/Min/Diff: ({self.battery_stats[self.Id]['cell_max']}/{self.battery_stats[self.Id]['cell_min']}/"
-            + f"{round((self.battery_stats[self.Id]['cell_max'] - self.battery_stats[self.Id]['cell_min']), 3)})v"
-        )
+        if logLevel == 1:
+            logger.info(f'  Battery Make/Model: {packet["hw_make"]}')
+            logger.info(f'  Hardware Version: {packet["hw_version"]}')
+        logger.info(f'  Serial Number: {packet["hw_serial"]}')
+        if logLevel != 3:
+            logger.info("===== Temp =====")
+            logger.info(f"  Temp 1: {packet['temp1']}c | Temp 2: {packet['temp2']}c | Temp Mos: {packet['temperature_mos']}c")
+            if "temp3" in packet and "temp4" in packet:
+                logger.info(f"  Temp 3: {packet['temp3']}c | Temp 4: {packet['temp4']}c")
+            logger.info(f"  Temp Max: {packet['temp_max']} | Temp Min: {packet['temp_min']}")
+            logger.info(f"  Heater {packet['BMS_Id']} Status: {packet['heater_state']}")
+        logger.info(f"  === BMS ID-{packet['BMS_Id']} ===")
+        logger.info("    Voltage: " + "%.3fv" % packet["cell_voltage"] + " | Current: " + str(packet["current"]) + "A")
+        logger.info(f"    Capacity: {packet['capacity_remain']} of {packet['capacity']} AH")
+        logger.info(f"    Balancing State: {packet['balancing_text']}")
+        logger.info(f"    State: {packet['status']}")
+        logger.info(f"    Last Update: {packet['cellLastPoll']}")
+        if logLevel == 1:
+            logger.info(f"    SoH: {packet['soh']}% | Cycle Count: {packet['cycles']}")
+            logger.info(f"    SoC: {packet['soc']}%")
+        if logLevel in {1, 2}:
+            logger.info("  === Warning/Alarms ===")
+            logger.info(f"      {packet['warning']}")
+            logger.info(f"      {packet['protection']}")
+            logger.info(f"      {packet['error']}")
+            if self.LoadBMSSettings and alarm_msg:
+                if logLevel == 1:
+                    logger.info("   === Alarm States ===")
+                    for alarm_name, state in alarm_msg.items():
+                        if state == 0:
+                            level = "OK"
+                        elif state == 1:
+                            level = "WARNING"
+                        else:
+                            level = "PROTECTION"
+                        logger.info(f"      {alarm_name}: {level}")
+                elif logLevel == 2:
+                    active_alarms = {name: state for name, state in alarm_msg.items() if state != 0}
+                    logger.info("   === Active Alarms ===")
+                    if active_alarms:
+                        for alarm_name, state in active_alarms.items():
+                            if state == 1:
+                                level = "WARNING"
+                            else:
+                                level = "PROTECTION"
+                            logger.info(f"      {alarm_name}: {level}")
+                    else:
+                        logger.info("      NONE")
+            logger.info("   === Active Controls ===")
+            pv_high = self._state_str(self.protection.high_voltage)
+            cv_high = self._state_str(self.protection.high_cell_voltage)
+            pv_low = self._state_str(self.protection.low_voltage)
+            cv_low = self._state_str(self.protection.low_cell_voltage)
+            tc_high = self._state_str(self.protection.high_charge_temperature)
+            tc_low = self._state_str(self.protection.low_charge_temperature)
+            td_high = self._state_str(self.protection.high_temperature)
+            td_low = self._state_str(self.protection.low_temperature)
+            cc_over = self._state_str(self.protection.high_charge_current)
+            dc_over = self._state_str(self.protection.high_discharge_current)
+            logger.info(f"     Pack High Voltage // Cell High Voltage: {pv_high}-{cv_high}")
+            logger.info(f"     Pack Low Voltage // Cell Low Voltage: {pv_low}-{cv_low}")
+            logger.info(f"     High Temp Charge // Low Temp Charge: {tc_high}-{tc_low}")
+            logger.info(f"     High Temp Discharge // Low Temp Discharge: {td_high}-{td_low}")
+            logger.info(f"     Charge Over Current // Discharge Over Current: {cc_over}-{dc_over}")
+            logger.info(
+                f"     Charging // Discharging // Balancer: "
+                f"{self._fet_str(self.charge_fet)}-{self._fet_str(self.discharge_fet)}-{self._fet_str(self.balance_fet)}"
+            )
+        logger.info("    === Cell Stats ===")
+        for cellId in range(1, packet["cell_count"] + 1):
+            cell_key = f"cell{cellId}"
+            if cell_key in packet:  # safety check
+                logger.info(f"      Cell {cellId}: {packet[cell_key]}v")
+        logger.info(f"  Cell Max/Min/Diff: ({packet['cell_max']}/{packet['cell_min']}/{round((packet['cell_max'] - packet['cell_min']), 3)})v")
         return True
 
-    def lookup_warning(self, batteryBankStats):
-        code = batteryBankStats[self.Id]["warning_hex"]
+    def update_alarm_dbus(self, alarm_status):
+        self.protection.high_voltage = alarm_status.get("Pack_OV", 0)
+        self.protection.high_cell_voltage = alarm_status.get("Cell_OV", 0)
+        self.protection.low_voltage = alarm_status.get("Pack_UV", 0)
+        self.protection.low_cell_voltage = alarm_status.get("Cell_UV", 0)
+        self.protection.low_soc = alarm_status.get("Low_Cap", 0)
+        self.charge_fet = self.alarm_mgr.charge_fet
+        self.discharge_fet = self.alarm_mgr.discharge_fet
+        self.protection.high_charge_current = alarm_status.get("Over_Charge_Current", 0)
+        self.protection.high_discharge_current = max(alarm_status.get("Over_Discharge_Current", 0), alarm_status.get("Load_Short", 0))
+        self.protection.high_charge_temperature = alarm_status.get("Charge_OT", 0)
+        self.protection.high_temperature = alarm_status.get("Discharge_OT", 0)
+        self.protection.low_charge_temperature = alarm_status.get("Charge_UT", 0)
+        self.protection.low_temperature = alarm_status.get("Discharge_UT", 0)
+
+    def lookup_warning(self, packet):
         warning_alarm = ""
+        code = packet["warning_hex"]
         if code == "0000":
             warning_alarm += "No Warnings - " + code
-        elif code == "0001":
-            warning_alarm += "Warning: " + code + " - Pack Over Voltage"
-            self.voltage_high = 1
-            self.charge_fet = False
-        elif code == "0002":
-            warning_alarm += "Warning: " + code + " - Cell Over Voltage"
-            self.voltage_cell_high = 1
-            self.charge_fet = False
-        elif code == "0004":
-            warning_alarm += "Warning: " + code + " - Pack Under Voltage"
-            self.voltage_low = 1
-            self.discharge_fet = False
-        elif code == "0008":
-            warning_alarm += "Warning: " + code + " - Cell Under Voltage"
-            self.voltage_cell_low = 1
-            self.discharge_fet = False
-        elif code == "0010":
-            warning_alarm += "Warning: " + code + " - Charge Over Current"
-            self.current_over = 1
-        elif code == "0020":
-            warning_alarm += "Warning: " + code + " - Discharge Over Current"
-            self.current_over = 1
-        elif code == "0040":
-            warning_alarm += "Warning: " + code + " - Ambient High Temp"
-            self.temp_high_internal = 1
-        elif code == "0080":
-            warning_alarm += "Warning: " + code + " - Mosfets High Temp"
-            self.temp_high_internal = 1
-        elif code == "0100":
-            warning_alarm += "Warning: " + code + " - Charge Under Temp"  # Testing: 0100=Charge Under Temp
-            self.temp_high_charge = 1
-        elif code == "0200":
-            warning_alarm += "Warning: " + code + " - Discharge Over Temp"
-            self.temp_high_discharge = 1
-        elif code == "0400":
-            warning_alarm += "Warning: " + code + " - Charge Under Temp"
-            self.temp_low_charge = 1
-        elif code == "1000":
-            warning_alarm += "Warning: " + code + " - Low Capacity"
-            self.soc_low = 1
-            self.discharge_fet = False
-        elif code == "2000":
-            warning_alarm += "Warning: " + code + " - Float Stoped"
-        elif code == "4000":
-            warning_alarm += "Warning: " + code + " - UNKNOWN"
-            self.internal_failure = 1
         else:
             warning_alarm += "Warning: " + code + " - UNKNOWN"
-        if self.protectionLogger is True:
-            if code != "0000":
-                logger.error(f"{warning_alarm}")
-                self.bms_stats()
         return warning_alarm
 
-    def lookup_protection(self, batteryBankStats):
-        code = batteryBankStats[self.Id]["protection_hex"]
+    def lookup_protection(self, packet):
         protection_alarm = ""
+        code = packet["protection_hex"]
         if code == "0000":
             protection_alarm += "No Protection Events - " + code
-            self.charge_fet = True
-            self.discharge_fet = True
-        elif code == "0001":
-            protection_alarm += "Protection: " + code + " - Pack Over Voltage"
-            self.voltage_high = 2
-            self.charge_fet = False
-        elif code == "0002":
-            protection_alarm += "Protection: " + code + " - Cell Over Voltage"
-            self.voltage_cell_high = 2
-            self.charge_fet = False
-        elif code == "0004":
-            protection_alarm += "Protection: " + code + " - Pack Under Voltage"
-            self.voltage_low = 2
-            self.discharge_fet = False
-        elif code == "0008":
-            protection_alarm += "Protection: " + code + " - Cell Under Voltage"
-            self.voltage_cell_low = 2
-            self.discharge_fet = False
-        elif code == "0010":
-            protection_alarm += "Protection: " + code + " - Charge Over Current"
-            self.current_over = 2
-        elif code == "0020":
-            protection_alarm += "Protection: " + code + " - Discharge Over Current"
-            self.current_over = 2
-        elif code == "0040":
-            protection_alarm += "Protection: " + code + " - High Ambient Temp"
-            self.temp_high_internal = 2
-            self.charge_fet = False
-        elif code == "0080":
-            protection_alarm += "Protection: " + code + " - Mosfets High Temp"
-            self.temp_high_internal = 2
-            self.charge_fet = False
-        elif code == "0100":
-            protection_alarm += "Protection: " + code + " - Charge Over Temp"
-            self.temp_high_charge = 2
-            self.charge_fet = False
-            self.discharge_fet = False
-        elif code == "0200":
-            protection_alarm += "Protection: " + code + " - Discharge Over Temp"
-            self.temp_high_discharge = 2
-            self.charge_fet = False
-            self.discharge_fet = False
-        elif code == "0400":
-            protection_alarm += "Protection: " + code + " - Charge Under Temp"
-            self.temp_low_charge = 2
-            self.charge_fet = False
-        elif code == "0800":
-            protection_alarm += "Protection: " + code + " - Discharge Under Temp"
-            self.temp_low_charge = 2
-            self.discharge_fet = False
-        elif code == "1000":
-            protection_alarm += "Protection: " + code + " - Low Capacity"
-            self.soc_low = 2
-            self.discharge_fet = False
-        elif code == "2000":
-            protection_alarm += "Protection: " + code + " - Discharge SC"
-            self.discharge_fet = False
         else:
             protection_alarm += "Protection UNKNOWN: " + code
-        if self.protectionLogger is True:
-            if code != "0000":
-                logger.error(f"{protection_alarm}")
-                self.bms_stats()
         return protection_alarm
 
-    def lookup_error(self, batteryBankStats):
-        code = batteryBankStats[self.Id]["error_hex"]
+    def lookup_error(self, packet):
+        code = packet["error_hex"]
         error_alarm = ""
         if code == "0000":
-            error_alarm = f"No Errors - {code}"
-        elif code == "0001":
-            error_alarm = f"Error: {code} - Voltage Error"
-        elif code == "0002":
-            error_alarm = f"Error: {code} - Temperature Error"
-        elif code == "0004":
-            error_alarm = f"Error: {code} - Current Flow Error"
-        elif code == "0010":
-            error_alarm = f"Error: {code} - Cell Unbalanced"
+            error_alarm = "No Errors - " + code
         else:
-            error_alarm = "UNKNOWN: " + code
-        if self.protectionLogger is True:
-            if code != "0000":
-                logger.error(f"{error_alarm}")
-                self.bms_stats()
+            error_alarm = "UNKNOWN Error: " + code
         return error_alarm
 
-    def lookup_status(self, status_hex):
-        status_code = "UNKNOWN"
-        if status_hex == "0000":
-            status_code = "Inactive/Standby"
-        elif status_hex == "0001":
-            status_code = "Inactive/Charging"
-        elif status_hex == "0002":
-            status_code = "Inactive/Discharging"
-        elif status_hex == "0004":
-            status_code = "Inactive/Protect"
-        elif status_hex == "0008":
-            status_code = "Inactive/Charging Limit"
-        elif status_hex == "8000":
+    def lookup_status(self, packet):
+        status_code = ""
+        if packet["status_hex"] == "0000":
             status_code = "Active/Standby"
-        elif status_hex == "8001":
+        elif packet["status_hex"] == "0100":
             status_code = "Active/Charging"
-        elif status_hex == "8002":
+        elif packet["status_hex"] == "0200":
             status_code = "Active/Discharging"
-        elif status_hex == "8004":
-            status_code = "Active/Protect"
-        elif status_hex == "8008":
+        elif packet["status_hex"] == "0008":
+            status_code = "Inactive/Protect"
+        elif packet["status_hex"] == "0800":
             status_code = "Active/Charging Limit"
+        else:
+            status_code = "UNKNOWN Status - " + packet["status_hex"]
         return status_code
 
-    def lookup_heater(self, heater_status):
-        if heater_status == "00":
-            heater_state = False
-        elif heater_status == "80":
+    def lookup_heater(self, packet):
+        if packet["heater_hex"] == "80":
             heater_state = True
+        else:
+            heater_state = False
         return heater_state
 
     def get_balancing(self):
-        balancer_current_delta = 0.40
-        balancer_voltage = 3.40
-        if (self.battery_stats[self.Id]["cell_max"] > balancer_voltage) and (
-            round((self.battery_stats[self.Id]["cell_max"] - self.battery_stats[self.Id]["cell_min"]), 3) <= balancer_current_delta
-        ):
-            balacing_state = 2
-            self.balance_fet = False
-            self.balancing = False
-        elif (self.battery_stats[self.Id]["cell_max"] - self.battery_stats[self.Id]["cell_min"]) >= balancer_current_delta:
-            balacing_state = 1
-            self.balance_fet = True
-            self.balancing = True
-        else:
-            balacing_state = 0
-            self.balance_fet = False
-            self.balancing = False
+        balacing_state = self.balancingStat(self.battery_stats[self.Id])
         return balacing_state
 
-    def balancingStat(self, cellMin, cellMax):
-        balancer_current_delta = 0.40
-        balancer_voltage = 3.40
-        if (cellMax > balancer_voltage) and (round((cellMax - cellMin), 3) <= balancer_current_delta):
-            balacing_state = 2
-        elif (cellMax - cellMin) >= balancer_current_delta:
-            balacing_state = 1
-        else:
-            balacing_state = 0
-        return balacing_state
+    def balancingStat(self, packet):
+        balancer_delta = float(packet.get("Balance_Volt_Diff") or 0.040)
+        balancer_min_voltage = float(packet.get("Balance_Volt") or 3.40)
+        cell_count = packet.get("cell_count")
+        cell_min = packet.get("cell_min")
+        cell_max = packet.get("cell_max")
+        if cell_count is None or cell_min is None or cell_max is None:
+            self.balacing_state = 0
+            self.balance_fet = False
+            return self.balacing_state
+        delta_v = round(cell_max - cell_min, 3)
+        # ---- Rule 1: all cells below balance voltage ----
+        if cell_min < balancer_min_voltage:
+            self.balacing_state = 0
+            self.balance_fet = False
+            return self.balacing_state
+        # ---- Rule 3: top balancing finished ----
+        if cell_min >= utils.MAX_CELL_VOLTAGE and delta_v <= balancer_delta:
+            if self.balacing_state != 2:
+                logger.info(f"BMS {packet['BMS_Id']} balancing finished")
+                self.eg4ll_logger(packet, 3)
+            self.balacing_state = 2
+            self.balance_fet = False
+            return self.balacing_state
+        # ---- Rule 2: balancing active ----
+        if cell_min >= balancer_min_voltage and delta_v > balancer_delta:
+            self.balacing_state = 1
+            self.balance_fet = True
+            return self.balacing_state
+        # ---- Default: monitoring / idle ----
+        self.balacing_state = 0
+        self.balance_fet = False
+        return self.balacing_state
 
     def get_max_temperature(self):
-        self.temp1 = self.battery_stats[self.Id]["temp1"]
-        self.temp2 = self.battery_stats[self.Id]["temp2"]
-        temp_max = max(self.temp1, self.temp2)
+        if not (self.temperature_3 == 0) and (self.temperature_4 == 0):
+            temp_max = max(self.temperature_1, self.temperature_2, self.temperature_3, self.temperature_4)
+        else:
+            temp_max = max(self.temperature_1, self.temperature_2)
         return temp_max
 
     def get_min_temperature(self):
-        self.temp1 = self.battery_stats[self.Id]["temp1"]
-        self.temp2 = self.battery_stats[self.Id]["temp2"]
-        temp_min = min(self.temp1, self.temp2)
+        if not (self.temperature_3 == 0) and (self.temperature_4 == 0):
+            temp_min = min(self.temperature_1, self.temperature_2, self.temperature_3, self.temperature_4)
+        else:
+            temp_min = min(self.temperature_1, self.temperature_2)
         return temp_min
 
     def read_bms_config(self):
-        logger.info("Executed read_bms_config function... function needs to be written")
-        return True
+        logger.info("Polling BMS for config settings...")
+        command = self.eg4CommandGen(self.Id.to_bytes(1, "big") + self.bmsConfigCommandRoot)
+        packet = self.read_eg4ll_command(command)
+        if not packet:
+            logger.error("Failed to read BMS config, will use defaults")
+            return False
 
-    def eg4CommandGen(self, data: bytes):
-        # CRC-16-ModBus Algorithm
-        poly = 0xA001
+        # --- Helper functions ---
+        def get_int(packet, start, end, signed=False, modifier=1, round_decimals=None):
+            if len(packet) < end:
+                return None
+            value = int.from_bytes(packet[start:end], "big", signed=signed) * modifier
+            if round_decimals is not None:
+                value = round(value, round_decimals)
+            return value
+
+        def get_temp(packet, start, end):
+            if len(packet) < end:
+                return None
+            return int.from_bytes(packet[start:end], "big", signed=True) - 50
+
+        def decode_string(packet, start, end):
+            if len(packet) < end:
+                return ""
+            return packet[start:end].decode("utf-8", errors="ignore").strip("\x00")
+
+        BMSConf = {}
+        # --- Voltage thresholds ---
+        BMSConf["Balance_Volt"] = get_int(packet, 25, 27, modifier=1 / 1000, round_decimals=3)
+        BMSConf["Balance_Volt_Diff"] = get_int(packet, 27, 29, modifier=1 / 1000, round_decimals=3)
+        BMSConf["Low_Cap_Warn"] = get_int(packet, 29, 31)
+        BMSConf["Cell_UV_Warn"] = get_int(packet, 35, 37, modifier=1 / 1000, round_decimals=3)
+        BMSConf["Cell_OV_Warn"] = get_int(packet, 47, 49, modifier=1 / 1000, round_decimals=3)
+        BMSConf["Cell_UV_Protect"] = get_int(packet, 37, 39, modifier=1 / 1000, round_decimals=3)
+        BMSConf["Cell_OV_Protect"] = get_int(packet, 49, 51, modifier=1 / 1000, round_decimals=3)
+        BMSConf["Cell_UV_Release"] = get_int(packet, 39, 41, modifier=1 / 1000, round_decimals=3)
+        BMSConf["Cell_OV_Release"] = get_int(packet, 51, 53, modifier=1 / 1000, round_decimals=3)
+        BMSConf["Pack_UV_Warn"] = get_int(packet, 41, 43, modifier=1 / 100, round_decimals=2)
+        BMSConf["Pack_OV_Warn"] = get_int(packet, 53, 55, modifier=1 / 100, round_decimals=2)
+        BMSConf["Pack_UV_Protect"] = get_int(packet, 43, 45, modifier=1 / 100, round_decimals=2)
+        BMSConf["Pack_OV_Protect"] = get_int(packet, 55, 57, modifier=1 / 100, round_decimals=2)
+        BMSConf["Pack_UV_Release"] = get_int(packet, 45, 47, modifier=1 / 100, round_decimals=2)
+        BMSConf["Pack_OV_Release"] = get_int(packet, 57, 59, modifier=1 / 100, round_decimals=2)
+        # --- Temperature thresholds ---
+        temp_fields = [
+            ("Charge_UT_Warn", 93, 95),
+            ("Charge_UT_Protect", 95, 97),
+            ("Charge_UT_Release", 97, 99),
+            ("Charge_OT_Warn", 99, 101),
+            ("Charge_OT_Protect", 101, 103),
+            ("Charge_OT_Release", 103, 105),
+            ("Discharge_UT_Warn", 105, 107),
+            ("Discharge_UT_Protect", 107, 109),
+            ("Discharge_UT_Release", 109, 111),
+            ("Discharge_OT_Warn", 111, 113),
+            ("Discharge_OT_Protect", 113, 115),
+            ("Discharge_OT_Release", 115, 117),
+            ("PCB_OT_Warn", 117, 119),
+            ("PCB_OT_Protect", 119, 121),
+            ("PCB_OT_Release", 121, 123),
+        ]
+        for suffix, start, end in temp_fields:
+            BMSConf[suffix] = get_temp(packet, start, end)
+        # --- Current protections and delays ---
+        current_fields = [
+            ("Charge_OC1_Protect", 73, 75, 1 / 100),
+            ("Charge_OC1_Delay", 83, 85, 1),
+            ("Charge_OC2_Protect", 79, 81, 1 / 100),
+            ("Charge_OC2_Delay", 85, 87, 1),
+            ("Discharge_OC1_Protect", 75, 77, 1 / 100),
+            ("Discharge_OC1_Delay", 87, 89, 1),
+            ("Discharge_OC2_Protect", 81, 83, 1 / 100),
+            ("Discharge_OC2_Delay", 89, 91, 1),
+            ("Charge_Release", 71, 73, 1),
+            ("Charge_OC_Times", 91, 92, 1),
+            ("Discharge_Release", 69, 71, 1),
+            ("Discharge_OC_Times", 92, 93, 1),
+            ("Load_Short_Current", 77, 79, 1 / 100),
+        ]
+        for key, start, end, modifier in current_fields:
+            BMSConf[key] = get_int(packet, start, end, modifier=modifier, round_decimals=2)
+        BMSConf["hw_make"] = decode_string(packet, 123, 145)
+        BMSConf["hw_version"] = decode_string(packet, 146, 153)
+        BMSConf["hw_serial"] = decode_string(packet, 153, 167) + str(self.Id)
+        BMSConf["hwLastPoll"] = datetime.datetime.now()
+        logger.info("BMS Config Pulled Settings:\n%s", pformat(BMSConf))
+        return BMSConf
+
+    def eg4CommandGen(self, data: bytes) -> bytes:
         crc = 0xFFFF
-        for b in data:
-            crc ^= 0xFF & b
-            for _ in range(0, 8):
-                if crc & 0x0001:
-                    crc = ((crc >> 1) & 0xFFFF) ^ poly
+        poly = 0xA001
+        for byte in data:
+            crc ^= byte
+            for _ in range(8):
+                if crc & 1:
+                    crc = (crc >> 1) ^ poly
                 else:
-                    crc = (crc >> 1) & 0xFFFF
-        reverseHex = pack("<H", crc)
-        command = data + reverseHex
-        return command
+                    crc >>= 1
+                crc &= 0xFFFF  # keep 16-bit
+        return data + struct.pack("<H", crc)
 
-    # Read data from previously opened serial port
+    def validate_crc(self, data: bytes) -> bool:
+        """
+        Validate Modbus CRC-16 on received data.
+        Returns True if CRC is valid, False otherwise.
+        """
+        if len(data) < 3:
+            return False
+        # Split payload and received CRC
+        payload = data[:-2]
+        received_crc = struct.unpack("<H", data[-2:])[0]
+        # Calculate expected CRC (Modbus CRC-16)
+        crc = 0xFFFF
+        poly = 0xA001
+        for byte in payload:
+            crc ^= byte
+            for _ in range(8):
+                if crc & 1:
+                    crc = (crc >> 1) ^ poly
+                else:
+                    crc >>= 1
+                crc &= 0xFFFF
+        return crc == received_crc
+
     def read_eg4ll_command(self, command):
-        attemptCount = 0
         try:
-            CommandHex = command.hex(":").upper()
-            bmsId = int(CommandHex[0:2], 16)
-            cmdId = CommandHex[9:11]
-
-            if cmdId == "69":
-                commandString = "Hardware"
+            bms_id = command[0]
+            cmd_id = command[3]
+            if cmd_id == 0x69:
+                command_string = "Hardware"
                 reply_length = 51
-            elif cmdId == "00":
-                commandString = "Cell"
+                poll_timeout = 1.5
+            elif cmd_id == 0x00:
+                command_string = "Cell"
                 reply_length = 83
-            elif cmdId == "2D":
-                commandString = "Config"
+                poll_timeout = 2.0
+            elif cmd_id == 0x2D:
+                command_string = "Config"
+                reply_length = 187
+                poll_timeout = 2.5
             else:
-                commandString = "UNKNOWN"
-
-            if self.ser.isOpen() is True:
-                while attemptCount <= 3:
+                logger.error(f"ERROR - Unknown command ID: 0x{cmd_id:02X} for BMS ID: {bms_id}")
+                return False
+            if not self.ser or not self.ser.is_open:
+                logger.error("ERROR - Serial Port Not Open!")
+                self.ser = self.open_serial()
+                if not self.ser:
+                    return False
+            # Retry loop with CRC validation
+            received_len = 0
+            for attempt in range(1, 4):
+                try:
                     self.ser.reset_input_buffer()
                     self.ser.reset_output_buffer()
                     self.ser.write(command)
-                    pollCount = 0
-                    toread = self.ser.inWaiting()
-                    attemptCount += 1
-                    while toread < reply_length:
-                        sleep(0.035)
-                        toread = self.ser.inWaiting()
-                        pollCount += 1
-                        if toread == reply_length:
+                    sleep(0.035)
+                    buffer = bytearray()
+                    start_time = time.time()
+                    # Read with timeout
+                    while len(buffer) < reply_length:
+                        if (time.time() - start_time) > poll_timeout:
                             break
-                        if pollCount > 50:
-                            if attemptCount == 3 and cmdId == "00":
-                                logger.error(f"No Reply - BMS ID: {bmsId} Command: {commandString} - Attempt: {attemptCount}")
-                                return False
-                            elif cmdId == "69":
-                                get_connection_error_message(self.online)
-                                logger.debug(f"No Reply - BMS ID: {bmsId} Command: {commandString}")
-                                return False
-                            elif cmdId != "00":
-                                return False
-                            else:
-                                break
-                    if toread == reply_length:
-                        break
-                res = self.ser.read(toread)
-                data = bytearray(res)
-            else:
-                logger.error("ERROR - Serial Port Not Open!")
-                self.ser = self.open_serial()
-                return False
-
-            if toread == reply_length:
-                return data
-            else:
-                logger.error(f"ERROR - Reply not meet expected length! BMS ID: {bmsId} Command: {commandString}")
-                return False
+                        waiting = self.ser.in_waiting
+                        if waiting:
+                            buffer.extend(self.ser.read(waiting))
+                        else:
+                            sleep(0.01)
+                    received_len = len(buffer)
+                    # Check length
+                    if received_len >= reply_length:
+                        reply_data = bytes(buffer[:reply_length])
+                        # VALIDATE CRC
+                        if not self.validate_crc(reply_data):
+                            continue  # Retry on CRC failure
+                        # CRC valid
+                        self._eg4_ll_initialized = True
+                        return reply_data
+                except serial.SerialException as e:
+                    logger.error(f"Serial error on attempt {attempt} for BMS {bms_id}: {e}")
+                    try:
+                        self.ser.close()
+                    except Exception:
+                        pass
+                    sleep(2.0)
+                    self.ser = self.open_serial()
+                    if not self.ser:
+                        return False
+            # All attempts failed
+            logger.error(
+                f"ERROR - All retry attempts failed! " f"BMS ID: {bms_id} Command: {command_string} " f"Received: {received_len} Expected: {reply_length}"
+            )
+            return False
         except serial.SerialException as e:
             logger.error(e)
             return False
+
+
+class EG4AlarmManager:
+    DEFAULTS = {
+        "Cell_OV_Warn": 3.6,
+        "Cell_OV_Protect": 3.9,
+        "Cell_OV_Release": 3.45,
+        "Cell_UV_Warn": 2.5,
+        "Cell_UV_Protect": 2.0,
+        "Cell_UV_Release": 3.1,
+        "Charge_UT_Warn": 2,
+        "Charge_UT_Protect": 0,
+        "Charge_UT_Release": 5,
+        "Charge_OT_Warn": 70,
+        "Charge_OT_Protect": 75,
+        "Charge_OT_Release": 65,
+        "Discharge_UT_Warn": -15,
+        "Discharge_UT_Protect": -20,
+        "Discharge_UT_Release": -10,
+        "Discharge_OT_Warn": 70,
+        "Discharge_OT_Protect": 75,
+        "Discharge_OT_Release": 65,
+        "PCB_OT_Warn": 95,
+        "PCB_OT_Protect": 100,
+        "PCB_OT_Release": 80,
+        "Charge_OC1_Protect": 220,
+        "Charge_OC1_Delay": 10,
+        "Charge_OC2_Protect": 250,
+        "Charge_OC2_Delay": 2,
+        "Charge_OC_Release": 60,
+        "Discharge_OC1_Protect": 220,
+        "Discharge_OC1_Delay": 10,
+        "Discharge_OC2_Protect": 250,
+        "Discharge_OC2_Delay": 2,
+        "Discharge_OC_Release": 60,
+        "Load_Short_Current": 350,
+        "Low_Cap_Warn": 5,
+    }
+
+    def __init__(self, bms_data, eg4ll_logger_cb=None):
+        """
+        Initialize the alarm manager.
+
+        :param bms_data: Dictionary containing BMS telemetry & limit values.
+        :param eg4ll_logger_cb: Optional callback function for warnings/protections.
+        """
+        self.data = bms_data
+        self.eg4ll_logger_cb = eg4ll_logger_cb
+        self.alarm_states = {}  # Tracks previous state for edge-triggered logging
+        self.charge_fet = True
+        self.discharge_fet = True
+        self._initialized = False
+        self._charge_oc_time = {}  # timestamps for Charge OC1/OC2
+        self._discharge_oc_time = {}  # timestamps for Discharge OC1/OC2
+
+    def _get(self, key):
+        if key in self.data:
+            return self.data[key]
+        if key in self.DEFAULTS:
+            return self.DEFAULTS[key]
+        return None
+
+    def _check_high(self, value, warn, protect):
+        if protect is not None and value >= protect:
+            return 2
+        if warn is not None and value >= warn:
+            return 1
+        return 0
+
+    def _check_low(self, value, warn, protect):
+        if protect is not None and value <= protect:
+            return 2
+        if warn is not None and value <= warn:
+            return 1
+        return 0
+
+    def evaluate(self, new_data=None):
+        """
+        Evaluate all alarms, update alarm states, FETs, and edge-triggered logging.
+        Optional `new_data` can be passed to refresh telemetry.
+        """
+        if new_data:
+            self.data = new_data
+        if not self.data:
+            return
+
+        # --- Do not evaluate until live telemetry exists ---
+        required_keys = ("cell_max", "cell_min", "temp_max", "temp_min", "current", "cell_voltage", "soc")
+        if not all(k in self.data for k in required_keys):
+            if not hasattr(self, "_telemetry_warned"):
+                self.eg4ll_logger_cb({"info": "Waiting for live telemetry before evaluating alarms"})
+                self._telemetry_warned = True
+            return {}
+
+        now = time.time()
+        alarms = {}
+
+        if not hasattr(self, "_limits_checked"):
+            for k in ["Pack_OV_Protect", "Pack_UV_Protect"]:
+                if self._get(k) is None:
+                    print(f"[EG4AlarmManager] {k} not provided by BMS — alarm disabled")
+            self._limits_checked = True
+
+        # --- Cell Voltage ---
+        cell_max = self.data.get("cell_max", 0)
+        cell_min = self.data.get("cell_min", 0)
+        alarms["Cell_OV"] = self._check_high(cell_max, self._get("Cell_OV_Warn"), self._get("Cell_OV_Protect"))
+        alarms["Cell_UV"] = self._check_low(cell_min, self._get("Cell_UV_Warn"), self._get("Cell_UV_Protect"))
+
+        # --- Pack Voltage ---
+        pack_v = self.data.get("cell_voltage", 0)
+        alarms["Pack_OV"] = self._check_high(pack_v, self._get("Pack_OV_Warn"), self._get("Pack_OV_Protect"))
+        alarms["Pack_UV"] = self._check_low(pack_v, self._get("Pack_UV_Warn"), self._get("Pack_UV_Protect"))
+
+        # --- Temperature ---
+        temp_max = self.data.get("temp_max", 0)
+        temp_min = self.data.get("temp_min", 0)
+        alarms["Charge_UT"] = self._check_low(temp_min, self._get("Charge_UT_Warn"), self._get("Charge_UT_Protect"))
+        alarms["Charge_OT"] = self._check_high(temp_max, self._get("Charge_OT_Warn"), self._get("Charge_OT_Protect"))
+        alarms["Discharge_UT"] = self._check_low(temp_min, self._get("Discharge_UT_Warn"), self._get("Discharge_UT_Protect"))
+        alarms["Discharge_OT"] = self._check_high(temp_max, self._get("Discharge_OT_Warn"), self._get("Discharge_OT_Protect"))
+        alarms["PCB_OT"] = self._check_high(temp_max, self._get("PCB_OT_Warn"), self._get("PCB_OT_Protect"))
+
+        # --- Low Capacity ---
+        soc = self.data.get("soc", 100)
+        low_cap = self._get("Low_Cap_Warn")
+        alarms["Low_Cap"] = 2 if low_cap is not None and soc <= low_cap else 0
+
+        # --- Load Short ---
+        current = self.data.get("current", 0)
+        ls = self._get("Load_Short_Current")
+        alarms["Load_Short"] = 2 if ls is not None and abs(current) >= ls else 0
+
+        # --- Charge/Discharge Overcurrent Timers ---
+        def check_overcurrent(value, oc1_prot, oc1_delay, oc2_prot, oc2_delay, last_oc_time):
+            state = 0
+
+            if oc2_prot is not None and value >= oc2_prot:
+                if "OC2_start" not in last_oc_time:
+                    last_oc_time["OC2_start"] = now
+                if now - last_oc_time["OC2_start"] >= oc2_delay:
+                    state = 2
+            else:
+                last_oc_time.pop("OC2_start", None)
+
+            if oc1_prot is not None and value >= oc1_prot:
+                if "OC1_start" not in last_oc_time:
+                    last_oc_time["OC1_start"] = now
+                if now - last_oc_time["OC1_start"] >= oc1_delay:
+                    state = max(state, 2)
+            else:
+                last_oc_time.pop("OC1_start", None)
+
+            return state
+
+        alarms["Over_Charge_Current"] = check_overcurrent(
+            max(current, 0),
+            self._get("Charge_OC1_Protect"),
+            self._get("Charge_OC1_Delay"),
+            self._get("Charge_OC2_Protect"),
+            self._get("Charge_OC2_Delay"),
+            self._charge_oc_time,
+        )
+
+        alarms["Over_Discharge_Current"] = check_overcurrent(
+            abs(min(current, 0)),
+            self._get("Discharge_OC1_Protect"),
+            self._get("Discharge_OC1_Delay"),
+            self._get("Discharge_OC2_Protect"),
+            self._get("Discharge_OC2_Delay"),
+            self._discharge_oc_time,
+        )
+
+        # --- FET control flags ---
+        # Voltage and current alarms disable FET on WARNING or PROTECTION (any non-zero state)
+        # Temperature alarms only disable FET on PROTECTION (state == 2) due to thermal buffering
+        self.charge_fet = all(alarms.get(k, 0) == 0 for k in ["Cell_OV", "Pack_OV", "Load_Short", "Over_Charge_Current"]) and all(
+            alarms.get(k, 0) < 2 for k in ["Charge_OT", "Charge_UT"]
+        )
+        self.discharge_fet = all(alarms.get(k, 0) == 0 for k in ["Cell_UV", "Pack_UV", "Load_Short", "Over_Discharge_Current"]) and all(
+            alarms.get(k, 0) < 2 for k in ["Discharge_OT", "Discharge_UT"]
+        )
+
+        # --- Edge-triggered state tracking ---
+        self._alarms_changed = False
+        for alarm, state in alarms.items():
+            prev = self.alarm_states.get(alarm, state)
+            if state != prev:
+                self._alarms_changed = True
+            self.alarm_states[alarm] = state
+
+        # Suppress on first valid evaluation
+        if not self._initialized:
+            self._initialized = True
+
+        return alarms

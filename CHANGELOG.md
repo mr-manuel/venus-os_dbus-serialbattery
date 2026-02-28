@@ -41,6 +41,11 @@
 * Changed: Daren 485 BMS - Fixed charge/discharge calculation with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/343 by @kopierschnitte
 * Changed: Disabled BMS SOC alerts if `SOC_CALCULATION` is enabled. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/377 by @mr-manuel
 * Changed: Driver internals - Renamed callback variables/functions and added a better description by @mr-manuel
+* Changed: EG4-LL BMS - Added BMS configuration polling on startup to load cell/pack voltage, temperature, current, and SOC alarm thresholds from the BMS by @tuxntoast
+* Changed: EG4-LL BMS - Added CRC-16 checksum validation for all BMS reply frames by @tuxntoast
+* Changed: EG4-LL BMS - Added EG4AlarmManager class for threshold-based alarm evaluation with charge/discharge FET control by @tuxntoast
+* Changed: EG4-LL BMS - Fixed Protection class attribute names to match framework API (e.g. `high_voltage`, `low_cell_voltage`, `high_charge_temperature`) by @tuxntoast
+* Changed: EG4-LL BMS - Improved serial port retry logic with automatic port recovery on SerialException by @tuxntoast
 * Changed: Exit behavior for excluded devices to behave like Victron services by @mr-manuel
 * Changed: Fix dbus connection leak which fixes problems on systems which multiple batteries with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/402 by @cgoudie
 * Changed: Fix issue with published JsonData, where None values were published as empty strings by @mr-manuel
