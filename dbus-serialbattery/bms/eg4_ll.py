@@ -70,23 +70,44 @@ class EG4_LL(Battery):
             parity=serial.PARITY_NONE,
             stopbits=serial.STOPBITS_ONE,
             bytesize=serial.EIGHTBITS,
+            dsrdtr=False,
+            rtscts=False,
         )
         if ser.isOpen():
             return ser
         else:
             return False
 
+    # How long to keep retrying the initial connection before giving up.
+    # The CH341 USB-RS485 adapter needs ~40s after port open to settle.
+    CONNECTION_TIMEOUT = 60
+
     def test_connection(self):
         try:
             self.battery_stats = {}
             self.Id = int.from_bytes(self.address, "big")
-            self.ser = self.open_serial()
-            logger.info(f"Waiting for BMS ID {self.Id} to initialize...")
-            sleep(1.0)
+            # Keep port open between framework rounds - closing resets the CH341 settling clock
+            if not hasattr(self, "ser") or self.ser is None or not self.ser.is_open:
+                self.ser = self.open_serial()
+                logger.info(f"Waiting for BMS ID {self.Id} to initialize...")
+                sleep(3.0)
             self.ser.reset_input_buffer()
             self.ser.reset_output_buffer()
             command = self.eg4CommandGen((self.Id.to_bytes(1, "big") + self.hwCommandRoot))
-            reply = self.read_eg4ll_command(command)
+            # Retry for up to CONNECTION_TIMEOUT seconds to allow CH341 adapter to settle.
+            # _connecting=True suppresses serial errors to DEBUG during this expected settling window.
+            self._connecting = True
+            t_start = time.time()
+            reply = False
+            while time.time() - t_start < self.CONNECTION_TIMEOUT:
+                reply = self.read_eg4ll_command(command)
+                if reply is not False:
+                    break
+                remaining = self.CONNECTION_TIMEOUT - (time.time() - t_start)
+                if remaining > 3.0:
+                    logger.debug(f"BMS ID {self.Id} not ready, retrying... ({remaining:.0f}s remaining)")
+                    sleep(3.0)
+            self._connecting = False
             if reply is False:
                 return False
             else:
@@ -425,7 +446,10 @@ class EG4_LL(Battery):
         self.charge_fet = self.alarm_mgr.charge_fet
         self.discharge_fet = self.alarm_mgr.discharge_fet
         self.protection.high_charge_current = alarm_status.get("Over_Charge_Current", 0)
-        self.protection.high_discharge_current = max(alarm_status.get("Over_Discharge_Current", 0), alarm_status.get("Load_Short", 0))
+        self.protection.high_discharge_current = max(
+            alarm_status.get("Over_Discharge_Current", 0),
+            alarm_status.get("Load_Short", 0),
+        )
         self.protection.high_charge_temperature = alarm_status.get("Charge_OT", 0)
         self.protection.high_temperature = alarm_status.get("Discharge_OT", 0)
         self.protection.low_charge_temperature = alarm_status.get("Charge_UT", 0)
@@ -521,14 +545,24 @@ class EG4_LL(Battery):
 
     def get_max_temperature(self):
         if not (self.temperature_3 == 0) and (self.temperature_4 == 0):
-            temp_max = max(self.temperature_1, self.temperature_2, self.temperature_3, self.temperature_4)
+            temp_max = max(
+                self.temperature_1,
+                self.temperature_2,
+                self.temperature_3,
+                self.temperature_4,
+            )
         else:
             temp_max = max(self.temperature_1, self.temperature_2)
         return temp_max
 
     def get_min_temperature(self):
         if not (self.temperature_3 == 0) and (self.temperature_4 == 0):
-            temp_min = min(self.temperature_1, self.temperature_2, self.temperature_3, self.temperature_4)
+            temp_min = min(
+                self.temperature_1,
+                self.temperature_2,
+                self.temperature_3,
+                self.temperature_4,
+            )
         else:
             temp_min = min(self.temperature_1, self.temperature_2)
         return temp_min
@@ -712,19 +746,26 @@ class EG4_LL(Battery):
                         self._eg4_ll_initialized = True
                         return reply_data
                 except serial.SerialException as e:
-                    logger.error(f"Serial error on attempt {attempt} for BMS {bms_id}: {e}")
+                    _log = logger.debug if getattr(self, "_connecting", False) else logger.error
+                    _log(f"Serial error on attempt {attempt} for BMS {bms_id}: {e}")
+                    # Flush without closing - closing resets the CH341 settling clock
                     try:
-                        self.ser.close()
+                        self.ser.reset_input_buffer()
+                        self.ser.reset_output_buffer()
+                        sleep(1.0)
                     except Exception:
-                        pass
-                    sleep(2.0)
-                    self.ser = self.open_serial()
-                    if not self.ser:
-                        return False
+                        # Port is truly dead - reopen as last resort
+                        try:
+                            self.ser.close()
+                        except Exception:
+                            pass
+                        sleep(2.0)
+                        self.ser = self.open_serial()
+                        if not self.ser:
+                            return False
             # All attempts failed
-            logger.error(
-                f"ERROR - All retry attempts failed! " f"BMS ID: {bms_id} Command: {command_string} " f"Received: {received_len} Expected: {reply_length}"
-            )
+            _log = logger.debug if getattr(self, "_connecting", False) else logger.error
+            _log(f"ERROR - All retry attempts failed! " f"BMS ID: {bms_id} Command: {command_string} " f"Received: {received_len} Expected: {reply_length}")
             return False
         except serial.SerialException as e:
             logger.error(e)
@@ -816,7 +857,15 @@ class EG4AlarmManager:
             return
 
         # --- Do not evaluate until live telemetry exists ---
-        required_keys = ("cell_max", "cell_min", "temp_max", "temp_min", "current", "cell_voltage", "soc")
+        required_keys = (
+            "cell_max",
+            "cell_min",
+            "temp_max",
+            "temp_min",
+            "current",
+            "cell_voltage",
+            "soc",
+        )
         if not all(k in self.data for k in required_keys):
             if not hasattr(self, "_telemetry_warned"):
                 self.eg4ll_logger_cb({"info": "Waiting for live telemetry before evaluating alarms"})
