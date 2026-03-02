@@ -60,7 +60,13 @@ cp -rf "/data/apps/dbus-serialbattery/service" "/opt/victronenergy/service-templ
 
 
 # install custom GUI
-bash /data/apps/dbus-serialbattery/custom-gui-install.sh
+# if GUI_INSTALL_CUSTOMIZATIONS in config file is set to True (ignore case and trim spaces), else skip this step
+gui_customizations=$(awk -F "=" '/^GUI_INSTALL_CUSTOMIZATIONS/ {print $2}' /data/apps/dbus-serialbattery/config.ini | tr -d ' ' | tr '[:upper:]' '[:lower:]')
+if [[ "$gui_customizations" != "false" ]]; then
+    bash /data/apps/dbus-serialbattery/custom-gui-install.sh
+else
+    bash /data/apps/dbus-serialbattery/custom-gui-uninstall.sh > /dev/null
+fi
 
 
 
