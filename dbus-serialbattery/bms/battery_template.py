@@ -10,6 +10,8 @@ from utils import read_serial_data, logger
 from struct import unpack_from
 import sys
 
+# from utils import SOC_CALCULATION
+
 
 class BatteryTemplate(Battery):
     def __init__(self, port, baud, address):
@@ -243,7 +245,8 @@ class BatteryTemplate(Battery):
         self.protection.low_cell_voltage = VALUE_FROM_BMS
 
         # low SOC alarm (int)
-        self.protection.low_soc = VALUE_FROM_BMS
+        if not SOC_CALCULATION:
+            self.protection.low_soc = VALUE_FROM_BMS
 
         # high charge current alarm (int)
         self.protection.high_charge_current = VALUE_FROM_BMS

@@ -10,6 +10,7 @@ from utils import (
     open_serial_port,
     logger,
     AUTO_RESET_SOC,
+    SOC_CALCULATION,
     BATTERY_CAPACITY,
     INVERT_CURRENT_MEASUREMENT,
     MIN_CELL_VOLTAGE,
@@ -361,14 +362,15 @@ class Daly(Battery):
         else:
             self.protection.high_charge_current = 0
 
-        if al_crnt_soc & 128:
-            # Low SoC - Alarm
-            self.protection.low_soc = 2
-        elif al_crnt_soc & 64:
-            # Low SoC Warning level - Pre-alarm
-            self.protection.low_soc = 1
-        else:
-            self.protection.low_soc = 0
+        if not SOC_CALCULATION:
+            if al_crnt_soc & 128:
+                # Low SoC - Alarm
+                self.protection.low_soc = 2
+            elif al_crnt_soc & 64:
+                # Low SoC Warning level - Pre-alarm
+                self.protection.low_soc = 1
+            else:
+                self.protection.low_soc = 0
 
         return True
 

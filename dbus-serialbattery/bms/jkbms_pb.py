@@ -4,7 +4,7 @@
 # Added by https://github.com/KoljaWindeler
 
 from battery import Battery, Cell
-from utils import read_serial_data, get_connection_error_message, logger
+from utils import SOC_CALCULATION, read_serial_data, get_connection_error_message, logger
 from struct import unpack_from
 import sys
 
@@ -398,7 +398,8 @@ class Jkbms_pb(Battery):
         """
 
         # low capacity alarm
-        self.protection.low_soc = (byte_data & 0x00001000) * 2
+        if not SOC_CALCULATION:
+            self.protection.low_soc = (byte_data & 0x00001000) * 2
         # MOSFET temperature alarm
         self.protection.high_internal_temperature = (byte_data & 0x00000002) * 2
         # charge over voltage alarm

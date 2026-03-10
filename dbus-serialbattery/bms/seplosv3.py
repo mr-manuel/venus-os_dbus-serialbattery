@@ -11,7 +11,7 @@ from typing import Union
 import ext.minimalmodbus as minimalmodbus
 import serial
 from battery import Battery, Cell, Protection
-from utils import get_connection_error_message, logger, USE_BMS_DVCC_VALUES
+from utils import get_connection_error_message, logger, USE_BMS_DVCC_VALUES, SOC_CALCULATION
 
 RETRYCNT = 3
 
@@ -230,7 +230,8 @@ class Seplosv3(Battery):
             self.protection.low_voltage = 2 if sfa[0x06] == 0 else 1 if sfa[0x06] == 0 else 0
             self.protection.high_cell_voltage = 1 if sfa[0x00] == 0 else 0 + 1 if sfa[0x01] == 0 else 0
             self.protection.low_cell_voltage = 2 if sfa[0x03] == 0 else 1 if sfa[0x02] == 0 else 0
-            self.protection.low_soc = 2 if sfa[0x30] == 0 else 0
+            if not SOC_CALCULATION:
+                self.protection.low_soc = 2 if sfa[0x30] == 0 else 0
             self.protection.high_charge_current = 2 if sfa[0x21] == 0 else 1 if sfa[0x20] == 0 else 0
             self.protection.high_discharge_current = 2 if sfa[0x24] == 0 else 1 if sfa[0x23] == 0 else 0
             self.protection.internal_failure = 2 if (sfa[0x48] + sfa[0x49] + sfa[0x4A] + sfa[0x4B] + sfa[0x4D] + sfa[53]) < 5 else 0

@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from enum import Enum, IntFlag
 from struct import pack, Struct, error as StructError
 from typing import ClassVar, Dict, Optional, Type, TypeVar
-from utils import logger, read_serialport_data, AUTO_RESET_SOC, UP16S_REQUIRE_DIRECT_CONNECTION
+from utils import SOC_CALCULATION, logger, read_serialport_data, AUTO_RESET_SOC, UP16S_REQUIRE_DIRECT_CONNECTION
 import serial
 import time
 import termios
@@ -569,7 +569,8 @@ class LltJbd_Up16s(Battery):
         # Since there's no other suitable place, show temp_diff_fault and temp_diff_alarm as cell_imbalance. This is presumably better than hiding the alarm
         # completely.
         self.protection.cell_imbalance = self.from_raw_protection_value(voltage_diff_fault or temp_diff_fault, voltage_diff_alarm or temp_diff_alarm)
-        self.protection.low_soc = self.from_raw_protection_value(soc_too_low_fault, soc_too_low_alarm)
+        if not SOC_CALCULATION:
+            self.protection.low_soc = self.from_raw_protection_value(soc_too_low_fault, soc_too_low_alarm)
         self.protection.internal_failure = self.from_raw_protection_value(
             eep_fault_alarm
             or cell_offline

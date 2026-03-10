@@ -8,7 +8,7 @@
 
 
 from battery import Battery, Cell
-from utils import get_connection_error_message, logger
+from utils import SOC_CALCULATION, get_connection_error_message, logger
 import serial
 import time
 import ext.minimalmodbus as minimalmodbus
@@ -284,10 +284,11 @@ class HeltecModbus(Battery):
                     else:
                         self.protection.high_internal_temperature = 0
 
-                    if warnings & (1 << 14):  # SOC low
-                        self.protection.low_soc = 2
-                    else:
-                        self.protection.low_soc = 0
+                    if not SOC_CALCULATION:
+                        if warnings & (1 << 14):  # SOC low
+                            self.protection.low_soc = 2
+                        else:
+                            self.protection.low_soc = 0
 
                     if warnings & (0xFFFF0000):  # any other fault
                         self.protection.internal_failure = 2

@@ -21,6 +21,7 @@ from utils import (
     MIN_CELL_VOLTAGE,
     UBMS_CAN_MODULE_SERIES,
     UBMS_CAN_MODULE_PARALLEL,
+    SOC_CALCULATION,
     logger,
 )
 from time import time
@@ -187,7 +188,8 @@ class Ubms_Can(Battery):
     def to_protection_bits(self):
         self.protection.low_cell_voltage = (self.voltageAndCellTAlarms & 0x10) >> 3
         self.protection.high_cell_voltage = (self.voltageAndCellTAlarms & 0x20) >> 4
-        self.protection.low_soc = (self.voltageAndCellTAlarms & 0x08) >> 3
+        if not SOC_CALCULATION:
+            self.protection.low_soc = (self.voltageAndCellTAlarms & 0x08) >> 3
         self.protection.high_discharge_current = self.currentAndPcbTAlarms & 0x3
 
         # flag high cell temperature alarm and high pcb temperature alarm
@@ -216,7 +218,8 @@ class Ubms_Can(Battery):
         self.protection.low_temperature = 0
         self.protection.high_charge_temperature = 0
         self.protection.high_temperature = 0
-        self.protection.low_soc = 0
+        if not SOC_CALCULATION:
+            self.protection.low_soc = 0
         self.protection.internal_failure = 0
 
     def update_cell_voltages(self):

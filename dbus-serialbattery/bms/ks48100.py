@@ -12,7 +12,7 @@
 
 # avoid importing wildcards, remove unused imports
 from battery import Battery, Cell
-from utils import open_serial_port, get_connection_error_message, logger
+from utils import SOC_CALCULATION, open_serial_port, get_connection_error_message, logger
 from time import sleep
 from struct import unpack
 from re import findall
@@ -324,10 +324,11 @@ class KS48100(Battery):
                     self.protection.low_cell_voltage = 0
 
                 # check bit 7 for low_BAT_alarm from warningstatus
-                if warningstatus & (1 << 7):
-                    self.protection.low_soc = 2
-                else:
-                    self.protection.low_soc = 0
+                if not SOC_CALCULATION:
+                    if warningstatus & (1 << 7):
+                        self.protection.low_soc = 2
+                    else:
+                        self.protection.low_soc = 0
 
                 # check bit 2 for CHG_OC_PROT
                 if currentstatus & (1 << 2):

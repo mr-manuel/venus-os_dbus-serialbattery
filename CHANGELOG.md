@@ -39,6 +39,7 @@
 * Added: Venus OS 3.7x GUIv2 support by @mr-manuel
 * Changed: Added integer conversion for Daly Can BMS Set SOC GUI method by @lex2k0
 * Changed: Daren 485 BMS - Fixed charge/discharge calculation with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/343 by @kopierschnitte
+* Changed: Disabled BMS SOC alerts if `SOC_CALCULATION` is enabled. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/377 by @mr-manuel
 * Changed: Driver internals - Renamed callback variables/functions and added a better description by @mr-manuel
 * Changed: Exit behavior for excluded devices to behave like Victron services by @mr-manuel
 * Changed: Fix dbus connection leak which fixes problems on systems which multiple batteries with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/402 by @cgoudie

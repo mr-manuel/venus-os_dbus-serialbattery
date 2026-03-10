@@ -4,7 +4,7 @@
 # Added by https://github.com/KoljaWindeler
 
 from battery import Battery, Cell
-from utils import read_serial_data, logger
+from utils import SOC_CALCULATION, read_serial_data, logger
 import sys
 
 
@@ -134,7 +134,8 @@ class Pace(Battery):
             return False
         # ## reset all warnings ###
         # low capacity alarm
-        self.protection.low_soc = 0  # not available at pace
+        if not SOC_CALCULATION:
+            self.protection.low_soc = 0  # not available at pace
         # pack over voltage alarm [done]
         self.protection.high_voltage = 0
         # over current alarm [done]

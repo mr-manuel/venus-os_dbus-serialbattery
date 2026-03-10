@@ -11,6 +11,7 @@ from utils import (
     read_serial_data,
     logger,
     ZERO_CHAR,
+    SOC_CALCULATION,
     SOC_LOW_ALARM,
     SOC_LOW_WARNING,
 )
@@ -476,7 +477,8 @@ class LltJbd(Battery):
         self.protection.high_discharge_current = 1 if is_bit_set(tmp[3]) else 0
 
         # Software implementations for low soc
-        self.protection.low_soc = 2 if self.soc < SOC_LOW_ALARM else 1 if self.soc < SOC_LOW_WARNING else 0
+        if not SOC_CALCULATION:
+            self.protection.low_soc = 2 if self.soc < SOC_LOW_ALARM else 1 if self.soc < SOC_LOW_WARNING else 0
 
         # extra protection flags for LltJbd
         self.protection.set_voltage_cell_low = is_bit_set(tmp[11])

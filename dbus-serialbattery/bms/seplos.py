@@ -5,7 +5,7 @@
 # https://github.com/Louisvdw/dbus-serialbattery/pull/530
 
 from battery import Protection, Battery, Cell
-from utils import get_connection_error_message, logger
+from utils import SOC_CALCULATION, get_connection_error_message, logger
 import serial
 import sys
 
@@ -213,8 +213,9 @@ class Seplos(Battery):
         self.protection.high_charge_current = Seplos.decode_alarm_byte(data_byte=current_alarm_byte, alarm_bit=1, warn_bit=0)
         self.protection.high_discharge_current = Seplos.decode_alarm_byte(data_byte=current_alarm_byte, alarm_bit=3, warn_bit=2)
 
-        soc_alarm_byte = data[34]
-        self.protection.low_soc = Seplos.decode_alarm_byte(data_byte=soc_alarm_byte, alarm_bit=3, warn_bit=2)
+        if not SOC_CALCULATION:
+            soc_alarm_byte = data[34]
+            self.protection.low_soc = Seplos.decode_alarm_byte(data_byte=soc_alarm_byte, alarm_bit=3, warn_bit=2)
 
         switch_byte = data[35]
         self.discharge_fet = True if switch_byte & 0b01 != 0 else False

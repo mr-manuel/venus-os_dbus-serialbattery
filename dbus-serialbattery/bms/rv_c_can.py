@@ -5,7 +5,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 from battery import Battery, Cell
-from utils import generate_unique_identifier, logger
+from utils import SOC_CALCULATION, generate_unique_identifier, logger
 from struct import unpack_from
 from time import sleep, time
 import sys
@@ -109,7 +109,8 @@ class RV_C_Can(Battery):
         # Low volts D2 bit 5
         self.protection.low_voltage = 2 if int(tmp[12:13]) > 0 else 0
         # Low SOC D3 bit 1
-        self.protection.low_soc = 2 if int(tmp[24:25]) > 0 else 0
+        if not SOC_CALCULATION:
+            self.protection.low_soc = 2 if int(tmp[24:25]) > 0 else 0
         # LowTemp D3 bit 5
         self.protection.low_temperature = 2 if int(tmp[20:21]) > 0 else 0
         # OverTemp D4 bit 1
@@ -134,7 +135,8 @@ class RV_C_Can(Battery):
         self.protection.low_temperature = 0
         self.protection.high_charge_temperature = 0
         self.protection.high_temperature = 0
-        self.protection.low_soc = 0
+        if not SOC_CALCULATION:
+            self.protection.low_soc = 0
         self.protection.internal_failure = 0
         self.protection.internal_failure = 0
         self.protection.internal_failure = 0

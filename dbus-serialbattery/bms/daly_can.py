@@ -10,6 +10,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from battery import Battery, Cell
 from utils import (
     BATTERY_CAPACITY,
+    SOC_CALCULATION,
     get_connection_error_message,
     generate_unique_identifier,
     INVERT_CURRENT_MEASUREMENT,
@@ -446,14 +447,15 @@ class Daly_Can(Battery):
                     else:
                         self.protection.high_charge_current = 0
 
-                    if al_crnt_soc & 128:
-                        # Low SoC - Alarm
-                        self.protection.low_soc = 2
-                    elif al_crnt_soc & 64:
-                        # Low SoC Warning level - Pre-alarm
-                        self.protection.low_soc = 1
-                    else:
-                        self.protection.low_soc = 0
+                    if not SOC_CALCULATION:
+                        if al_crnt_soc & 128:
+                            # Low SoC - Alarm
+                            self.protection.low_soc = 2
+                        elif al_crnt_soc & 64:
+                            # Low SoC Warning level - Pre-alarm
+                            self.protection.low_soc = 1
+                        else:
+                            self.protection.low_soc = 0
 
             self.hardware_version = "Daly CAN " + str(self.cell_count) + "S"
 
