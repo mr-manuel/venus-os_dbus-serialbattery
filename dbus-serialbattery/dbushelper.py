@@ -65,21 +65,26 @@ class SessionBus(dbus.bus.BusConnection):
         return dbus.bus.BusConnection.__new__(cls, dbus.bus.BusConnection.TYPE_SESSION)
 
 
-# Cached bus connection shared by all call sites in this process.
+# Cached bus connection shared by dbus service call sites in this process.
 #
 # BusConnection objects created with DBusGMainLoop as the default main loop
 # are pinned in memory by C-level GLib watch/timeout references that Python's
 # GC cannot reach.  Without caching, every get_bus() call leaks a connection
 # to the D-Bus daemon, eventually exhausting the per-UID connection limit.
-_bus_instance = None
+_bus_instances = {}
 
 
-def get_bus() -> dbus.bus.BusConnection:
-    """Return the shared bus connection, creating it on first use."""
-    global _bus_instance
-    if _bus_instance is None or not _bus_instance.get_is_connected():
-        _bus_instance = SessionBus() if "DBUS_SESSION_BUS_ADDRESS" in os.environ else SystemBus()
-    return _bus_instance
+def get_bus(dbus_name) -> dbus.bus.BusConnection:
+    """Return a shared bus connection for the given service name, creating it if needed.
+
+    Note: VeDbusService registers D-Bus object paths (such as '/') and requires a unique bus connection per service instance.
+    If multiple VeDbusService objects share the same connection, they will conflict when registering the same object path.
+    By using the service name as the key, each service gets its own dedicated connection, allowing multiple services to run
+    in the same process without interfering with each other's D-Bus registrations.
+    """
+    if dbus_name not in _bus_instances or not _bus_instances[dbus_name].get_is_connected():
+        _bus_instances[dbus_name] = SessionBus() if "DBUS_SESSION_BUS_ADDRESS" in os.environ else SystemBus()
+    return _bus_instances[dbus_name]
 
 
 class DbusHelper:
@@ -102,7 +107,7 @@ class DbusHelper:
             + self.battery.port[self.battery.port.rfind("/") + 1 :]
             + ("__" + str(bms_address) if bms_address is not None and bms_address != 0 else "")
         )
-        self._dbusservice = _CachedDbusProxy(VeDbusService(self._dbusname, get_bus(), register=False))
+        self._dbusservice = _CachedDbusProxy(VeDbusService(self._dbusname, get_bus(self._dbusname), register=False))
         self.bms_id: str = (
             "".join(
                 # remove all non alphanumeric characters except underscore from the identifier
@@ -232,12 +237,12 @@ class DbusHelper:
         self.path_battery = "/Settings/Devices/serialbattery" + "_" + str(self.bms_id).upper()
 
         # prepare settings class
-        self.settings = SettingsDevice(get_bus(), self.EMPTY_DICT, self.handle_changed_setting)
+        self.settings = SettingsDevice(get_bus("com.victronenergy.settings"), self.EMPTY_DICT, self.handle_changed_setting)
         logger.debug("setup_instance(): SettingsDevice")
 
         # get all the settings from the dbus
         settings_from_dbus = self.get_settings_with_values(
-            get_bus(),
+            get_bus("com.victronenergy.settings"),
             "com.victronenergy.settings",
             "/Settings/Devices",
         )
@@ -372,7 +377,7 @@ class DbusHelper:
                     elif "LastSeen" in value and int(value["LastSeen"]) < int(time()) - (60 * 60 * 24 * 30):
                         # remove entry
                         del_return = self.remove_settings(
-                            get_bus(),
+                            get_bus("com.victronenergy.settings"),
                             "com.victronenergy.settings",
                             "/Settings/Devices/" + key,
                             [
@@ -392,7 +397,7 @@ class DbusHelper:
                     # check if the battery has a last seen time, if not then it's an old entry and can be removed
                     elif "LastSeen" not in value:
                         del_return = self.remove_settings(
-                            get_bus(),
+                            get_bus("com.victronenergy.settings"),
                             "com.victronenergy.settings",
                             "/Settings/Devices/" + key,
                             ["ClassAndVrmInstance"],
@@ -403,7 +408,7 @@ class DbusHelper:
                     # check if Ruuvi tag is enabled, if not remove entry.
                     if "Enabled" in value and value["Enabled"] == "0" and "ClassAndVrmInstance" not in value:
                         del_return = self.remove_settings(
-                            get_bus(),
+                            get_bus("com.victronenergy.settings"),
                             "com.victronenergy.settings",
                             "/Settings/Devices/" + key,
                             ["CustomName", "Enabled", "TemperatureType"],
@@ -481,7 +486,7 @@ class DbusHelper:
         # update last seen
         if found_bms:
             self.set_settings(
-                get_bus(),
+                get_bus("com.victronenergy.settings"),
                 "com.victronenergy.settings",
                 self.path_battery,
                 "LastSeen",
@@ -875,12 +880,12 @@ class DbusHelper:
                 utils.EXTERNAL_SENSOR_DBUS_PATH_CURRENT is not None or utils.EXTERNAL_SENSOR_DBUS_PATH_SOC is not None
             ):
                 # Check if external sensor was and is still connected
-                if self.battery.dbus_external_objects is not None and utils.EXTERNAL_SENSOR_DBUS_DEVICE not in get_bus().list_names():
+                if self.battery.dbus_external_objects is not None and utils.EXTERNAL_SENSOR_DBUS_DEVICE not in get_bus(self._dbusname).list_names():
                     logger.error("External current sensor was disconnected, falling back to internal sensor")
                     self.battery.dbus_external_objects = None
 
                 # Check if external current sensor was not connected and is now connected
-                elif self.battery.dbus_external_objects is None and utils.EXTERNAL_SENSOR_DBUS_DEVICE in get_bus().list_names():
+                elif self.battery.dbus_external_objects is None and utils.EXTERNAL_SENSOR_DBUS_DEVICE in get_bus(self._dbusname).list_names():
                     logger.info("External current sensor was connected, switching to external sensor")
                     self.battery.setup_external_sensor()
 
@@ -1250,12 +1255,12 @@ class DbusHelper:
 
                     # Get settings from dbus
                     settings_battery_life = self.get_settings_with_values(
-                        get_bus(),
+                        get_bus("com.victronenergy.settings"),
                         "com.victronenergy.settings",
                         "/Settings/CGwacs/BatteryLife",
                     )
                     settings_hub4mode = self.get_settings_with_values(
-                        get_bus(),
+                        get_bus("com.victronenergy.settings"),
                         "com.victronenergy.settings",
                         "/Settings/CGwacs/Hub4Mode",
                     )
@@ -1546,7 +1551,7 @@ class DbusHelper:
         :return: The custom name if the operation was successful, otherwise None.
         """
         result = self.set_settings(
-            get_bus(),
+            get_bus("com.victronenergy.settings"),
             "com.victronenergy.settings",
             self.path_battery,
             "CustomName",
@@ -1604,7 +1609,7 @@ class DbusHelper:
 
         if self.battery.allow_max_voltage != self.save_charge_details_last["allow_max_voltage"]:
             result = result + self.set_settings(
-                get_bus(),
+                get_bus("com.victronenergy.settings"),
                 "com.victronenergy.settings",
                 self.path_battery,
                 "AllowMaxVoltage",
@@ -1615,7 +1620,7 @@ class DbusHelper:
 
         if self.battery.max_voltage_start_time != self.save_charge_details_last["max_voltage_start_time"]:
             result = result and self.set_settings(
-                get_bus(),
+                get_bus("com.victronenergy.settings"),
                 "com.victronenergy.settings",
                 self.path_battery,
                 "MaxVoltageStartTime",
@@ -1629,7 +1634,7 @@ class DbusHelper:
 
         if self.battery.soc_calc != self.save_charge_details_last["soc_calc"]:
             result = result and self.set_settings(
-                get_bus(),
+                get_bus("com.victronenergy.settings"),
                 "com.victronenergy.settings",
                 self.path_battery,
                 "SocCalc",
@@ -1640,7 +1645,7 @@ class DbusHelper:
 
         if self.battery.soc_reset_last_reached != self.save_charge_details_last["soc_reset_last_reached"]:
             result = result and self.set_settings(
-                get_bus(),
+                get_bus("com.victronenergy.settings"),
                 "com.victronenergy.settings",
                 self.path_battery,
                 "SocResetLastReached",
@@ -1667,7 +1672,7 @@ class DbusHelper:
         history_values = json.dumps(history_values_dict)
         if history_values != self.save_charge_details_last["history_values"]:
             result = result and self.set_settings(
-                get_bus(),
+                get_bus("com.victronenergy.settings"),
                 "com.victronenergy.settings",
                 self.path_battery,
                 "HistoryValues",
