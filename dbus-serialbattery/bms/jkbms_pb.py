@@ -313,6 +313,8 @@ class Jkbms_pb(Battery):
         discharge = unpack_from("<B", status_data, 199)[0]
         heat = unpack_from("<B", status_data, 215)[0]
 
+        logger.info("bal: " + str(bal) + " charge: " + str(charge) + " discharge: " + str(discharge) + " heat: " + str(heat))
+
         self.charge_fet = 1 if charge != 0 else 0
         self.discharge_fet = 1 if discharge != 0 else 0
         self.balancing = 1 if bal != 0 else 0
@@ -399,28 +401,28 @@ class Jkbms_pb(Battery):
 
         # low capacity alarm
         if not SOC_CALCULATION:
-            self.protection.low_soc = (byte_data & 0x00001000) * 2
+            self.protection.low_soc = 2 if (byte_data & 0x00001000) else 0
         # MOSFET temperature alarm
-        self.protection.high_internal_temperature = (byte_data & 0x00000002) * 2
+        self.protection.high_internal_temperature = 2 if (byte_data & 0x00000002) else 0
         # charge over voltage alarm
-        self.protection.high_voltage = (byte_data & 0x00000020) * 2
+        self.protection.high_voltage = 2 if (byte_data & 0x00000020) else 0
         # discharge under voltage alarm
-        self.protection.low_voltage = (byte_data & 0x00000800) * 2
+        self.protection.low_voltage = 2 if (byte_data & 0x00000800) else 0
         # charge overcurrent alarm
-        self.protection.high_charge_current = (byte_data & 0x00000040) * 2
+        self.protection.high_charge_current = 2 if (byte_data & 0x00000040) else 0
         # discharge over current alarm
-        self.protection.high_discharge_current = (byte_data & 0x00002000) * 2
+        self.protection.high_discharge_current = 2 if (byte_data & 0x00002000) else 0
         # core differential pressure alarm OR unit overvoltage alarm
         self.protection.cell_imbalance = 0
         # cell overvoltage alarm
-        self.protection.high_cell_voltage = (byte_data & 0x00000010) * 2
+        self.protection.high_cell_voltage = 2 if (byte_data & 0x00000010) else 0
         # cell undervoltage alarm
-        self.protection.low_cell_voltage = (byte_data & 0x00001000) * 2
+        self.protection.low_cell_voltage = 2 if (byte_data & 0x00001000) else 0
         # battery overtemperature alarm OR overtemperature alarm in the battery box
-        self.protection.high_charge_temperature = (byte_data & 0x00000100) * 2
-        self.protection.low_charge_temperature = (byte_data & 0x00000200) * 2
+        self.protection.high_charge_temperature = 2 if (byte_data & 0x00000100) else 0
+        self.protection.low_charge_temperature = 2 if (byte_data & 0x00000200) else 0
         # check if low/high temp alarm arise during discharging
-        self.protection.high_temperature = (byte_data & 0x00008000) * 2
+        self.protection.high_temperature = 2 if (byte_data & 0x00008000) else 0
         self.protection.low_temperature = 0
 
     def read_serial_data_jkbms_pb(self, command: str, length: int) -> bool:
