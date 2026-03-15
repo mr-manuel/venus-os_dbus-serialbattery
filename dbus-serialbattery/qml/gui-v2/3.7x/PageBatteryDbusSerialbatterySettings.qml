@@ -9,8 +9,8 @@ import Victron.VenusOS
 Page {
 	id: root
 
-	//% "dbus-serialbattery - Settings"
-	title: qsTrId("dbus_serialbattery_settings_title")
+	// "dbus-serialbattery - Settings"
+	title: "dbus-serialbattery - Settings"
 
 	property string bindPrefix
 
@@ -23,8 +23,8 @@ Page {
 		model: VisibleItemModel {
 
 			SettingsListHeader {
-				//% "IO"
-				text: qsTrId("dbus_serialbattery_settings_io")
+				// "IO"
+				text: "IO"
 			}
 
 			ListText {
@@ -42,58 +42,58 @@ Page {
 			}
 
 			ListText {
-				//% "Allow to balance"
-				text: qsTrId("dbus_serialbattery_settings_allow_to_balance")
+				// "Allow to balance"
+				text: "Allow to balance"
 				dataItem.uid: root.bindPrefix + "/Io/AllowToBalance"
 				preferredVisible: dataItem.valid
 				secondaryText: CommonWords.yesOrNo(dataItem.value)
 			}
 
 			ListText {
-				//% "Allow to heat"
-				text: qsTrId("dbus_serialbattery_settings_allow_to_heat")
+				// "Allow to heat"
+				text: "Allow to heat"
 				dataItem.uid: root.bindPrefix + "/Io/AllowToHeat"
 				preferredVisible: dataItem.valid
 				secondaryText: CommonWords.yesOrNo(dataItem.value)
 			}
 
 			SettingsListHeader {
-				//% "Settings"
-				text: qsTrId("dbus_serialbattery_settings_settings")
+				// "Settings"
+				text: "Settings"
 				preferredVisible: hasSettingsItem.valid && hasSettingsItem.value === 1
 			}
 
 			ListSwitch {
-				//% "Force charging off"
-				text: qsTrId("dbus_serialbattery_settings_force_charging_off")
+				// "Force charging off"
+				text: "Force charging off"
 				dataItem.uid: root.bindPrefix + "/Settings/ForceChargingOff"
 				preferredVisible: dataItem.valid
 			}
 
 			ListSwitch {
-				//% "Force discharging off"
-				text: qsTrId("dbus_serialbattery_settings_force_discharging_off")
+				// "Force discharging off"
+				text: "Force discharging off"
 				dataItem.uid: root.bindPrefix + "/Settings/ForceDischargingOff"
 				preferredVisible: dataItem.valid
 			}
 
 			ListSwitch {
-				//% "Turn balancing off"
-				text: qsTrId("dbus_serialbattery_settings_turn_balancing_off")
+				// "Turn balancing off"
+				text: "Turn balancing off"
 				dataItem.uid: root.bindPrefix + "/Settings/TurnBalancingOff"
 				preferredVisible: dataItem.valid
 			}
 
 			ListSwitch {
-				//% "Turn heating off"
-				text: qsTrId("dbus_serialbattery_settings_turn_heating_off")
+				// "Turn heating off"
+				text: "Turn heating off"
 				dataItem.uid: root.bindPrefix + "/Settings/TurnHeatingOff"
 				preferredVisible: dataItem.valid
 			}
 
 			ListButton {
-				//% "Reset SoC to"
-				text: qsTrId("dbus_serialbattery_settings_reset_soc_to")
+				// "Reset SoC to"
+				text: "Reset SoC to"
 				secondaryText: Units.getCombinedDisplayText(VenusOS.Units_Percentage, resetSocToItem.value)
 				preferredVisible: resetSocToItem.valid
 				onClicked: Global.dialogLayer.open(resetSocToDialogComponent)
@@ -105,8 +105,8 @@ Page {
 
 						property int resetSocTo: resetSocToItem.value
 
-						//% "Reset SoC to"
-						title: qsTrId("dbus_serialbattery_settings_reset_soc_to")
+						// "Reset SoC to"
+						title: "Reset SoC to"
 
 						onAccepted: {
 							resetSocToItem.setValue(resetSocTo)

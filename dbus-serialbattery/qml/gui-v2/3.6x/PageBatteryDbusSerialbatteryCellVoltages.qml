@@ -9,8 +9,8 @@ import Victron.VenusOS
 Page {
 	id: root
 
-	//% "dbus-serialbattery - Cell Voltages"
-	title: qsTrId("dbus_serialbattery_cell_voltages_title")
+	// "dbus-serialbattery - Cell Voltages"
+	title: "dbus-serialbattery - Cell Voltages"
 
 	property string bindPrefix
 
@@ -117,8 +117,8 @@ Page {
 
 			ListItem {
 				id: cellOverviewItem
-				//% "Overview"
-				text: qsTrId("dbus_serialbattery_cell_voltages_overview")
+				// "Overview"
+				text: "Overview"
 				content.children: [
 					Row {
 						id: contentRowOverview
@@ -142,8 +142,8 @@ Page {
 							Label {
 								width: parent.width
 								horizontalAlignment: Text.AlignHCenter
-								//% "Sum"
-								text: qsTrId("dbus_serialbattery_cell_voltages_sum")
+								// "Sum"
+								text: "Sum"
 								color: Theme.color_font_secondary
 								font.pixelSize: Theme.font_size_caption
 							}
@@ -162,8 +162,8 @@ Page {
 							Label {
 								width: parent.width
 								horizontalAlignment: Text.AlignHCenter
-								//% "Mean"
-								text: "Ø " + qsTrId("dbus_serialbattery_cell_voltages_mean")
+								// "Mean"
+								text: "Ø " + "Mean"
 								color: Theme.color_font_secondary
 								font.pixelSize: Theme.font_size_caption
 							}
@@ -182,8 +182,8 @@ Page {
 							Label {
 								width: parent.width
 								horizontalAlignment: Text.AlignHCenter
-								//% "Min"
-								text: qsTrId("dbus_serialbattery_cell_voltages_min")
+								// "Min"
+								text: "Min"
 								color: Theme.color_font_secondary
 								font.pixelSize: Theme.font_size_caption
 							}
@@ -202,8 +202,8 @@ Page {
 							Label {
 								width: parent.width
 								horizontalAlignment: Text.AlignHCenter
-								//% "Max"
-								text: qsTrId("dbus_serialbattery_cell_voltages_max")
+								// "Max"
+								text: "Max"
 								color: Theme.color_font_secondary
 								font.pixelSize: Theme.font_size_caption
 							}
@@ -222,8 +222,8 @@ Page {
 							Label {
 								width: parent.width
 								horizontalAlignment: Text.AlignHCenter
-								//% "Diff"
-								text: qsTrId("dbus_serialbattery_cell_voltages_diff")
+								// "Diff"
+								text: "Diff"
 								color: Theme.color_font_secondary
 								font.pixelSize: Theme.font_size_caption
 							}
@@ -244,8 +244,8 @@ Page {
 
 						property int outerIndex: model.index
 
-						//% "Cells %1-%2"
-						text: qsTrId("dbus_serialbattery_cell_voltages_cells").arg(model.index * 4 + 1).arg(model.index * 4 + 4)
+						// "Cells %1-%2"
+						text: "Cells %1-%2".arg(model.index * 4 + 1).arg(model.index * 4 + 4)
 						preferredVisible: (
 							root.cellVoltageItems[outerIndex * 4 + 0] && root.cellVoltageItems[outerIndex * 4 + 0].valid
 						) || (

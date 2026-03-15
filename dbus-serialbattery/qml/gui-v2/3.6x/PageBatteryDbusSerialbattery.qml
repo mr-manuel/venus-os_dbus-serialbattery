@@ -9,8 +9,8 @@ import Victron.VenusOS
 Page {
 	id: root
 
-	//% "dbus-serialbattery - General"
-	title: qsTrId("dbus_serialbattery_general_title")
+	// "dbus-serialbattery - General"
+	title: "dbus-serialbattery - General"
 
 	property string bindPrefix
 
@@ -374,8 +374,8 @@ Page {
 								width: parent.width
 								horizontalAlignment: Text.AlignHCenter
 								//: Label of the current average in amps
-								//% "Current avg"
-								text: qsTrId("dbus_serialbattery_general_current_avg")
+								// "Current avg"
+								text: "Current avg"
 								color: Theme.color_font_secondary
 								font.pixelSize: Theme.font_size_caption
 							}
@@ -418,8 +418,8 @@ Page {
 							Label {
 								width: parent.width
 								horizontalAlignment: Text.AlignHCenter
-								//% "Cell max"
-								text: qsTrId("dbus_serialbattery_general_cell_max")
+								// "Cell max"
+								text: "Cell max"
 								color: Theme.color_font_secondary
 								font.pixelSize: Theme.font_size_caption
 							}
@@ -441,8 +441,8 @@ Page {
 							Label {
 								width: parent.width
 								horizontalAlignment: Text.AlignHCenter
-								//% "Cell min"
-								text: qsTrId("dbus_serialbattery_general_cell_min")
+								// "Cell min"
+								text: "Cell min"
 								color: Theme.color_font_secondary
 								font.pixelSize: Theme.font_size_caption
 							}
@@ -464,8 +464,8 @@ Page {
 							Label {
 								width: parent.width
 								horizontalAlignment: Text.AlignHCenter
-								//% "SoC"
-								text: qsTrId("dbus_serialbattery_general_soc")
+								// "SoC"
+								text: "SoC"
 								color: Theme.color_font_secondary
 								font.pixelSize: Theme.font_size_caption
 							}
@@ -476,8 +476,8 @@ Page {
 
 			ListItem {
 				id: temperaturesOverviewItem
-				//% "Temperatures"
-				text: qsTrId("dbus_serialbattery_general_temperatures")
+				// "Temperatures"
+				text: "Temperatures"
 				content.children: [
 					Row {
 						id: temperaturesContentRowOverview
@@ -527,8 +527,8 @@ Page {
 							Label {
 								width: parent.width
 								horizontalAlignment: Text.AlignHCenter
-								//% "MOSFET"
-								text: qsTrId("dbus_serialbattery_general_mosfet")
+								// "MOSFET"
+								text: "MOSFET"
 								color: Theme.color_font_secondary
 								font.pixelSize: Theme.font_size_caption
 							}
@@ -548,8 +548,8 @@ Page {
 							Label {
 								width: parent.width
 								horizontalAlignment: Text.AlignHCenter
-								//% "Temp 1"
-								text: temperature1NameItem.value ?? qsTrId("dbus_serialbattery_general_temp1")
+								// "Temp 1"
+								text: temperature1NameItem.value ?? "Temp 1"
 								color: Theme.color_font_secondary
 								font.pixelSize: Theme.font_size_caption
 							}
@@ -569,8 +569,8 @@ Page {
 							Label {
 								width: parent.width
 								horizontalAlignment: Text.AlignHCenter
-								//% "Temp 2"
-								text: temperature2NameItem.value ?? qsTrId("dbus_serialbattery_general_temp2")
+								// "Temp 2"
+								text: temperature2NameItem.value ?? "Temp 2"
 								color: Theme.color_font_secondary
 								font.pixelSize: Theme.font_size_caption
 							}
@@ -590,8 +590,8 @@ Page {
 							Label {
 								width: parent.width
 								horizontalAlignment: Text.AlignHCenter
-								//% "Temp 3"
-								text: temperature3NameItem.value ?? qsTrId("dbus_serialbattery_general_temp3")
+								// "Temp 3"
+								text: temperature3NameItem.value ?? "Temp 3"
 								color: Theme.color_font_secondary
 								font.pixelSize: Theme.font_size_caption
 							}
@@ -611,8 +611,8 @@ Page {
 							Label {
 								width: parent.width
 								horizontalAlignment: Text.AlignHCenter
-								//% "Temp 4"
-								text: temperature4NameItem.value ?? qsTrId("dbus_serialbattery_general_temp4")
+								// "Temp 4"
+								text: temperature4NameItem.value ?? "Temp 4"
 								color: Theme.color_font_secondary
 								font.pixelSize: Theme.font_size_caption
 							}
@@ -622,8 +622,8 @@ Page {
 			}
 
 			ListText {
-				//% "Charge Mode"
-				text: qsTrId("dbus_serialbattery_general_charge_mode")
+				// "Charge Mode"
+				text: "Charge Mode"
 				secondaryText: chargeModeItem.valid ? chargeModeItem.value : "--"
 				preferredVisible: chargeModeItem.valid
 			}
@@ -640,8 +640,8 @@ Page {
 
 				QtObject {
 					id: customDataObject
-					//% "V/cell"
-					property string name: maxChargeCellVoltageItem.valid ? maxChargeCellVoltageItem.value.toFixed(3) + qsTrId("serialbattery_general_volt_per_cell") : "--"
+					// "V/cell"
+					property string name: maxChargeCellVoltageItem.valid ? maxChargeCellVoltageItem.value.toFixed(3) + "V/cell" : "--"
 				}
 			}
 
@@ -694,8 +694,8 @@ Page {
 
 			ListItem {
 				id: allowToOverviewItem
-				//% "Allow to"
-				text: qsTrId("dbus_serialbattery_general_allow_to")
+				// "Allow to"
+				text: "Allow to"
 				preferredVisible: allowToChargeItem.valid || allowToDischargeItem.valid || allowToBalanceItem.valid
 				content.children: [
 					Row {
@@ -720,8 +720,8 @@ Page {
 								width: parent.width
 								horizontalAlignment: Text.AlignHCenter
 								//: Allow to ...
-								//% "Charge"
-								text: qsTrId("dbus_serialbattery_general_charge")
+								// "Charge"
+								text: "Charge"
 								color: Theme.color_font_secondary
 								font.pixelSize: Theme.font_size_caption
 							}
@@ -740,8 +740,8 @@ Page {
 								width: parent.width
 								horizontalAlignment: Text.AlignHCenter
 								//: Allow to ...
-								//% "Discharge"
-								text: qsTrId("dbus_serialbattery_general_discharge")
+								// "Discharge"
+								text: "Discharge"
 								color: Theme.color_font_secondary
 								font.pixelSize: Theme.font_size_caption
 							}
@@ -760,8 +760,8 @@ Page {
 								width: parent.width
 								horizontalAlignment: Text.AlignHCenter
 								//: Allow to ...
-								//% "Balance"
-								text: qsTrId("dbus_serialbattery_general_balance")
+								// "Balance"
+								text: "Balance"
 								color: Theme.color_font_secondary
 								font.pixelSize: Theme.font_size_caption
 							}
@@ -781,8 +781,8 @@ Page {
 								width: parent.width
 								horizontalAlignment: Text.AlignHCenter
 								//: Allow to ...
-								//% "Heat"
-								text: qsTrId("dbus_serialbattery_general_heat")
+								// "Heat"
+								text: "Heat"
 								color: Theme.color_font_secondary
 								font.pixelSize: Theme.font_size_caption
 							}
@@ -793,8 +793,8 @@ Page {
 
 			ListItem {
 				id: heaterOverviewItem
-				//% "Heater"
-				text: qsTrId("dbus_serialbattery_general_heater")
+				// "Heater"
+				text: "Heater"
 				preferredVisible: heatingItem.valid || heatingCurrentItem.valid || heatingPowerItem.valid || heatingTemperatureStartItem.valid || heatingTemperatureStopItem.valid
 				content.children: [
 					Row {
@@ -813,10 +813,10 @@ Page {
 								horizontalAlignment: Text.AlignHCenter
 								text: heatingItem.valid ? (
 									heatingItem.value === 1
-									//% "Running"
-									? qsTrId("dbus_serialbattery_general_heater_running")
-									//% "Stopped"
-									: qsTrId("dbus_serialbattery_general_heater_stopped")
+									// "Running"
+									? "Running"
+									// "Stopped"
+									: "Stopped"
 									) : "--"
 								color: Theme.color_font_primary
 								font.pixelSize: 22
@@ -904,8 +904,8 @@ Page {
 								width: parent.width
 								horizontalAlignment: Text.AlignHCenter
 								//: Temperature at which the heater starts
-								//% "Temp start"
-								text: qsTrId("dbus_serialbattery_general_temp_start")
+								// "Temp start"
+								text: "Temp start"
 								color: Theme.color_font_secondary
 								font.pixelSize: Theme.font_size_caption
 							}
@@ -931,8 +931,8 @@ Page {
 								width: parent.width
 								horizontalAlignment: Text.AlignHCenter
 								//: Temperature at which the heater stops
-								//% "Temp stop"
-								text: qsTrId("dbus_serialbattery_general_temp_stop")
+								// "Temp stop"
+								text: "Temp stop"
 								color: Theme.color_font_secondary
 								font.pixelSize: Theme.font_size_caption
 							}
@@ -955,53 +955,53 @@ Page {
 			}
 
 			SettingsListHeader {
-				//% "Support"
-				text: qsTrId("dbus_serialbattery_general_support")
+				// "Support"
+				text: "Support"
 				// show only for mr-manuel/dbus-serialbattery (productId registered at Victron)
 				preferredVisible: productId.value === 0xBA77
 			}
 
 			ListLink {
-				//% "How to troubleshoot"
-				text: qsTrId("dbus_serialbattery_general_how_to_troubleshoot")
+				// "How to troubleshoot"
+				text: "How to troubleshoot"
 				url: "https://mr-manuel.github.io/venus-os_dbus-serialbattery_docs/troubleshoot/"
 				// show only for mr-manuel/dbus-serialbattery (productId registered at Victron)
 				preferredVisible: productId.value === 0xBA77
 			}
 
 			ListLink {
-				//% "FAQ (Frequently Asked Questions)"
-				text: qsTrId("dbus_serialbattery_general_faq")
+				// "FAQ (Frequently Asked Questions)"
+				text: "FAQ (Frequently Asked Questions)"
 				url: "https://mr-manuel.github.io/venus-os_dbus-serialbattery_docs/faq/"
 				// show only for mr-manuel/dbus-serialbattery (productId registered at Victron)
 				preferredVisible: productId.value === 0xBA77
 			}
 
 			ListLink {
-				//% "GitHub"
-				text: qsTrId("dbus_serialbattery_general_github")
+				// "GitHub"
+				text: "GitHub"
 				url: "https://github.com/mr-manuel/venus-os_dbus-serialbattery/"
 				// show only for mr-manuel/dbus-serialbattery (productId registered at Victron)
 				preferredVisible: productId.value === 0xBA77
 			}
 
 			ListLink {
-				//% "Donate to help this project, any amount is appreciated"
-				text: qsTrId("dbus_serialbattery_general_donate")
+				// "Donate to help this project, any amount is appreciated"
+				text: "Donate to help this project, any amount is appreciated"
 				url: "https://www.paypal.com/donate/?hosted_button_id=3NEVZBDM5KABW"
 				// show only for mr-manuel/dbus-serialbattery (productId registered at Victron)
 				preferredVisible: productId.value === 0xBA77
 			}
 
 			SettingsListHeader {
-				//% "Driver Debug Data"
-				text: qsTrId("dbus_serialbattery_general_driver_debug_data")
+				// "Driver Debug Data"
+				text: "Driver Debug Data"
 				preferredVisible: chargeModeDebug.valid && chargeModeDebug.value !== ""
 			}
 
 			ListItem {
-				//% "General Values"
-				text: qsTrId("dbus_serialbattery_general_values")
+				// "General Values"
+				text: "General Values"
 
 				bottomContentChildren: [
 					PrimaryListLabel {
@@ -1022,8 +1022,8 @@ Page {
 			}
 
 			ListItem {
-				//% "Switch to Float Requirements"
-				text: qsTrId("dbus_serialbattery_general_switch_to_float_requirements")
+				// "Switch to Float Requirements"
+				text: "Switch to Float Requirements"
 
 				bottomContentChildren: [
 					PrimaryListLabel {
@@ -1044,8 +1044,8 @@ Page {
 			}
 
 			ListItem {
-				//% "Switch to Bulk Requirements"
-				text: qsTrId("dbus_serialbattery_general_switch_to_bulk_requirements")
+				// "Switch to Bulk Requirements"
+				text: "Switch to Bulk Requirements"
 
 				bottomContentChildren: [
 					PrimaryListLabel {
