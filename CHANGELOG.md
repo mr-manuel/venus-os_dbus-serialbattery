@@ -38,6 +38,7 @@
 * Added: Set SOC manually via GUI if SOC_CALCULATION is enabled by @mr-manuel
 * Added: Venus OS 3.7x GUIv2 support by @mr-manuel
 * Changed: Added integer conversion for Daly Can BMS Set SOC GUI method by @lex2k0
+* Changed: Daly BMS & Daly CAN BMS: Fix high charge/discharge current alarm. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/378 by @mr-manuel
 * Changed: Daren 485 BMS - Fixed charge/discharge calculation with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/343 by @kopierschnitte
 * Changed: Disabled BMS SOC alerts if `SOC_CALCULATION` is enabled. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/377 by @mr-manuel
 * Changed: Driver internals - Renamed callback variables/functions and added a better description by @mr-manuel

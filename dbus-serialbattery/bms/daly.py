@@ -335,32 +335,23 @@ class Daly(Battery):
         else:
             self.protection.low_temperature = 0
 
-        # if al_crnt_soc & 2:
-        #    # High charge current - Alarm
-        #    self.protection.high_charge_current = 2
-        # elif al_crnt_soc & 1:
-        #    # High charge current - Pre-alarm
-        #    self.protection.high_charge_current = 1
-        # else:
-        #    self.protection.high_charge_current = 0
-
-        # if al_crnt_soc & 8:
-        #    # High discharge current - Alarm
-        #    self.protection.high_charge_current = 2
-        # elif al_crnt_soc & 4:
-        #    # High discharge current - Pre-alarm
-        #    self.protection.high_charge_current = 1
-        # else:
-        #    self.protection.high_charge_current = 0
-
-        if al_crnt_soc & 2 or al_crnt_soc & 8:
-            # High charge/discharge current - Alarm
+        if al_crnt_soc & 2:
+            # High charge current - Alarm
             self.protection.high_charge_current = 2
-        elif al_crnt_soc & 1 or al_crnt_soc & 4:
-            # High charge/discharge current - Pre-alarm
+        elif al_crnt_soc & 1:
+            # High charge current - Pre-alarm
             self.protection.high_charge_current = 1
         else:
             self.protection.high_charge_current = 0
+
+        if al_crnt_soc & 8:
+            # High discharge current - Alarm
+            self.protection.high_discharge_current = 2
+        elif al_crnt_soc & 4:
+            # High discharge current - Pre-alarm
+            self.protection.high_discharge_current = 1
+        else:
+            self.protection.high_discharge_current = 0
 
         if not SOC_CALCULATION:
             if al_crnt_soc & 128:
