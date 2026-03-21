@@ -247,7 +247,15 @@ class Jkbms_pb(Battery):
             logger.debug("pin: " + str(pin))
             logger.debug("PWROnTimes: " + str(PWROnTimes))
             logger.debug(
-                "ODDRunTime: " + str(ODDRunTime) + "s; " + str(ODDRunTime / 60) + "m; " + str(ODDRunTime / 60 / 60) + "h; " + str(ODDRunTime / 60 / 60 / 24) + "d"
+                "ODDRunTime: "
+                + str(ODDRunTime)
+                + "s; "
+                + str(ODDRunTime / 60)
+                + "m; "
+                + str(ODDRunTime / 60 / 60)
+                + "h; "
+                + str(ODDRunTime / 60 / 60 / 24)
+                + "d"
             )
 
         # init the cell array
@@ -465,11 +473,14 @@ class Jkbms_pb(Battery):
         # I never understood the CRC algorithm in the returned message,
         # so we check the header and the length and that's it
 
-        if data[0] == 0x55 and data[1] == 0xAA:
-            return data
-        else:
+        # When multiple batteries share the RS485 bus the Modbus 0x10 write-ACK
+        # (8 bytes) may be prepended to the BMS response, shifting the 0x55 0xAA
+        # header by a few bytes.  Scan for it rather than assuming offset 0.
+        offset = data.find(b"\x55\xaa")
+        if offset < 0:
             get_connection_error_message(self.online)
             return False
+        return data[offset:]
 
     def modbusCrc(self, msg: str):
         """
