@@ -292,10 +292,12 @@ class Jkbms_pb(Battery):
 
         try:
             with serial.Serial(self.port, baudrate=self.baud_rate, timeout=0.1) as ser:
-                # Wake-up: just send command_settings, wait briefly, flush RX
+                # Wake-up: send command_settings, wait for echo + full BMS response
+                # to arrive (~50ms processing + ~26ms wire time for 300 bytes at
+                # 115200 baud), then flush everything.
                 ser.reset_input_buffer()
                 ser.write(wakeup_msg)
-                time.sleep(0.1)
+                time.sleep(0.075)
                 ser.reset_input_buffer()
 
                 # Read status; on fail, retry once (wake-up is still warm)
