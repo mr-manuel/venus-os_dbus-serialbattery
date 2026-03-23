@@ -61,6 +61,7 @@ class Jkbms_pb(Battery):
         # Return True if success, False for failure
         status_data = self.read_serial_data_jkbms_pb(self.command_settings, 300)
         if not status_data:
+            logger.warning("get_settings: command_settings failed for addr 0x" + self.address.hex())
             return False
 
         VolSmartSleep = unpack_from("<i", status_data, 6)[0] / 1000
@@ -278,6 +279,7 @@ class Jkbms_pb(Battery):
         status_data = self.read_serial_data_jkbms_pb(self.command_status, 299)
         # check if connection success
         if not status_data:
+            logger.warning("read_status_data: command_status failed for addr 0x" + self.address.hex())
             return False
 
         #        logger.error("sucess we have data")
@@ -454,6 +456,7 @@ class Jkbms_pb(Battery):
         :param command: the command to be sent to the bms
         :return: data bytearray starting at 0x55 0xAA header if successful, False otherwise
         """
+        addr_str = "0x" + self.address.hex()
         modbus_msg = self.address + command + self.modbusCrc(self.address + command)
 
         try:
@@ -463,11 +466,11 @@ class Jkbms_pb(Battery):
                 # data.find() below locates the actual 0x55 0xAA header.
                 data = read_serialport_data(ser, modbus_msg, 1.0, 0, 0, length_fixed=length)
         except serial.SerialException as e:
-            logger.error(e)
+            logger.error(f"[{addr_str}] serial error: {e}")
             return False
 
         if data is None:
-            get_connection_error_message(self.online)
+            get_connection_error_message(self.online, f"[{addr_str}] no response data")
             return False
 
         # I never understood the CRC algorithm in the returned message,
@@ -478,7 +481,7 @@ class Jkbms_pb(Battery):
         # header by a few bytes.  Scan for it rather than assuming offset 0.
         offset = data.find(b"\x55\xaa")
         if offset < 0:
-            get_connection_error_message(self.online)
+            logger.error(f"[{addr_str}] no 0x55AA header in {len(data)} bytes: {data[:20].hex()}")
             return False
         return data[offset:]
 
