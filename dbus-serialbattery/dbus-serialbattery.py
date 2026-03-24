@@ -164,14 +164,21 @@ def main():
             helper[key_address].publish_battery(loop)
 
         runtime = (datetime.now() - start).total_seconds()
-        logger.debug(f"Polling data took {runtime:.3f} seconds")
+
+        # Use the sum of individual refresh_data times (serial I/O + calc) for
+        # interval decisions, not the full runtime which includes dbus overhead.
+        # Dbus write time is unpredictable (reentrancy from incoming requests)
+        # and should not cause the poll interval to increase silently.
+        refresh_runtime = sum(getattr(battery[k], "last_refresh_duration", 0) for k in battery)
+        logger.debug(f"Polling data took {runtime:.3f} seconds (refresh: {refresh_runtime:.3f})")
 
         # check if polling took too long and adjust poll interval, but only after 5 loops
         # since the first polls are always slower
-        if runtime > battery[first_key].poll_interval / 1000:
+        if refresh_runtime > battery[first_key].poll_interval / 1000:
             delayed_loop_count += 1
             if delayed_loop_count > 1:
-                logger.warning(f"Polling data took {runtime:.3f} seconds. Automatically increase interval in {count_for_loops - delayed_loop_count} cycles.")
+                remaining = count_for_loops - delayed_loop_count
+                logger.warning(f"Polling took {runtime:.3f}s (refresh {refresh_runtime:.3f}s). Increase in {remaining} cycles.")
         else:
             delayed_loop_count = 0
 

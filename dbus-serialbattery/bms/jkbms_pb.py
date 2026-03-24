@@ -4,9 +4,11 @@
 # Added by https://github.com/KoljaWindeler
 
 from battery import Battery, Cell
-from utils import SOC_CALCULATION, read_serial_data, get_connection_error_message, logger
+from utils import SOC_CALCULATION, get_connection_error_message, logger
 from struct import unpack_from
+import serial
 import sys
+import time
 
 
 class Jkbms_pb(Battery):
@@ -20,6 +22,7 @@ class Jkbms_pb(Battery):
         self.command_settings = b"\x10\x16\x1e\x00\x01\x02\x00\x00"
         self.command_about = b"\x10\x16\x1c\x00\x01\x02\x00\x00"
         self.history.exclude_values_to_calculate = ["charge_cycles"]
+        self.use_async_refresh = True
         # self.has_settings = True
         # self.callbacks_available = ["callback_heating_turn_off"]
 
@@ -58,8 +61,27 @@ class Jkbms_pb(Battery):
         # After successful connection get_settings() will be called to set up the battery
         # Set the current limits, populate cell count, etc
         # Return True if success, False for failure
-        status_data = self.read_serial_data_jkbms_pb(self.command_settings, 300)
+        addr_str = "0x" + self.address.hex()
+        try:
+            ser = serial.Serial(self.port, baudrate=self.baud_rate, timeout=0.1)
+        except serial.SerialException as e:
+            logger.error(f"[{addr_str}] serial error: {e}")
+            return False
+
+        # Drain stale CH341 buffer bytes from previous battery's session
+        time.sleep(0.02)
+        ser.reset_input_buffer()
+
+        status_data = self._read_response(ser, self.command_settings, 300, timeout=1.0)
         if not status_data:
+            # Retry once: drain again and resend
+            logger.debug(f"[{addr_str}] get_settings retry")
+            time.sleep(0.02)
+            ser.reset_input_buffer()
+            status_data = self._read_response(ser, self.command_settings, 300, timeout=1.0)
+        if not status_data:
+            ser.close()
+            logger.warning(f"get_settings: command_settings failed for addr {addr_str}")
             return False
 
         VolSmartSleep = unpack_from("<i", status_data, 6)[0] / 1000
@@ -189,55 +211,77 @@ class Jkbms_pb(Battery):
         logger.debug("TMPStartHeating: " + str(TMPStartHeating))
         logger.debug("TMPStopHeating: " + str(TMPStopHeating))
 
-        status_data = self.read_serial_data_jkbms_pb(self.command_about, 300)
+        # Brief pause for BMS to settle before next command on half-duplex bus
+        time.sleep(0.1)
+        ser.reset_input_buffer()
+        status_data = self._read_response(ser, self.command_about, 300, timeout=1.0)
+        ser.close()
         # vendor_version start  0: 16 chars
         # hw_version     start 16:  8 chars
         # sw_version     start 24:  8 chars
         # oddruntim      start 32:  1 UINT32
         # pwr_on_time    start 36:  1 UINT32
 
-        vendor_id = status_data[6:21].decode("utf-8").split("\x00", 1)[0]  # 16 chars
-        hw_version = status_data[22:29].decode("utf-8").split("\x00", 1)[0]  # 8 chars
-        sw_version = status_data[30:37].decode("utf-8").split("\x00", 1)[0]  # 8 chars
-        bms_version = hw_version + " / " + sw_version
-
-        # if we have an older hardware older as 19A (starting with 19A the FW supports the heating temperature setting)
-        # we use the old behavior by using the Bat Charge Under Temperature and Reset value
-        if hw_version > "15A":
-            self.heater_temperature_start = TMPStartHeating
-            self.heater_temperature_stop = TMPStopHeating
+        if not status_data:
+            # fw >= v15.36 may not respond to command_about in every window;
+            # fall back to safe defaults so get_settings() can still succeed
+            if not self.version:
+                self.version = ""
+                self.hardware_version = ""
+                self.heater_temperature_start = TMPBatCUT
+                self.heater_temperature_stop = TMPBatCUTPR
+            logger.debug("command_about: no response, keeping previous version info")
         else:
-            self.heater_temperature_start = TMPBatCUT
-            self.heater_temperature_stop = TMPBatCUTPR
+            vendor_id = status_data[6:21].decode("utf-8").split("\x00", 1)[0]  # 16 chars
+            hw_version = status_data[22:29].decode("utf-8").split("\x00", 1)[0]  # 8 chars
+            sw_version = status_data[30:37].decode("utf-8").split("\x00", 1)[0]  # 8 chars
+            bms_version = hw_version + " / " + sw_version
 
-        logger.debug("TMPStartHeating: " + str(self.heater_temperature_start))
-        logger.debug("TMPStopHeating: " + str(self.heater_temperature_stop))
+            # if we have an older hardware older as 19A (starting with 19A the FW supports the heating temperature setting)
+            # we use the old behavior by using the Bat Charge Under Temperature and Reset value
+            if hw_version > "15A":
+                self.heater_temperature_start = TMPStartHeating
+                self.heater_temperature_stop = TMPStopHeating
+            else:
+                self.heater_temperature_start = TMPBatCUT
+                self.heater_temperature_stop = TMPBatCUTPR
 
-        ODDRunTime = unpack_from("<I", status_data, 38)[0]  # 1 unit32 # runtime of the system in seconds
-        PWROnTimes = unpack_from("<I", status_data, 42)[0]  # 1 unit32 # how many startups the system has done
-        serial_nr = status_data[46:61].decode("utf-8").split("\x00", 1)[0]  # serialnumber 16 chars max
-        usrData = status_data[102:117].decode("utf-8").split("\x00", 1)[0]  # usrData 16 chars max
-        pin = status_data[118:133].decode("utf-8").split("\x00", 1)[0]  # pin 16 chars max
-        usrData2 = status_data[134:149].decode("utf-8").split("\x00", 1)[0]  # usrData 2 16 chars max
-        ble_id = serial_nr + "-" + str(DevAddr)
+            logger.debug("TMPStartHeating: " + str(self.heater_temperature_start))
+            logger.debug("TMPStopHeating: " + str(self.heater_temperature_stop))
 
-        self.unique_identifier_tmp = serial_nr
-        self.version = sw_version
-        self.hardware_version = bms_version
+            ODDRunTime = unpack_from("<I", status_data, 38)[0]  # 1 unit32 # runtime of the system in seconds
+            PWROnTimes = unpack_from("<I", status_data, 42)[0]  # 1 unit32 # how many startups the system has done
+            serial_nr = status_data[46:61].decode("utf-8").split("\x00", 1)[0]  # serialnumber 16 chars max
+            usrData = status_data[102:117].decode("utf-8").split("\x00", 1)[0]  # usrData 16 chars max
+            pin = status_data[118:133].decode("utf-8").split("\x00", 1)[0]  # pin 16 chars max
+            usrData2 = status_data[134:149].decode("utf-8").split("\x00", 1)[0]  # usrData 2 16 chars max
+            ble_id = serial_nr + "-" + str(DevAddr)
 
-        logger.debug("Serial Nr: " + str(serial_nr))
-        logger.debug("Ble Id: " + str(ble_id))
-        logger.debug("Vendor ID: " + str(vendor_id))
-        logger.debug("HW Version: " + str(hw_version))
-        logger.debug("SW Version: " + str(sw_version))
-        logger.debug("BMS Version: " + str(bms_version))
-        logger.debug("User data: " + str(usrData))
-        logger.debug("User data 2: " + str(usrData2))
-        logger.debug("pin: " + str(pin))
-        logger.debug("PWROnTimes: " + str(PWROnTimes))
-        logger.debug(
-            "ODDRunTime: " + str(ODDRunTime) + "s; " + str(ODDRunTime / 60) + "m; " + str(ODDRunTime / 60 / 60) + "h; " + str(ODDRunTime / 60 / 60 / 24) + "d"
-        )
+            self.unique_identifier_tmp = serial_nr
+            self.version = sw_version
+            self.hardware_version = bms_version
+
+            logger.debug("Serial Nr: " + str(serial_nr))
+            logger.debug("Ble Id: " + str(ble_id))
+            logger.debug("Vendor ID: " + str(vendor_id))
+            logger.debug("HW Version: " + str(hw_version))
+            logger.debug("SW Version: " + str(sw_version))
+            logger.debug("BMS Version: " + str(bms_version))
+            logger.debug("User data: " + str(usrData))
+            logger.debug("User data 2: " + str(usrData2))
+            logger.debug("pin: " + str(pin))
+            logger.debug("PWROnTimes: " + str(PWROnTimes))
+            logger.debug(
+                "ODDRunTime: "
+                + str(ODDRunTime)
+                + "s; "
+                + str(ODDRunTime / 60)
+                + "m; "
+                + str(ODDRunTime / 60 / 60)
+                + "h; "
+                + str(ODDRunTime / 60 / 60 / 24)
+                + "d"
+            )
 
         # init the cell array
         for _ in range(self.cell_count):
@@ -249,22 +293,62 @@ class Jkbms_pb(Battery):
         # call all functions that will refresh the battery data.
         # This will be called for every iteration (1 second)
         # Return True if success, False for failure
-        return self.read_status_data()
+        #
+        # fw >= v15.36: command_status only responds when preceded by another command
+        # in the same rapid burst (< ~200ms gap). We open the serial port once for
+        # both commands: send command_settings as a quick wake-up (write-only, no
+        # full read), then immediately send command_status and read its response.
+        addr_str = "0x" + self.address.hex()
+        wakeup_msg = self.address + self.command_settings + self.modbusCrc(self.address + self.command_settings)
 
-    def read_status_data(self):
-        status_data = self.read_serial_data_jkbms_pb(self.command_status, 299)
+        try:
+            with serial.Serial(self.port, baudrate=self.baud_rate, timeout=0.1) as ser:
+                # Wake-up: send command_settings, wait for echo + full BMS response
+                # to arrive (~50ms processing + ~26ms wire time for 300 bytes at
+                # 115200 baud), then flush everything.
+                ser.reset_input_buffer()
+                ser.write(wakeup_msg)
+                time.sleep(0.075)
+                ser.reset_input_buffer()
+
+                # Read status; on fail, retry once (wake-up is still warm)
+                status_data = self._read_response(ser, self.command_status, 299)
+                if not status_data:
+                    logger.debug(f"[{addr_str}] status retry")
+                    ser.reset_input_buffer()
+                    status_data = self._read_response(ser, self.command_status, 299)
+        except serial.SerialException as e:
+            logger.error(f"[{addr_str}] serial error: {e}")
+            return False
+
+        if not status_data:
+            logger.warning(f"refresh_data: command_status failed for addr {addr_str}")
+            return False
+
+        return self.read_status_data(status_data)
+
+    def read_status_data(self, status_data=None):
+        if status_data is None:
+            status_data = self.read_serial_data_jkbms_pb(self.command_status, 299)
         # check if connection success
         if not status_data:
+            logger.warning("read_status_data: command_status failed for addr 0x" + self.address.hex())
             return False
 
         #        logger.error("sucess we have data")
         #        be = ''.join(format(x, ' 02X') for x in status_data)
         #        logger.error(be)
 
-        # cell voltages
+        # cell voltages — EMA low-pass filter to suppress 1mV ADC jitter
+        # and reduce dbus write traffic (cache proxy suppresses unchanged values)
         for c in range(self.cell_count):
-            if (unpack_from("<H", status_data, c * 2 + 6)[0] / 1000) != 0:
-                self.cells[c].voltage = unpack_from("<H", status_data, c * 2 + 6)[0] / 1000
+            raw = unpack_from("<H", status_data, c * 2 + 6)[0] / 1000
+            if raw != 0:
+                prev = self.cells[c].voltage
+                if prev is not None:
+                    self.cells[c].voltage = round(0.3 * raw + 0.7 * prev, 3)
+                else:
+                    self.cells[c].voltage = round(raw, 3)
 
         # MOSFET temperature
         temperature_mos = unpack_from("<h", status_data, 144)[0] / 10
@@ -313,7 +397,7 @@ class Jkbms_pb(Battery):
         discharge = unpack_from("<B", status_data, 199)[0]
         heat = unpack_from("<B", status_data, 215)[0]
 
-        logger.info("bal: " + str(bal) + " charge: " + str(charge) + " discharge: " + str(discharge) + " heat: " + str(heat))
+        logger.debug("bal: " + str(bal) + " charge: " + str(charge) + " discharge: " + str(discharge) + " heat: " + str(heat))
 
         self.charge_fet = 1 if charge != 0 else 0
         self.discharge_fet = 1 if discharge != 0 else 0
@@ -425,39 +509,61 @@ class Jkbms_pb(Battery):
         self.protection.high_temperature = 2 if (byte_data & 0x00008000) else 0
         self.protection.low_temperature = 0
 
-    def read_serial_data_jkbms_pb(self, command: str, length: int) -> bool:
+    def _read_response(self, ser, command, length, timeout=0.5, no_data_timeout=0.25):
         """
-        use the read_serial_data() function to read the data and then do BMS specific checks (crc, start bytes, etc)
-        :param command: the command to be sent to the bms
-        :return: True if everything is fine, else False
-        """
-        modbus_msg = self.address
-        modbus_msg += command
-        modbus_msg += self.modbusCrc(modbus_msg)
+        Send a command on an already-open serial port and return the response
+        starting at the 0x55 0xAA header, or False on failure.
 
-        data = read_serial_data(
-            modbus_msg,
-            self.port,
-            self.baud_rate,
-            self.LENGTH_POS,  # ignored
-            self.LENGTH_CHECK,  # ignored
-            length,
-            self.LENGTH_SIZE,  # ignored
-            battery_online=self.online,
-        )
+        Fail-fast: if no bytes arrive within no_data_timeout, bail early instead
+        of waiting for the full timeout.
+        """
+        addr_str = "0x" + self.address.hex()
+        modbus_msg = self.address + command + self.modbusCrc(self.address + command)
+
+        ser.reset_input_buffer()
+        ser.write(modbus_msg)
+
+        data = bytearray()
+        deadline = time.monotonic() + timeout
+        no_data_deadline = time.monotonic() + no_data_timeout
+        while time.monotonic() < deadline:
+            chunk = ser.read(max(1, ser.in_waiting))
+            if chunk:
+                data.extend(chunk)
+                if len(data) >= length:
+                    break
+            elif not data and time.monotonic() > no_data_deadline:
+                # fail-fast: no bytes at all within no_data_timeout
+                break
+            time.sleep(0.01)
+
         if not data:
+            get_connection_error_message(self.online, f"[{addr_str}] no response data")
             return False
 
-        # be = ''.join(format(x, ' 02X') for x in data)
-        # logger.error(be)
+        # When multiple batteries share the RS485 bus the Modbus 0x10 write-ACK
+        # (8 bytes) may be prepended to the BMS response, shifting the 0x55 0xAA
+        # header by a few bytes.  Scan for it rather than assuming offset 0.
+        offset = data.find(b"\x55\xaa")
+        if offset < 0:
+            logger.error(f"[{addr_str}] no 0x55AA header in {len(data)} bytes: {data[:20].hex()}")
+            return False
+        return data[offset:]
 
-        # I never understood the CRC algorithm in the returned message,
-        # so we check the header and the length and that's it
-
-        if data[0] == 0x55 and data[1] == 0xAA:
-            return data
-        else:
-            get_connection_error_message(self.online)
+    def read_serial_data_jkbms_pb(self, command: str, length: int) -> bool:
+        """
+        Send a command and read the response from the BMS.
+        Opens a fresh serial port; for callers that already have an open port,
+        use _read_response() directly.
+        :param command: the command to be sent to the bms
+        :return: data bytearray starting at 0x55 0xAA header if successful, False otherwise
+        """
+        addr_str = "0x" + self.address.hex()
+        try:
+            with serial.Serial(self.port, baudrate=self.baud_rate, timeout=0.1) as ser:
+                return self._read_response(ser, command, length)
+        except serial.SerialException as e:
+            logger.error(f"[{addr_str}] serial error: {e}")
             return False
 
     def modbusCrc(self, msg: str):
