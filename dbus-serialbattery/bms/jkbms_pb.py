@@ -22,6 +22,7 @@ class Jkbms_pb(Battery):
         self.command_settings = b"\x10\x16\x1e\x00\x01\x02\x00\x00"
         self.command_about = b"\x10\x16\x1c\x00\x01\x02\x00\x00"
         self.history.exclude_values_to_calculate = ["charge_cycles"]
+        self.use_async_refresh = True
         # self.has_settings = True
         # self.callbacks_available = ["callback_heating_turn_off"]
 
@@ -67,7 +68,17 @@ class Jkbms_pb(Battery):
             logger.error(f"[{addr_str}] serial error: {e}")
             return False
 
+        # Drain stale CH341 buffer bytes from previous battery's session
+        time.sleep(0.02)
+        ser.reset_input_buffer()
+
         status_data = self._read_response(ser, self.command_settings, 300, timeout=1.0)
+        if not status_data:
+            # Retry once: drain again and resend
+            logger.debug(f"[{addr_str}] get_settings retry")
+            time.sleep(0.02)
+            ser.reset_input_buffer()
+            status_data = self._read_response(ser, self.command_settings, 300, timeout=1.0)
         if not status_data:
             ser.close()
             logger.warning(f"get_settings: command_settings failed for addr {addr_str}")
