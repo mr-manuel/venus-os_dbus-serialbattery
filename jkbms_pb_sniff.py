@@ -5,14 +5,15 @@ Sends commands and prints raw hex response.
 Usage: python3 jkbms_pb_sniff.py /dev/ttyUSB1 [address]
   address: DIP switch ID as hex, e.g. 0x03 (default)
 """
+
 import sys
 import time
 import serial
 
-PORT  = sys.argv[1] if len(sys.argv) > 1 else "/dev/ttyUSB1"
-ADDR  = int(sys.argv[2], 16) if len(sys.argv) > 2 else 0x03
-BAUD  = 115200
-TIMEOUT = 1.0   # seconds to wait for response
+PORT = sys.argv[1] if len(sys.argv) > 1 else "/dev/ttyUSB1"
+ADDR = int(sys.argv[2], 16) if len(sys.argv) > 2 else 0x03
+BAUD = 115200
+TIMEOUT = 1.0  # seconds to wait for response
 
 
 def modbus_crc(msg: bytes) -> bytes:
@@ -43,7 +44,7 @@ def send_and_read(ser: serial.Serial, cmd: bytes, label: str) -> bytes:
     if data:
         print(f"RX ({len(data)} bytes): {data.hex(' ').upper()}")
         # ASCII printable overlay
-        printable = ''.join(chr(b) if 32 <= b < 127 else '.' for b in data)
+        printable = "".join(chr(b) if 32 <= b < 127 else "." for b in data)
         print(f"    ASCII: {printable}")
     else:
         print("RX: (no response)")
@@ -51,14 +52,14 @@ def send_and_read(ser: serial.Serial, cmd: bytes, label: str) -> bytes:
 
 
 # Known commands from driver (function 0x10 = write-multiple-registers)
-CMD_SETTINGS = b"\x10\x16\x1e\x00\x01\x02\x00\x00"   # get_settings
-CMD_STATUS   = b"\x10\x16\x20\x00\x01\x02\x00\x00"   # get_status
-CMD_ABOUT    = b"\x10\x16\x1c\x00\x01\x02\x00\x00"   # get_about
+CMD_SETTINGS = b"\x10\x16\x1e\x00\x01\x02\x00\x00"  # get_settings
+CMD_STATUS = b"\x10\x16\x20\x00\x01\x02\x00\x00"  # get_status
+CMD_ABOUT = b"\x10\x16\x1c\x00\x01\x02\x00\x00"  # get_about
 
 # Alternative: Modbus read holding registers (fn 0x03) variants to probe
-CMD_READ_REG_0000 = b"\x03\x00\x00\x00\x01"   # read 1 reg at 0x0000
-CMD_READ_REG_1000 = b"\x03\x10\x00\x00\x01"   # read 1 reg at 0x1000
-CMD_READ_REG_1620 = b"\x03\x16\x20\x00\x01"   # read 1 reg at 0x1620
+CMD_READ_REG_0000 = b"\x03\x00\x00\x00\x01"  # read 1 reg at 0x0000
+CMD_READ_REG_1000 = b"\x03\x10\x00\x00\x01"  # read 1 reg at 0x1000
+CMD_READ_REG_1620 = b"\x03\x16\x20\x00\x01"  # read 1 reg at 0x1620
 # broadcast / address 0x00
 CMD_BROADCAST_SETTINGS = b"\x10\x16\x1e\x00\x01\x02\x00\x00"
 
@@ -69,12 +70,12 @@ with serial.Serial(PORT, baudrate=BAUD, timeout=TIMEOUT) as ser:
 
     # Try existing driver commands
     send_and_read(ser, build_cmd(ADDR, CMD_SETTINGS), f"get_settings  addr=0x{ADDR:02X}")
-    send_and_read(ser, build_cmd(ADDR, CMD_STATUS),   f"get_status    addr=0x{ADDR:02X}")
-    send_and_read(ser, build_cmd(ADDR, CMD_ABOUT),    f"get_about     addr=0x{ADDR:02X}")
+    send_and_read(ser, build_cmd(ADDR, CMD_STATUS), f"get_status    addr=0x{ADDR:02X}")
+    send_and_read(ser, build_cmd(ADDR, CMD_ABOUT), f"get_about     addr=0x{ADDR:02X}")
 
     # Try broadcast address 0x00
     send_and_read(ser, build_cmd(0x00, CMD_SETTINGS), "get_settings  addr=0x00 (broadcast)")
-    send_and_read(ser, build_cmd(0x00, CMD_STATUS),   "get_status    addr=0x00 (broadcast)")
+    send_and_read(ser, build_cmd(0x00, CMD_STATUS), "get_status    addr=0x00 (broadcast)")
 
     # Try Modbus read-holding-registers variants
     send_and_read(ser, build_cmd(ADDR, CMD_READ_REG_0000), f"read-regs 0x0000 addr=0x{ADDR:02X}")
