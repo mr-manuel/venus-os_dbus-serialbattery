@@ -76,7 +76,7 @@ supported_bms_types = [
     {"bms": Jkbms_pb, "baud": 115200, "address": b"\x01"},
     {"bms": KS48100, "baud": 9600, "address": b"\x01"},
     {"bms": LltJbd, "baud": 9600, "address": b"\x00"},
-    {"bms": LltJbd_Up16s, "baud": 9600, "address": b"\x00"},
+    {"bms": LltJbd_Up16s, "baud": 9600, "address": b"\x01"},
     {"bms": Pace, "baud": 9600, "address": b"\x00"},
     {"bms": Renogy, "baud": 9600, "address": b"\x30"},
     {"bms": Renogy, "baud": 9600, "address": b"\xf7"},
