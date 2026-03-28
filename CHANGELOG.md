@@ -44,6 +44,9 @@
 * Changed: Added integer conversion for Daly Can BMS Set SOC GUI method by @lex2k0
 * Changed: Daly BMS & Daly CAN BMS: Fix high charge/discharge current alarm. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/378 by @mr-manuel
 * Changed: Daren 485 BMS - Fixed charge/discharge calculation with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/343 by @kopierschnitte
+* Changed: dbushelper.py - Ensure loading of newest battery data if more than one duplicate exists by @lex2k0
+* Changed: dbushelper.py - Reworked save settings methods by @lex2k0
+* Changed: Decoupled SOC Reset after x days from the need that the battery has to switch to bulk charge, thus after every x days are passed by there will be a bulk charge / top balancing by @lex2k0
 * Changed: Disabled BMS SOC alerts if `SOC_CALCULATION` is enabled. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/377 by @mr-manuel
 * Changed: Driver internals - Renamed callback variables/functions and added a better description by @mr-manuel
 * Changed: EG4-LL BMS - Added BMS configuration polling on startup to load cell/pack voltage, temperature, current, and SOC alarm thresholds from the BMS by @tuxntoast
@@ -82,7 +85,6 @@
 * Changed: Use Bluetooth MAC address as unique identifier for all Bluetooth BMS by @mr-manuel
 * Changed: Use correct temperature sensors for Daly CAN BMS instead of min/max values by @lex2k0
 * Changed: Use port and address as unique identifier is now available for all serial BMS by @mr-manuel
-* Changed: Decoupled SOC Reset after x days from the need that the battery has to switch to bulk charge, thus after every x days are passed by there will be a bulk charge / top balancing by @lex2k0
 
 ## v2.0.20250729
 
