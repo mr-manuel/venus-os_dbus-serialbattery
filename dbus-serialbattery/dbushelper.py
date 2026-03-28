@@ -317,7 +317,7 @@ class DbusHelper:
 
                         if temp_instance != "Unknown":
                             device_instance = temp_instance
-                            logger.info(f"--> Loading values from DeviceInstance: {device_instance} (Newest instance)")
+                            logger.info(f"--> Loading values from DeviceInstance: {device_instance} (Newer instance)")
 
                         # check if the battery has AllowMaxVoltage set
                         if "AllowMaxVoltage" in value and value["AllowMaxVoltage"] != "":
