@@ -127,6 +127,7 @@ class DbusHelper:
             "history_values": "",
         }
         self.history_calculated_last_time: int = 0
+        self.settings_saved_last_time: int = 0
         """
         Last time the history values were calculated.
         """
@@ -1322,13 +1323,14 @@ class DbusHelper:
             logger.error("Non blocking exception occurred: " + f"{repr(exception_object)} of type {exception_type} in {file} line #{line}")
 
         # calculate history values every 60 seconds
-        if utils.HISTORY_ENABLE and int(time()) - self.history_calculated_last_time > 60:
+        if utils.HISTORY_ENABLE and int(time()) - self.history_calculated_last_time >= 60:
             self.battery.history_calculate_values()
             self.history_calculated_last_time = int(time())
 
         # save settings every 15 seconds to dbus
-        if int(time()) % 15 == 0:
+        if int(time()) - self.settings_saved_last_time >= 15:
             self.save_current_battery_state()
+            self.settings_saved_last_time = int(time())
 
         if self.battery.soc is not None:
             logger.debug("logged to dbus [%s]" % str(round(self.battery.soc, 2)))
