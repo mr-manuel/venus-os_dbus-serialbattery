@@ -297,7 +297,7 @@ class DbusHelper:
                     # check the unique identifier, if the battery was already connected once
                     # if so, get the last saved data
                     if "UniqueIdentifier" in value and value["UniqueIdentifier"] == self.bms_id:
-                        
+
                         # check if the battery has ClassAndVrmInstance set
                         temp_instance = "Unknown"
                         if "ClassAndVrmInstance" in value and value["ClassAndVrmInstance"] != "":
@@ -306,15 +306,15 @@ class DbusHelper:
 
                         # compare last seen timestamp
                         device_last_seen = int(value["LastSeen"]) if "LastSeen" in value and value["LastSeen"] != "" else 0
-                        
+
                         if device_last_seen < newest_last_seen:
                             logger.info(f"--> Ignoring DeviceInstance {temp_instance} (Older instance)")
                             continue
-                            
+
                         # take data if it is the newest timestamp
                         newest_last_seen = device_last_seen
                         found_bms = True
-                        
+
                         if temp_instance != "Unknown":
                             device_instance = temp_instance
                             logger.info(f"--> Loading values from DeviceInstance: {device_instance} (Newest instance)")
@@ -1651,7 +1651,9 @@ class DbusHelper:
                 logger.error(f"Failed to save MaxVoltageStartTime ({self.battery.max_voltage_start_time}).")
                 result = False
             else:
-                logger.debug(f"Saved MaxVoltageStartTime. Before {self.save_charge_details_last['max_voltage_start_time']}, after {self.battery.max_voltage_start_time}")
+                logger.debug(
+                    f"Saved MaxVoltageStartTime. Before {self.save_charge_details_last['max_voltage_start_time']}, after {self.battery.max_voltage_start_time}"
+                )
                 self.save_charge_details_last["max_voltage_start_time"] = self.battery.max_voltage_start_time
 
         if self.battery.soc_calc != self.save_charge_details_last["soc_calc"]:
@@ -1681,7 +1683,9 @@ class DbusHelper:
                 logger.error(f"Failed to save SocResetLastReached ({self.battery.soc_reset_last_reached}).")
                 result = False
             else:
-                logger.debug(f"Saved SocResetLastReached. Before {self.save_charge_details_last['soc_reset_last_reached']}, after {self.battery.soc_reset_last_reached}")
+                logger.debug(
+                    f"Saved SocResetLastReached. Before {self.save_charge_details_last['soc_reset_last_reached']}, after {self.battery.soc_reset_last_reached}"
+                )
                 self.save_charge_details_last["soc_reset_last_reached"] = self.battery.soc_reset_last_reached
 
         # copy history values
