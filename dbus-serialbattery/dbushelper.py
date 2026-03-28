@@ -283,6 +283,8 @@ class DbusHelper:
         #     }
         # }
 
+        newest_last_seen = 0
+
         # loop through devices in dbus settings
         if "Settings" in settings_from_dbus and "Devices" in settings_from_dbus["Settings"]:
             for key, value in settings_from_dbus["Settings"]["Devices"].items():
@@ -295,14 +297,27 @@ class DbusHelper:
                     # check the unique identifier, if the battery was already connected once
                     # if so, get the last saved data
                     if "UniqueIdentifier" in value and value["UniqueIdentifier"] == self.bms_id:
-                        # set found_bms to true
-                        found_bms = True
-
+                        
                         # check if the battery has ClassAndVrmInstance set
+                        temp_instance = "Unknown"
                         if "ClassAndVrmInstance" in value and value["ClassAndVrmInstance"] != "":
-                            # get the instance from the object name
-                            device_instance = int(value["ClassAndVrmInstance"][value["ClassAndVrmInstance"].rfind(":") + 1 :])
-                            logger.info(f"Reconnected to previously identified battery with DeviceInstance: {device_instance}")
+                            temp_instance = int(value["ClassAndVrmInstance"][value["ClassAndVrmInstance"].rfind(":") + 1 :])
+                            logger.info(f"Found previously identified battery with DeviceInstance: {temp_instance}")
+
+                        # compare last seen timestamp
+                        device_last_seen = int(value["LastSeen"]) if "LastSeen" in value and value["LastSeen"] != "" else 0
+                        
+                        if device_last_seen < newest_last_seen:
+                            logger.info(f"--> Ignoring DeviceInstance {temp_instance} (Older instance)")
+                            continue
+                            
+                        # take data if it is the newest timestamp
+                        newest_last_seen = device_last_seen
+                        found_bms = True
+                        
+                        if temp_instance != "Unknown":
+                            device_instance = temp_instance
+                            logger.info(f"--> Loading values from DeviceInstance: {device_instance} (Newest instance)")
 
                         # check if the battery has AllowMaxVoltage set
                         if "AllowMaxVoltage" in value and value["AllowMaxVoltage"] != "":
