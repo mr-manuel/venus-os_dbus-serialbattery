@@ -78,6 +78,8 @@
 * Changed: Use Bluetooth MAC address as unique identifier for all Bluetooth BMS by @mr-manuel
 * Changed: Use correct temperature sensors for Daly CAN BMS instead of min/max values by @lex2k0
 * Changed: Use port and address as unique identifier is now available for all serial BMS by @mr-manuel
+* Changed: dbushelper.py - Ensure loading of newest battery data if more than one duplicate exists by @lex2k0
+* Changed: dbushelper.py - Reworked save settings methods by @lex2k0
 
 ## v2.0.20250729
 
