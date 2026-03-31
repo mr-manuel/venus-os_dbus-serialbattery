@@ -135,8 +135,7 @@ def main():
 
         # Close the serial connection
         else:
-            # Currently not feasible to close the serial connection
-            # TODO: Is it worth implementing this?
+            # Serial connection is automatically closed when driver exits
             pass
 
         logger.info(f"Stopped dbus-serialbattery with exit code {code}")
