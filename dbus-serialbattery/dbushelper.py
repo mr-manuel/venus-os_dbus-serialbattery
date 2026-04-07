@@ -18,9 +18,10 @@ from vedbus import VeDbusService  # noqa: E402
 from ve_utils import get_vrm_portal_id  # noqa: E402
 from settingsdevice import SettingsDevice  # noqa: E402
 
-# Victron settings service: D-Bus well-known name and the shared key for get_bus() so every
-# SettingsDevice / get_settings / set_settings call reuses one BusConnection (avoids leaks;
-# see #402) while each VeDbusService still uses its own connection (see #410).
+# Bus name Victron's settings daemon publishes on the system bus (D-Bus calls this a
+# "well-known" name: a fixed string both sides use, unlike unique :1.xx connection names).
+# Every DbusHelper uses this same peer; get_bus() caches one BusConnection for it (#402).
+# Each battery's VeDbusService uses a different name (_dbusname) and its own connection (#410).
 VICTRON_SETTINGS_DBUS_NAME = "com.victronenergy.settings"
 
 _SENTINEL = object()
@@ -82,11 +83,17 @@ _bus_instances = {}
 def get_bus(dbus_name: str) -> dbus.bus.BusConnection:
     """Return a shared bus connection for the given cache key, creating it if needed.
 
-    ``dbus_name`` is the dict key in ``_bus_instances`` and must match the D-Bus well-known
-    bus name for that connection: ``VICTRON_SETTINGS_DBUS_NAME`` for all settings I/O
-    (``SettingsDevice``, ``get_settings_with_values``, ``set_settings``, etc.), or
-    each ``DbusHelper`` instance's ``_dbusname`` for the ``BusConnection`` paired with that
-    battery's ``VeDbusService`` (one connection per exported battery service name).
+    ``dbus_name`` is the dict key in ``_bus_instances`` and must be the same fixed bus name
+    this code uses to reach the corresponding peer on D-Bus (freedesktop D-Bus spec:
+    ``well-known name``). Two cases:
+
+    * ``VICTRON_SETTINGS_DBUS_NAME`` — Victron exposes one settings service under this name;
+      all batteries are clients of that single peer, so all settings I/O in this process
+      correctly reuses one cached ``BusConnection``.
+    * Each ``DbusHelper``'s ``_dbusname`` — must be **unique per battery** this process
+      exports (port plus BMS address suffix when needed). That name must **not** be shared
+      across batteries: each ``VeDbusService`` needs its own ``BusConnection`` or object-path
+      registration on ``'/'`` collides (see #410).
 
     Note: VeDbusService registers D-Bus object paths (such as '/') and requires a unique bus connection per service instance.
     If multiple VeDbusService objects share the same connection, they will conflict when registering the same object path.
