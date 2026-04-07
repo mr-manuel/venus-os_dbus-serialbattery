@@ -82,8 +82,11 @@ _bus_instances = {}
 def get_bus(dbus_name: str) -> dbus.bus.BusConnection:
     """Return a shared bus connection for the given cache key, creating it if needed.
 
-    ``dbus_name`` is both the dict key in ``_bus_instances`` and, for peer services, the
-    well-known name you will talk to on that connection (e.g. ``VICTRON_SETTINGS_DBUS_NAME``).
+    ``dbus_name`` is the dict key in ``_bus_instances`` and must match the D-Bus well-known
+    bus name for that connection: ``VICTRON_SETTINGS_DBUS_NAME`` for all settings I/O
+    (``SettingsDevice``, ``get_settings_with_values``, ``set_settings``, etc.), or
+    each ``DbusHelper`` instance's ``_dbusname`` for the ``BusConnection`` paired with that
+    battery's ``VeDbusService`` (one connection per exported battery service name).
 
     Note: VeDbusService registers D-Bus object paths (such as '/') and requires a unique bus connection per service instance.
     If multiple VeDbusService objects share the same connection, they will conflict when registering the same object path.
