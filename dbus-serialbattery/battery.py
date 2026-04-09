@@ -657,7 +657,6 @@ class Battery(ABC):
         if (
             utils.SOC_RESET_AFTER_DAYS is not False
             and self.soc_reset_requested is False
-            and self.allow_max_voltage
             and (self.soc_reset_last_reached == 0 or utils.SOC_RESET_AFTER_DAYS < soc_reset_last_reached_days_ago)
         ):
             self.soc_reset_requested = True
@@ -974,7 +973,7 @@ class Battery(ABC):
                             "soc_reset_last_reached: "
                             + ("Never" if self.soc_reset_last_reached == 0 else f"{soc_reset_days_ago} d ago")
                             + ", next "
-                            + (" already planned" if soc_reset_in_days < 0 else f"in {soc_reset_in_days} d")
+                            + ("already planned" if soc_reset_in_days < 0 else f"in {soc_reset_in_days} d")
                             + "\n"
                         )
                         if utils.SOC_RESET_AFTER_DAYS is not False
