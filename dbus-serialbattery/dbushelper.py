@@ -1206,10 +1206,9 @@ class DbusHelper:
                         voltage_sum += voltage
                 pathbase = "Cell" if (utils.BATTERY_CELL_DATA_FORMAT & 2) else "Voltages"
                 self._dbusservice["/%s/Sum" % pathbase] = round(voltage_sum, 2)
-                self._dbusservice["/%s/Diff" % pathbase] = round(
-                    self.battery.get_max_cell_voltage() - self.battery.get_min_cell_voltage(),
-                    3,
-                )
+                cell_max = self.battery.get_max_cell_voltage()
+                cell_min = self.battery.get_min_cell_voltage()
+                self._dbusservice["/%s/Diff" % pathbase] = round(cell_max - cell_min, 3) if cell_max is not None and cell_min is not None else None
             except Exception:
                 # set error code, to show in the GUI that something is wrong
                 self.battery.manage_error_code(8)
