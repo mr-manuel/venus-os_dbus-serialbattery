@@ -2,7 +2,7 @@
 XDZN / WattCycle BLE BMS driver for dbus-serialbattery.
 
 Supports XDZN_001 and WT-prefixed devices (e.g. WattCycle 314Ah LiFePO4).
-Protocol reverse-engineered from com.gz.wattcycle Android APK.
+Protocol reverse-engineered by @qume (https://github.com/qume/wattcycle_ble).
 
 BLE GATT:
   Service  0xFFF0
