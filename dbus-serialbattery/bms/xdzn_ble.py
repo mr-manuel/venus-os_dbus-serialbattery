@@ -304,27 +304,51 @@ class Xdzn_Ble(Battery):
 
     # ── Async connection test ───────────────────────────────────────────────
 
-    async def _async_test_connection(self) -> bool:
-        if not await self._connect():
-            return False
-        try:
-            if not await self._detect_frame_head():
-                await self._disconnect()
-                return False
-
-            raw = await self._send(DP_PRODUCT)
-            data = self._parse_frame_data(raw)
-            if data and len(data) == 60:
-                fw = data[0:20].decode("ascii", errors="replace").rstrip("\x00").strip()
-                sn = data[40:60].decode("ascii", errors="replace").rstrip("\x00").strip()
-                self._unique_id = sn
-                self.hardware_version = fw
-                return True
-            return False
-        except Exception as e:
-            logger.error("XDZN_BLE: _async_test_connection error: %s", e)
+async def _async_test_connection(self) -> bool:
+    if not await self._connect():
+        return False
+    try:
+        if not await self._detect_frame_head():
             await self._disconnect()
             return False
+
+        # Read product info (serial / firmware)
+        raw = await self._send(DP_PRODUCT)
+        data = self._parse_frame_data(raw)
+        if data and len(data) == 60:
+            fw = data[0:20].decode("ascii", errors="replace").rstrip("\x00").strip()
+            sn = data[40:60].decode("ascii", errors="replace").rstrip("\x00").strip()
+            self._unique_id = sn
+            self.hardware_version = fw
+
+        # Read analog data to get real cell count before setup_vedbus runs
+        raw_a = await self._send(DP_ANALOG)
+        analog = self._parse_analog(self._parse_frame_data(raw_a))
+        if analog:
+            self.cell_count = analog.get("cell_count", 4)
+            self.max_battery_voltage = self.cell_count * 3.65
+            self.min_battery_voltage = self.cell_count * 2.80
+            self.cells = [Cell(False) for _ in range(self.cell_count)]
+            logger.info(
+                "XDZN_BLE: test_connection found %d cells, "
+                "Vmax=%.2f Vmin=%.2f",
+                self.cell_count,
+                self.max_battery_voltage,
+                self.min_battery_voltage,
+            )
+        else:
+            logger.warning(
+                "XDZN_BLE: could not read analog data in test_connection, "
+                "using default %d cells",
+                self.cell_count,
+            )
+
+        return True
+
+    except Exception as e:
+        logger.error("XDZN_BLE: _async_test_connection error: %s", e)
+        await self._disconnect()
+        return False
 
     # ── Async settings read ─────────────────────────────────────────────────
 
