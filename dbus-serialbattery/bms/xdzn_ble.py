@@ -149,15 +149,15 @@ class Xdzn_Ble(Battery):
         super().__init__(port, baud, address)
         self.type = "XDZN_BLE"
         self.address = address
-        self.cell_count = 0
+        self.cell_count = 4
         self.capacity = 314.0
-        self.max_battery_voltage = 0
+        self.max_battery_voltage = 4 * 3.65
         self.max_battery_charge_current = 150.0
         self.max_battery_discharge_current = 200.0
         self.charge_fet = True
         self.discharge_fet = True
-        self.min_battery_voltage = 0
-        self.cells = []
+        self.min_battery_voltage = 4 * 2.80
+        self.cells = [Cell(False) for _ in range(4)]
         self.temperature_mos = 0.0
         self.temperature_1 = 0.0
         self.temperature_2 = 0.0
