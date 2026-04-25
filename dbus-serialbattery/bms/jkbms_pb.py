@@ -321,7 +321,7 @@ class Jkbms_pb(Battery):
         self.heating = 1 if heat != 0 else 0
 
         # HeatCurrent is provided in mA, convert to A
-        self.heater_current = int(unpack_from("<H", status_data, 236)[0]) / 1000
+        self.heater_current = int(unpack_from("<h", status_data, 236)[0]) / 1000
         self.heater_power = 0.0 if self.heating != 1 else float(self.heater_current * self.voltage)
 
         # show wich cells are balancing
