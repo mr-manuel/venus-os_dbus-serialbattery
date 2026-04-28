@@ -33,6 +33,8 @@
 * Added: JBD CAN protocol support with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/363 by @dmitrych5
 * Added: JBD UP16S series support, including daisy-chaining, with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/375 by @dmitrych5
 * Added: JK Inverter BMS - Heating informations with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/367 by @BitSeb
+* Added: JKBMS PB - Multi-battery RS485 fix for fw >= v15.36 with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/425 by @hsteinhaus
+* Added: JKBMS PB - Performance and stability improvements with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/428 by @hsteinhaus
 * Added: KS48100 BMS - Read SoH with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/344 by @kopierschnitte
 * Added: Prevent GUI modification installations by setting `GUI_INSTALL_CUSTOMIZATIONS` to `False` by @mr-manuel
 * Added: Set SOC manually via GUI if SOC_CALCULATION is enabled by @mr-manuel
