@@ -434,9 +434,11 @@ class Jkbms_pb(Battery):
 
     def unique_identifier(self) -> str:
         """
-        Used to identify a BMS when multiple BMS are connected
+        Used to identify a BMS when multiple BMS are connected. Falls back
+        to the bus address (each BMS on the RS485 bus has a unique one)
+        until the serial number is parsed from the 'about' frame.
         """
-        return self.unique_identifier_tmp
+        return self.unique_identifier_tmp or ("0x" + self.address.hex())
 
     def get_balancing(self):
         return 1 if self.balancing else 0

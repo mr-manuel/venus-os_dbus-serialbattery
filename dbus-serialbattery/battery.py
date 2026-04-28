@@ -486,20 +486,27 @@ class Battery(ABC):
 
     def custom_name(self) -> str:
         """
-        Shown in the GUI under `Device -> Name`
-        Overwritten, if the user set a custom name via GUI
+        Shown in the GUI under `Device -> Name`. Empty by default so the GUI
+        falls back to ProductName (which is dynamic per boot). User-typed
+        names from the GUI are persisted by dbushelper.callback_custom_name
+        and override this default.
 
-        :return: the connection name
+        :return: the custom name (empty unless a subclass overrides)
         """
-        return "SerialBattery(" + self.type + ")"
+        return ""
 
     def product_name(self) -> str:
         """
-        Shown in the GUI under `Device -> Product`
+        Shown in the GUI under `Device -> Product`. Combines the BMS unique
+        identifier and the serial-port basename so the label stays
+        informative across USB renumbering. Subclasses can override if the
+        port is not a /dev path (e.g. BLE, MQTT).
 
-        :return: the connection name
+        :return: the product name
         """
-        return "SerialBattery(" + self.type + ")"
+        uid = self.unique_identifier()
+        iface = self.port.rsplit("/", 1)[-1] if self.port else ""
+        return f"SerialBattery {uid} @ {iface} ({self.type})"
 
     def use_callback(self, callback: Callable) -> bool:
         """
