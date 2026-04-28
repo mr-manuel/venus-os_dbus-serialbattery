@@ -331,10 +331,16 @@ class Jkbms_pb(Battery):
         return result
 
     def read_status_data(self, status_data):
-        # cell voltages
+        # cell voltages — EMA low-pass filter to suppress 1mV ADC jitter
+        # and reduce dbus write traffic (cache proxy suppresses unchanged values)
         for c in range(self.cell_count):
-            if (unpack_from("<H", status_data, c * 2 + 6)[0] / 1000) != 0:
-                self.cells[c].voltage = unpack_from("<H", status_data, c * 2 + 6)[0] / 1000
+            raw = unpack_from("<H", status_data, c * 2 + 6)[0] / 1000
+            if raw != 0:
+                prev = self.cells[c].voltage
+                if prev is not None:
+                    self.cells[c].voltage = round(0.3 * raw + 0.7 * prev, 3)
+                else:
+                    self.cells[c].voltage = round(raw, 3)
 
         # MOSFET temperature
         temperature_mos = unpack_from("<h", status_data, 144)[0] / 10
