@@ -35,6 +35,7 @@
 * Added: JBD CAN protocol support with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/363 by @dmitrych5
 * Added: JBD UP16S series support, including daisy-chaining, with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/375 by @dmitrych5
 * Added: JK Inverter BMS - Heating informations with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/367 by @BitSeb
+* Changed: Default ProductName now includes the BMS unique identifier and the serial-port basename (e.g. `SerialBattery BB02 @ ttyUSB0 (JKBMS PB Model)`) so the GUI label tracks the current port across USB renumbering; the default CustomName is left empty so it acts as a pure user-override slot. Applies to any BMS class that does not override `custom_name()` / `product_name()` by @hsteinhaus
 * Added: JKBMS PB - Multi-battery RS485 fix for fw >= v15.36 with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/425 by @hsteinhaus
 * Added: JKBMS PB - Performance and stability improvements with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/428 by @hsteinhaus
 * Added: KS48100 BMS - Read SoH with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/344 by @kopierschnitte
