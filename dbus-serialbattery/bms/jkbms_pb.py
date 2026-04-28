@@ -438,6 +438,17 @@ class Jkbms_pb(Battery):
         """
         return self.unique_identifier_tmp
 
+    def custom_name(self) -> str:
+        # Empty so GUI falls back to ProductName (dynamic per boot).
+        # User-typed names from the GUI are persisted by
+        # dbushelper.callback_custom_name and override this default.
+        return ""
+
+    def product_name(self) -> str:
+        uid = self.unique_identifier_tmp or "0x" + self.address.hex()
+        iface = self.port.rsplit("/", 1)[-1]
+        return f"SerialBattery {uid} @ {iface} (JKBMS PB)"
+
     def get_balancing(self):
         return 1 if self.balancing else 0
 
