@@ -29,6 +29,8 @@ _BusConnection = type(
         "TYPE_SYSTEM": 0,
         "TYPE_SESSION": 1,
         "__new__": lambda cls, *a, **kw: object.__new__(cls),
+        # dbushelper.get_bus() checks this; stub must not raise AttributeError in tests.
+        "get_is_connected": lambda self: True,
     },
 )
 
