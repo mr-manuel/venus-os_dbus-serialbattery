@@ -3,9 +3,15 @@
 # Forward signals to the child process
 trap 'kill -TERM $PID' TERM INT
 
+# Derive port name from the service directory (dbus-serialbattery.<port>).
+# Lets manually-created service entries (e.g. for PTYs) work without depending
+# on serial-starter's template-rewriting step.
+SVC_DIR="$(dirname "$(readlink -f "$0")")"
+PORT_NAME="${SVC_DIR##*/dbus-serialbattery.}"
+
 # Start the main process
 exec 2>&1
-exec bash /data/apps/dbus-serialbattery/start-serialbattery.sh TTY &
+exec bash /data/apps/dbus-serialbattery/start-serialbattery.sh "$PORT_NAME" &
 
 # Capture the PID of the child process
 PID=$!
