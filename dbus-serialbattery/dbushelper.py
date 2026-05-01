@@ -1142,9 +1142,14 @@ class DbusHelper:
             else None
         )
 
-        # Charge control
-        self._dbusservice["/Info/MaxChargeCurrent"] = self.battery.control_charge_current
-        self._dbusservice["/Info/MaxDischargeCurrent"] = self.battery.control_discharge_current
+        # Charge control. Skip None writes so consumers like dbus-aggregate-batteries
+        # that arithmetic on these paths don't crash on transient None during startup
+        # or a dead-bus window. The initial value set at add_path() (static configured
+        # maximum) stays in place until manage_charge_and_discharge_current() runs.
+        if self.battery.control_charge_current is not None:
+            self._dbusservice["/Info/MaxChargeCurrent"] = self.battery.control_charge_current
+        if self.battery.control_discharge_current is not None:
+            self._dbusservice["/Info/MaxDischargeCurrent"] = self.battery.control_discharge_current
 
         # Voltage and charge control info (custom dbus paths)
         self._dbusservice["/Info/ChargeMode"] = self.battery.charge_mode
