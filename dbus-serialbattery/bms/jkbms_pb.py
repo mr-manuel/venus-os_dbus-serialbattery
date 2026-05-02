@@ -41,6 +41,11 @@ class Jkbms_pb(Battery):
 
     _last_command_time = 0.0
     _timing_logged = False
+    _consecutive_failures = 0
+    # Recycle the shared port after this many consecutive failed reads. pyserial
+    # leaves is_open=True after a USB device disappears, so without this the
+    # driver keeps reusing a stale fd indefinitely.
+    _RECYCLE_THRESHOLD = 8
 
     @property
     def addr_str(self):
@@ -52,12 +57,29 @@ class Jkbms_pb(Battery):
             Jkbms_pb._shared_ser = serial.Serial(self.port, baudrate=self.baud_rate, timeout=0.1)
         return Jkbms_pb._shared_ser
 
+    def _recycle_port(self):
+        """Force the next _get_ser() to reopen the port (e.g. after USB re-plug)."""
+        logger.warning(f"[{self.addr_str}] recycling serial port after {Jkbms_pb._consecutive_failures} consecutive failures")
+        try:
+            if Jkbms_pb._shared_ser is not None:
+                Jkbms_pb._shared_ser.close()
+        except Exception:
+            pass
+        Jkbms_pb._shared_ser = None
+        Jkbms_pb._consecutive_failures = 0
+
     def _read_with_retry(self, ser, command, timeout=0.5):
         """Send command and read response, retry once on failure."""
         result = self._read_response(ser, command, timeout)
         if not result:
             logger.warning(f"[{self.addr_str}] retry: {command[1:5].hex()}")
             result = self._read_response(ser, command, timeout)
+        if result:
+            Jkbms_pb._consecutive_failures = 0
+        else:
+            Jkbms_pb._consecutive_failures += 1
+            if Jkbms_pb._consecutive_failures >= Jkbms_pb._RECYCLE_THRESHOLD:
+                self._recycle_port()
         return result
 
     def test_connection(self):

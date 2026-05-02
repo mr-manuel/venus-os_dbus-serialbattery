@@ -113,9 +113,15 @@ if [ ! -f "$filename" ]; then
     chmod 755 "$filename"
 fi
 
-# add enable script to rc.local
+# add enable script to rc.local with --boot flag, so the boot run can skip
+# the unconditional kill cycle that would otherwise tear down the freshly-started
+# BMS service ~30 s after it first comes up.
 # log the output to a file and run it in the background to prevent blocking the boot process
-grep -qxF "bash /data/apps/dbus-serialbattery/enable.sh > /data/apps/dbus-serialbattery/startup.log 2>&1 &" $filename || echo "bash /data/apps/dbus-serialbattery/enable.sh > /data/apps/dbus-serialbattery/startup.log 2>&1 &" >> $filename
+old_rclocal_line="bash /data/apps/dbus-serialbattery/enable.sh > /data/apps/dbus-serialbattery/startup.log 2>&1 &"
+new_rclocal_line="bash /data/apps/dbus-serialbattery/enable.sh --boot > /data/apps/dbus-serialbattery/startup.log 2>&1 &"
+# remove the previous (unflagged) entry if present
+sed -i "\|^${old_rclocal_line}\$|d" "$filename"
+grep -qxF "$new_rclocal_line" "$filename" || echo "$new_rclocal_line" >> "$filename"
 
 
 
@@ -139,18 +145,25 @@ fi
 
 
 
-# stop all dbus-serialbattery services, if at least one exists
-echo "Stop all dbus-serialbattery services..."
-for service in /service/dbus-serialbattery.*; do
-    [ -e "$service" ] && svc -d "$service"
-done
+# Stop all dbus-serialbattery services unless we were invoked from rc.local with
+# --boot. Boot-time invocations must not kill the freshly-started driver: that
+# causes a ~30 s outage which breaks downstream consumers like
+# dbus-aggregate-batteries (which polls dbus once at startup).
+if [ "${1:-}" = "--boot" ]; then
+    echo "Boot invocation — leaving any already-supervised dbus-serialbattery alone."
+else
+    echo "Stop all dbus-serialbattery services..."
+    for service in /service/dbus-serialbattery.*; do
+        [ -e "$service" ] && svc -d "$service"
+    done
 
-sleep 1
+    sleep 1
 
-# kill driver, if still running
-pkill -f "supervise dbus-serialbattery.*"
-pkill -f "multilog .* /var/log/dbus-serialbattery.*"
-pkill -f "python .*/dbus-serialbattery.py /dev/tty.*"
+    # kill driver, if still running
+    pkill -f "supervise dbus-serialbattery.*"
+    pkill -f "multilog .* /var/log/dbus-serialbattery.*"
+    pkill -f "python .*/dbus-serialbattery.py /dev/tty.*"
+fi
 
 
 

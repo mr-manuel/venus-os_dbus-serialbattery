@@ -748,6 +748,39 @@ publishes ~100 properties per cycle. Mitigations:
 2. **Poll interval decoupling**: auto-increase logic uses serial+calc
    time only, excluding D-Bus overhead.
 
+### Custom serial port (PTY / network bridge)
+
+Serial-starter only auto-spawns the driver for ports it discovers via
+udev (USB serials). To run on a `socat`-bridged PTY or any other
+non-USB port, register a manual service entry. The runscripts derive
+the port name from the service-directory suffix, so no template
+rewriting is needed.
+
+```sh
+# 1. Create the PTY (example: Waveshare RS485↔TCP server at <host>:<port>)
+socat -d pty,link=/dev/ttyV0,raw,echo=0,b115200,user=root,group=dialout,mode=0660 \
+      tcp:<host>:<port> &
+
+# 2. Create a permanent service entry under /data/
+PORT=ttyV0
+SVC=/data/etc/dbus-serialbattery-custom/dbus-serialbattery.$PORT
+mkdir -p "$SVC/log"
+cp /data/apps/dbus-serialbattery/service/run     "$SVC/run"
+cp /data/apps/dbus-serialbattery/service/log/run "$SVC/log/run"
+ln -sf "$SVC" "/service/dbus-serialbattery.$PORT"
+
+# 3. Persist across reboot (Venus wipes /service/ symlinks)
+echo "ln -sf $SVC /service/dbus-serialbattery.$PORT" >> /data/rc.local
+```
+
+Verify on D-Bus: `com.victronenergy.battery.<port>__<addr>` per
+battery, e.g. `com.victronenergy.battery.ttyV0__0x01`.
+
+`socat` lifecycle is the user's responsibility — supervise it with
+your tool of choice. If `/dev/$PORT` is missing when runit picks the
+service up, the runscript exits and the service stays down until
+socat is up and `svc -u /service/dbus-serialbattery.$PORT` is run.
+
 ## Reference Documents
 
 - "极空BMS RS485 Modbus通用协议(V1.0)" — `JK_BMS.RS485.Modbus.v1_0.pdf`

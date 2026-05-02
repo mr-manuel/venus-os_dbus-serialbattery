@@ -44,6 +44,7 @@
 * Changed: Daren 485 BMS - Fixed charge/discharge calculation with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/343 by @kopierschnitte
 * Changed: Disabled BMS SOC alerts if `SOC_CALCULATION` is enabled. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/377 by @mr-manuel
 * Changed: Driver internals - Renamed callback variables/functions and added a better description by @mr-manuel
+* Changed: D-bus charge limits - Skip None writes to `/Info/MaxChargeCurrent` and `/Info/MaxDischargeCurrent` so consumers like `dbus-aggregate-batteries` don't crash with `TypeError: unsupported operand type(s) for *: 'NoneType' and 'int'` during the brief window before the first charge-control decision lands by @hsteinhaus
 * Changed: EG4-LL BMS - Added BMS configuration polling on startup to load cell/pack voltage, temperature, current, and SOC alarm thresholds from the BMS by @tuxntoast
 * Changed: EG4-LL BMS - Added CRC-16 checksum validation for all BMS reply frames by @tuxntoast
 * Changed: EG4-LL BMS - Added EG4AlarmManager class for threshold-based alarm evaluation with charge/discharge FET control by @tuxntoast
@@ -55,6 +56,7 @@
 * Changed: EG4-LL BMS - Improved serial port retry logic with automatic port recovery on SerialException by @tuxntoast
 * Changed: EG4-LL BMS - Improved startup log clarity by suppressing expected CH341 serial errors and retry messages to DEBUG level during the connection settling window by @tuxntoast
 * Changed: EG4-LL BMS - Improved USB-RS485 (CH341) connection reliability on startup by keeping the serial port open between retry attempts, adding a 60-second connection timeout loop, and disabling DTR/RTS hardware flow control to prevent adapter resets by @tuxntoast
+* Changed: enable.sh - Skip the unconditional kill cycle when invoked from `rc.local` with `--boot`, preventing a ~30 s outage at boot that broke downstream consumers like `dbus-aggregate-batteries` which poll dbus once at startup by @hsteinhaus
 * Changed: Exit behavior for excluded devices to behave like Victron services by @mr-manuel
 * Changed: Fix dbus connection leak which fixes problems on systems which multiple batteries with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/402 by @cgoudie
 * Changed: Fix issue with published JsonData, where None values were published as empty strings by @mr-manuel
@@ -68,6 +70,7 @@
 * Changed: JK Inverter BMS - Fixed serial number lenght by @mr-manuel
 * Changed: JKBMS BLE - Fixed negative temperature display. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/369 by @mr-manuel
 * Changed: JKBMS CAN - Correct calculation of arbitration_id for device_address > 0. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/288 with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/306 by @Hooorny
+* Changed: JKBMS PB - Auto-recover the shared RS485 port when the driver gets stuck after a USB re-plug or a persistent dead-bus: after 8 consecutive failed reads the fd is closed and reopened on next access by @hsteinhaus
 * Changed: JKBMS PB: Alarms were not set correctly @mr-manuel
 * Changed: KS48100 BMS - Fixed charge/discharge calculation with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/343 by @kopierschnitte
 * Changed: LLT/JBD BLE BMS - Fixed wrong charge/discharge fet assignment @mr-manuel
@@ -76,6 +79,7 @@
 * Changed: Mechanism to reset SOC via GUI, since it was not possible to set the same SOC twice by @mr-manuel
 * Changed: RV-C CAN BMS - Fixed wrong charge/discharge fet assignment @mr-manuel
 * Changed: Seplos BMS - Fix problems with unique identifier when daisy chained by @KoljaWindeler
+* Changed: Service runscripts now derive the serial port name from the service-directory suffix, so manually-created service entries (e.g. for socat-bridged PTYs) no longer depend on the `TTY` sentinel substitution by serial-starter. Fixes https://github.com/hsteinhaus/venus-os_dbus-serialbattery/issues/2 by @hsteinhaus
 * Changed: UBMS CAN code style to snake_case, various improvements and fixes by @gimx
 * Changed: Use Bluetooth MAC address as unique identifier for all Bluetooth BMS by @mr-manuel
 * Changed: Use correct temperature sensors for Daly CAN BMS instead of min/max values by @lex2k0
