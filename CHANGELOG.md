@@ -25,6 +25,7 @@
 ### What's Changed
 
 * Added: aiobmsble library (https://github.com/patman15/aiobmsble), which adds a lot of Bluetooth batteries to Venus OS by @mr-manuel
+* Added: XDZN/WattCycle BLE BMS - Added new BMS driver for XDZN_001 and WT-prefixed devices (e.g. WattCycle 314Ah LiFePO4) communicating over Bluetooth by @synergiaenergia
 * Added: Daren 485 BMS - Read SoH with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/344 by @kopierschnitte
 * Added: dbus caching to reduce writes and therefore CPU consumption with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/397 by @cgoudie
 * Added: Disable serial starter if not needed by @mr-manuel
