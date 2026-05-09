@@ -180,6 +180,7 @@ body:
         - Seplos v3
         - Sinowealth
         - Valence U-BMS
+        - Xdzn_Ble
     validations:
       required: true
 

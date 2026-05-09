@@ -55,6 +55,12 @@ See this checklist, if you want to [add a new BMS](https://mr-manuel.github.io/v
 
 For more details on the Victron dbus interface see [the official victron dbus documentation](https://github.com/victronenergy/venus/wiki/dbus)
 
+## Try it out — no setup required!
+
+Curious what dbus-serialbattery looks and feels like in action? Explore the interactive demo and play around with all the settings — completely risk-free. Nothing is saved, nothing can go wrong, and no device is needed. It's a great way to get familiar with the interface before or during your own setup.
+
+[Launch the interactive demo](https://mr-manuel.github.io/venus-os_gui-v2/)
+
 ## Join the community on Discord
 
 https://discord.gg/YXzFB8rSgx
