@@ -63,7 +63,7 @@ class LiTime_Ble(Battery):
         for byte_pos in range(16, 48, 2):
             (cell_volt,) = unpack_from("H", data, byte_pos)
             if cell_volt != 0:
-                if len(self.cells) >= nr_of_cells:
+                if len(self.cells) <= nr_of_cells:
                     self.cells.append(Cell(False))
                 cell_volt = cell_volt / 1000
                 self.cells[nr_of_cells].voltage = cell_volt
