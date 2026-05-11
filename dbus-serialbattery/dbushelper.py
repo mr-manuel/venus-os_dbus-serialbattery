@@ -1599,7 +1599,11 @@ class DbusHelper:
             value,
         )
         logger.debug(f'CustomName changed to "{value}" for {self.path_battery}: {result}')
-        return value if result else None
+        # Return truthy on success: VeDbusService.SetValue checks the callback
+        # return in boolean context, so returning ``value`` would reject empty
+        # strings (user clearing the field) even though set_settings persisted
+        # them. See ext/velib_python/vedbus.py:578.
+        return True if result else None
 
     def callback_soc_reset_to(self, path, value) -> int:
         """

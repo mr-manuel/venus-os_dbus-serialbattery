@@ -228,3 +228,39 @@ class TestReadResponse:
         assert result is not False
         assert len(result) == 300
         assert result[4] | result[5] << 8 == 1  # ftype=1 = settings
+
+
+class TestNaming:
+    """ProductName carries dynamic serial+interface info; CustomName is a
+    pure user-override slot (empty by default).
+    """
+
+    def _bms(self, addr=0x03, port="/dev/ttyUSB0", serial=""):
+        bms = _make_bms(addr=addr)
+        bms.port = port
+        bms.unique_identifier_tmp = serial
+        return bms
+
+    def test_product_name_with_serial_and_iface(self):
+        bms = self._bms(serial="BB02")
+        assert bms.product_name() == "SerialBattery BB02 @ ttyUSB0 (JKBMS PB)"
+
+    def test_product_name_falls_back_to_address_hex(self):
+        bms = self._bms(addr=0x05, serial="")
+        assert bms.product_name() == "SerialBattery 0x05 @ ttyUSB0 (JKBMS PB)"
+
+    def test_product_name_uses_port_basename(self):
+        bms = self._bms(port="/dev/ttyUSB1", serial="BB02")
+        assert "ttyUSB1" in bms.product_name()
+        assert "/dev/" not in bms.product_name()
+
+    def test_product_name_starts_with_serialbattery_prefix(self):
+        # Required for dbus-aggregate-batteries detection.
+        bms = self._bms(serial="BB02")
+        assert bms.product_name().startswith("SerialBattery ")
+
+    def test_custom_name_empty(self):
+        # GUI falls back to ProductName; user-typed names are persisted
+        # by dbushelper.callback_custom_name and override this default.
+        bms = self._bms(serial="BB02")
+        assert bms.custom_name() == ""

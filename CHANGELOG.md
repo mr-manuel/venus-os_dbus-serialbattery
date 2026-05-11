@@ -34,6 +34,7 @@
 * Added: JBD CAN protocol support with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/363 by @dmitrych5
 * Added: JBD UP16S series support, including daisy-chaining, with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/375 by @dmitrych5
 * Added: JK Inverter BMS - Heating informations with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/367 by @BitSeb
+* Added: JKBMS PB - Dynamic ProductName with battery serial and serial port basename (e.g. `SerialBattery BB02 @ ttyUSB0 (JKBMS PB)`); CustomName left empty by default so user-typed names are preserved as a true override by @hsteinhaus
 * Added: JKBMS PB - Multi-battery RS485 fix for fw >= v15.36 with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/425 by @hsteinhaus
 * Added: JKBMS PB - Performance and stability improvements with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/428 by @hsteinhaus
 * Added: KS48100 BMS - Read SoH with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/344 by @kopierschnitte
@@ -68,6 +69,7 @@
 * Changed: Fixed discharge current limit calculations when MOSFET temperature is not available, by @dmitrych5
 * Changed: Fixed problems with the `BLOCK_ON_DISCONNECT` behavior. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/309 by @mr-manuel
 * Changed: Fixed typo in activation instructions by @mr-manuel
+* Changed: GUI clearing of CustomName was silently ignored — `callback_custom_name` returned the new value, which is falsy for the empty string and caused VeDbusService to reject the write while `set_settings` had already persisted it; callback now returns truthy on success by @hsteinhaus
 * Changed: GUIv2: Add cell diff to mean and improve calculations to reduce CPU load. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/360 by @mr-manuel
 * Changed: HLPDATA BMS - Fixed wrong charge/discharge fet assignment @mr-manuel
 * Changed: HLPDATA BMS - Fixed wrong charge/discharge fet assignment @mr-manuel
