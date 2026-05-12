@@ -9,7 +9,6 @@ import types
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "dbus-serialbattery"))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "dbus-serialbattery", "ext", "velib_python"))
 
-# utils_ble pulls in bleak/dbus that are not available in test envs; stub it.
 sys.modules.setdefault("utils_ble", types.SimpleNamespace(Syncron_Ble=None))
 
 from battery import History  # noqa: E402
@@ -40,13 +39,7 @@ def _make_bms():
 
 
 def test_parse_status_does_not_grow_cells_on_repeated_calls():
-    """Regression test for issue #440.
-
-    parse_status is invoked once per BLE notification. Previously the cell-array
-    growth guard used >= so self.cells.append ran on every iteration, causing
-    cells to grow unboundedly and the dbushelper loop in dbushelper.py to write
-    to /Voltages/Cell5, Cell6, ... that were never registered as dbus paths.
-    """
+    """Regression for issue #440."""
     bms = _make_bms()
     payload = _build_status_payload(cell_voltage_mv=3320, nr_cells=4)
     for _ in range(10):
