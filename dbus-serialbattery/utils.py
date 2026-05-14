@@ -545,6 +545,11 @@ TEMPERATURE_NAMES: dict = {
     3: config["DEFAULT"]["TEMPERATURE_3_NAME"],
     4: config["DEFAULT"]["TEMPERATURE_4_NAME"],
 }
+TEMPERATURE_1_ADJUST: List[float] = get_list_from_config("DEFAULT", "TEMPERATURE_1_ADJUST", float)
+TEMPERATURE_2_ADJUST: List[float] = get_list_from_config("DEFAULT", "TEMPERATURE_2_ADJUST", float)
+TEMPERATURE_3_ADJUST: List[float] = get_list_from_config("DEFAULT", "TEMPERATURE_3_ADJUST", float)
+TEMPERATURE_4_ADJUST: List[float] = get_list_from_config("DEFAULT", "TEMPERATURE_4_ADJUST", float)
+TEMPERATURE_MOS_ADJUST: List[float] = get_list_from_config("DEFAULT", "TEMPERATURE_MOS_ADJUST", float)
 GUI_PARAMETERS_SHOW_ADDITIONAL_INFO: bool = get_bool_from_config("DEFAULT", "GUI_PARAMETERS_SHOW_ADDITIONAL_INFO")
 TELEMETRY: bool = get_bool_from_config("DEFAULT", "TELEMETRY")
 
