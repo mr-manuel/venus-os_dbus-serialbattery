@@ -23,6 +23,9 @@ from settingsdevice import SettingsDevice  # noqa: E402
 # Every DbusHelper uses this same peer; get_bus() caches one BusConnection for it (#402).
 # Each battery's VeDbusService uses a different name (_dbusname) and its own connection (#410).
 VICTRON_SETTINGS_DBUS_NAME = "com.victronenergy.settings"
+# Interface name each path in the settings service exposes in D-Bus introspection XML.
+# Distinct from VICTRON_SETTINGS_DBUS_NAME (the service/bus well-known name, lowercase 's').
+VICTRON_SETTINGS_IFACE_NAME = "com.victronenergy.Settings"
 
 _SENTINEL = object()
 
@@ -1352,21 +1355,27 @@ class DbusHelper:
                         if "Settings" in settings_battery_life and "State" in settings_battery_life["Settings"]["CGwacs"]["BatteryLife"]
                         else None
                     )
+                    # Venus OS returns SoC limits as float strings (e.g. "15.0"), so int() alone
+                    # would raise ValueError; float() parses the decimal first.
+                    minimum_soc_limit = (
+                        int(float(settings_battery_life["Settings"]["CGwacs"]["BatteryLife"]["MinimumSocLimit"]))
+                        if "Settings" in settings_battery_life and "MinimumSocLimit" in settings_battery_life["Settings"]["CGwacs"]["BatteryLife"]
+                        else None
+                    )
+                    soc_limit = (
+                        int(float(settings_battery_life["Settings"]["CGwacs"]["BatteryLife"]["SocLimit"]))
+                        if "Settings" in settings_battery_life and "SocLimit" in settings_battery_life["Settings"]["CGwacs"]["BatteryLife"]
+                        else None
+                    )
 
-                    if (
-                        hub4mode == 1
-                        and state != 9
-                        and "Settings" in settings_battery_life
-                        and "MinimumSocLimit" in settings_battery_life["Settings"]["CGwacs"]["BatteryLife"]
-                        and "SocLimit" in settings_battery_life["Settings"]["CGwacs"]["BatteryLife"]
-                    ):
+                    if hub4mode == 1 and state != 9 and minimum_soc_limit is not None and soc_limit is not None:
                         # Optimized without BatteryLife
                         if state >= 10 and state <= 12:
-                            time_to_go_soc = int(float(settings_battery_life["Settings"]["CGwacs"]["BatteryLife"]["MinimumSocLimit"]))
+                            time_to_go_soc = minimum_soc_limit
                             logger.debug(f"Time-to-Go: Use /Settings/CGwacs/BatteryLife/MinimumSocLimit: {time_to_go_soc}")
                         # Optimized with BatteryLife
                         else:
-                            time_to_go_soc = int(float(settings_battery_life["Settings"]["CGwacs"]["BatteryLife"]["SocLimit"]))
+                            time_to_go_soc = soc_limit
                             logger.debug(f"Time-to-Go: Use /Settings/CGwacs/BatteryLife/SocLimit: {time_to_go_soc}")
                     # External control
                     # Keep batteries charged
@@ -1504,7 +1513,7 @@ class DbusHelper:
                 result_sub = self.get_settings_with_values(bus, service, new_path)
                 self.merge_dicts(result, result_sub)
             elif child.tag == "interface":
-                if child.attrib["name"] == VICTRON_SETTINGS_DBUS_NAME:
+                if child.attrib["name"] == VICTRON_SETTINGS_IFACE_NAME:
                     settings_iface = dbus.Interface(obj, "com.victronenergy.BusItem")
                     method = settings_iface.get_dbus_method("GetValue")
                     try:
@@ -1570,7 +1579,7 @@ class DbusHelper:
         # iface = dbus.Interface(obj, "org.freedesktop.DBus.Introspectable")
         # xml_string = iface.Introspect()
         # print(xml_string)
-        settings_iface = dbus.Interface(obj, VICTRON_SETTINGS_DBUS_NAME)
+        settings_iface = dbus.Interface(obj, VICTRON_SETTINGS_IFACE_NAME)
         method = settings_iface.get_dbus_method("RemoveSettings")
         try:
             logger.debug(f"Removed setting at {object_path}")
@@ -1669,9 +1678,9 @@ class DbusHelper:
         """
         if value != 0:
             if utils.SOC_CALCULATION:
-                self.soc_calc = self.callback_value_reset_soc_to
-                self.soc_calc_capacity_remain = None  # reset SOC calculation cache, since SOC was force set
-                logger.info(f"SOC reset to {self.soc_calc}% by user")
+                self.battery.soc_calc = self.callback_value_reset_soc_to
+                self.battery.soc_calc_capacity_remain = None  # reset SOC calculation cache, since SOC was force set
+                logger.info(f"SOC reset to {self.battery.soc_calc}% by user")
             else:
                 self.battery.callback_soc_reset_to(path, value)
 

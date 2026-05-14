@@ -70,6 +70,7 @@
 * Changed: Fix wrong current if charging/discharging is blocked and current map is used by @mr-manuel
 * Changed: Fixed discharge current limit calculations when MOSFET temperature is not available, by @dmitrych5
 * Changed: Fixed problems with the `BLOCK_ON_DISCONNECT` behavior. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/309 by @mr-manuel
+* Changed: Fixed SOC manual reset via GUI having no effect when `SOC_CALCULATION` is enabled by @mr-manuel
 * Changed: Fixed typo in activation instructions by @mr-manuel
 * Changed: GUIv2 - With Venus OS `v3.80~21` GUIv2 plugins are used instead of fully customized GUI by @mr-manuel
 * Changed: GUIv2: Add cell diff to mean and improve calculations to reduce CPU load. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/360 by @mr-manuel
