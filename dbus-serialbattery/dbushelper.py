@@ -975,6 +975,13 @@ class DbusHelper:
                 # Calculate the values for the battery
                 self.battery.set_calculated_data()
 
+                # Adjust temperature readings
+                self.battery.temperature_1 = (self.battery.temperature_1 * utils.TEMPERATURE_1_ADJUST[1]) + utils.TEMPERATURE_1_ADJUST[0]
+                self.battery.temperature_2 = (self.battery.temperature_2 * utils.TEMPERATURE_2_ADJUST[1]) + utils.TEMPERATURE_2_ADJUST[0]
+                self.battery.temperature_3 = (self.battery.temperature_3 * utils.TEMPERATURE_3_ADJUST[1]) + utils.TEMPERATURE_3_ADJUST[0]
+                self.battery.temperature_4 = (self.battery.temperature_4 * utils.TEMPERATURE_4_ADJUST[1]) + utils.TEMPERATURE_4_ADJUST[0]
+                self.battery.temperature_mos = (self.battery.temperature_mos * utils.TEMPERATURE_MOS_ADJUST[1]) + utils.TEMPERATURE_MOS_ADJUST[0]
+
                 # This is to manage CVCL
                 self.battery.manage_charge_voltage()
 
