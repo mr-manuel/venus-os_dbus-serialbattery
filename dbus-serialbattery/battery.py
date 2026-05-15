@@ -1797,15 +1797,27 @@ class Battery(ABC):
     def get_capacity_remain(self) -> Union[float, None]:
         """
         Get the remaining capacity of the battery.
-        Use `self.capacity_remain` if it is set, otherwise calculate it using `self.capacity` and `self.soc_calc`.
+        When SOC_CALCULATION is enabled, derive from soc_calc so the displayed Ah matches the calculated SOC.
+        Otherwise use the BMS-reported value, falling back to soc_calc if the BMS does not provide it.
 
         :return: The remaining capacity of the battery
         """
+        if utils.SOC_CALCULATION and self.capacity is not None and self.soc_calc is not None:
+            return self.capacity * self.soc_calc / 100
         if self.capacity_remain is not None:
             return self.capacity_remain
         if self.capacity is not None and self.soc_calc is not None:
             return self.capacity * self.soc_calc / 100
         return None
+
+    def get_capacity_remain_bms(self) -> Union[float, None]:
+        """
+        Get the BMS-reported remaining capacity, regardless of SOC_CALCULATION.
+        Used to expose the raw BMS value alongside the calculated value for comparison.
+
+        :return: The BMS-reported remaining capacity, or None if not available
+        """
+        return self.capacity_remain
 
     def get_capacity_consumed(self) -> Union[float, None]:
         """
@@ -1816,6 +1828,17 @@ class Battery(ABC):
         if self.capacity is not None and self.get_capacity_remain() is not None:
             return abs(self.capacity - self.get_capacity_remain()) * -1
 
+        return None
+
+    def get_capacity_consumed_bms(self) -> Union[float, None]:
+        """
+        Get the BMS-reported consumed capacity, regardless of SOC_CALCULATION.
+        Used to expose the raw BMS value alongside the calculated value for comparison.
+
+        :return: The BMS-reported consumed capacity, or None if not available
+        """
+        if self.capacity is not None and self.get_capacity_remain_bms() is not None:
+            return abs(self.capacity - self.get_capacity_remain_bms()) * -1
         return None
 
     def get_time_to_soc(self, soc_target: float, percent_per_second: float, only_number: bool = False) -> str:

@@ -24,7 +24,6 @@
 
 ### What's Changed
 
-* Added: support calibration/adjustment of reported temperatures by @mike-s123
 * Added: aiobmsble library (https://github.com/patman15/aiobmsble), which adds a lot of Bluetooth batteries to Venus OS by @mr-manuel
 * Added: Daren 485 BMS - Read SoH with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/344 by @kopierschnitte
 * Added: dbus caching to reduce writes and therefore CPU consumption with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/397 by @cgoudie
@@ -68,6 +67,7 @@
 * Changed: Fix dbus connection leak which fixes problems on systems which multiple batteries with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/402 by @cgoudie
 * Changed: Fix issue with published JsonData, where None values were published as empty strings by @mr-manuel
 * Changed: Fix wrong current if charging/discharging is blocked and current map is used by @mr-manuel
+* Changed: Fixed consumed/remaining Ah displaying BMS values instead of calculated values when `SOC_CALCULATION` is enabled; BMSes that report remaining capacity (e.g. Daly CAN) previously caused `/Capacity` and `/ConsumedAmphours` to diverge from the calculated SOC. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/414 by @mr-manuel
 * Changed: Fixed discharge current limit calculations when MOSFET temperature is not available, by @dmitrych5
 * Changed: Fixed problems with the `BLOCK_ON_DISCONNECT` behavior. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/309 by @mr-manuel
 * Changed: Fixed SOC manual reset via GUI having no effect when `SOC_CALCULATION` is enabled by @mr-manuel

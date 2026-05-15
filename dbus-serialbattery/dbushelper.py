@@ -680,6 +680,20 @@ class DbusHelper:
             writeable=True,
             gettextcallback=lambda p, v: "{:0.0f}Ah".format(v),
         )
+        # add original BMS capacity values for comparing when SOC_CALCULATION overrides them
+        if utils.SOC_CALCULATION or utils.EXTERNAL_SENSOR_DBUS_PATH_SOC is not None:
+            self._dbusservice.add_path(
+                "/CapacityBms",
+                None,
+                writeable=True,
+                gettextcallback=lambda p, v: "{:0.2f}Ah".format(v),
+            )
+            self._dbusservice.add_path(
+                "/ConsumedAmphoursBms",
+                None,
+                writeable=True,
+                gettextcallback=lambda p, v: "{:0.0f}Ah".format(v),
+            )
 
         # Create SOC, DC and System items
         self._dbusservice.add_path("/Soc", None, writeable=True)
@@ -1118,6 +1132,9 @@ class DbusHelper:
         self._dbusservice["/Dc/0/Temperature"] = self.battery.get_temperature()
         self._dbusservice["/Capacity"] = self.battery.get_capacity_remain()
         self._dbusservice["/ConsumedAmphours"] = self.battery.get_capacity_consumed()
+        if utils.SOC_CALCULATION or utils.EXTERNAL_SENSOR_DBUS_PATH_SOC is not None:
+            self._dbusservice["/CapacityBms"] = self.battery.get_capacity_remain_bms()
+            self._dbusservice["/ConsumedAmphoursBms"] = self.battery.get_capacity_consumed_bms()
 
         midpoint, deviation = self.battery.get_midvoltage()
         if midpoint is not None:
