@@ -5,7 +5,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 from battery import Battery, Cell
-from utils import SOC_CALCULATION, generate_unique_identifier, logger
+from utils import SOC_CALCULATION, USE_BMS_DVCC_VALUES, generate_unique_identifier, logger
 from struct import unpack_from
 from time import sleep, time
 import sys
@@ -191,8 +191,9 @@ class RV_C_Can(Battery):
 
             # BATT_STAT4 Target charge current and voltage
             elif normalized_arbitration_id in self.CAN_FRAMES[self.BATT_STAT4]:
-                self.max_battery_voltage = unpack_from("<H", bytes([data[3], data[4]]))[0] / 20
-                self.max_battery_charge_current = unpack_from("<H", bytes([data[5], data[6]]))[0] / 100
+                if USE_BMS_DVCC_VALUES:
+                    self.max_battery_voltage = unpack_from("<H", bytes([data[3], data[4]]))[0] / 20
+                    self.max_battery_charge_current = unpack_from("<H", bytes([data[5], data[6]]))[0] / 100
 
                 # check if all needed data is available
                 data_check += 4
