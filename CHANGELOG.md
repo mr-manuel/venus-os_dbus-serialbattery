@@ -73,6 +73,7 @@
 * Changed: Fixed problems with the `BLOCK_ON_DISCONNECT` behavior. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/309 by @mr-manuel
 * Changed: Fixed SOC manual reset via GUI having no effect when `SOC_CALCULATION` is enabled by @mr-manuel
 * Changed: Fixed typo in activation instructions by @mr-manuel
+* Changed: Guard voltage and current limit assignments with `USE_BMS_DVCC_VALUES`; replace hardcoded limits with `MAX_CELL_VOLTAGE`, `MAX_BATTERY_CHARGE_CURRENT`, and `MAX_BATTERY_DISCHARGE_CURRENT` config constants. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/454 by @mr-manuel
 * Changed: GUIv2 - With Venus OS `v3.80~21` GUIv2 plugins are used instead of fully customized GUI by @mr-manuel
 * Changed: GUIv2: Add cell diff to mean and improve calculations to reduce CPU load. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/360 by @mr-manuel
 * Changed: History values: Fix calculation of some values by @mr-manuel

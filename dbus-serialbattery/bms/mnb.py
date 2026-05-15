@@ -6,7 +6,7 @@
 # https://community.victronenergy.com/comments/231924/view.html
 
 from battery import Protection, Battery, Cell
-from utils import logger
+from utils import logger, MAX_CELL_VOLTAGE, MIN_CELL_VOLTAGE, MAX_BATTERY_CHARGE_CURRENT, MAX_BATTERY_DISCHARGE_CURRENT
 from bms.mnb_utils_max17853 import data_cycle, init_max
 import sys
 
@@ -65,10 +65,8 @@ class MNB(Battery):
         self.poll_interval = None
         self.type = self.BATTERYTYPE
         self.inst_capacity = None
-        self.V_C_min = None
-        self.V_C_max = None
-        self.max_battery_voltage = None
-        self.min_battery_voltage = None
+        self.V_C_min = MIN_CELL_VOLTAGE
+        self.V_C_max = MAX_CELL_VOLTAGE
         self.capacity = None
         self.C_rating = None
         self.current = None
@@ -114,17 +112,11 @@ class MNB(Battery):
         # *****************************************************************
         self.inst_capacity = 36 * 3.6  # Equivalent cell capacity Ah
         self.C_rating = 1  # Max current/Ah eg 1, 0.5 or 0.25
-        self.max_battery_charge_current = self.inst_capacity * self.C_rating  # MAX_BATTERY_CHARGE_CURRENT = Crating * Capacity
-        self.max_battery_discharge_current = self.inst_capacity * self.C_rating  # MAX_BATTERY_DISCHARGE_CURRENT
-        self.V_C_min = 2.55  # Min cell voltage permitted
-        self.V_C_max = 3.65  # Max cell voltage permitted
         self.cell_count = 8  # Number of cells in series (max) 8 for 24V
         self.version = "V2.01"
         # temperature_sensors = 6
         self.T_C_max = 40
         self.T_C_min = 15
-        self.max_battery_voltage = self.V_C_max * self.cell_count
-        self.min_battery_voltage = self.V_C_min * self.cell_count
         self.hardware_version = "MNB_BMS " + str(self.cell_count) + "S"
         self.poll_interval = 1000  # scan repeat time, ms
         for c in range(self.cell_count):
