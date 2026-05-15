@@ -6,7 +6,11 @@
 # https://community.victronenergy.com/comments/231924/view.html
 
 from battery import Protection, Battery, Cell
+<<<<<<< HEAD
 from utils import logger, MAX_CELL_VOLTAGE, MIN_CELL_VOLTAGE, MAX_BATTERY_CHARGE_CURRENT, MAX_BATTERY_DISCHARGE_CURRENT
+=======
+from utils import logger, MAX_CELL_VOLTAGE, MIN_CELL_VOLTAGE
+>>>>>>> refs/remotes/origin/Temperature_adjust
 from bms.mnb_utils_max17853 import data_cycle, init_max
 import sys
 
