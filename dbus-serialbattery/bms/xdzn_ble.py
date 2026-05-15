@@ -28,7 +28,7 @@ import struct
 from typing import Optional
 
 from battery import Battery, Cell
-from utils import logger
+from utils import logger, MAX_CELL_VOLTAGE, MAX_BATTERY_CHARGE_CURRENT, MAX_BATTERY_DISCHARGE_CURRENT
 
 # ── BLE UUIDs ──────────────────────────────────────────────────────────────
 
@@ -156,9 +156,9 @@ class Xdzn_Ble(Battery):
         self.address = address
         self.cell_count = 4
         self.capacity = 314.0
-        self.max_battery_voltage = 4 * 3.65
-        self.max_battery_charge_current = 150.0
-        self.max_battery_discharge_current = 200.0
+        self.max_battery_voltage = 4 * MAX_CELL_VOLTAGE
+        self.max_battery_charge_current = MAX_BATTERY_CHARGE_CURRENT
+        self.max_battery_discharge_current = MAX_BATTERY_DISCHARGE_CURRENT
         self.charge_fet = True
         self.discharge_fet = True
         self.min_battery_voltage = 4 * 2.80
@@ -336,7 +336,7 @@ class Xdzn_Ble(Battery):
             analog = self._parse_analog(self._parse_frame_data(raw_a))
             if analog:
                 self.cell_count = analog.get("cell_count", 4)
-                self.max_battery_voltage = self.cell_count * 3.65
+                self.max_battery_voltage = self.cell_count * MAX_CELL_VOLTAGE
                 self.min_battery_voltage = self.cell_count * 2.80
                 self.cells = [Cell(False) for _ in range(self.cell_count)]
                 logger.info(
@@ -374,7 +374,7 @@ class Xdzn_Ble(Battery):
             if result:
                 self.cell_count = result.get("cell_count", 4)
                 self.capacity = result.get("design_capacity", 314.0)
-                self.max_battery_voltage = self.cell_count * 3.65
+                self.max_battery_voltage = self.cell_count * MAX_CELL_VOLTAGE
                 self.min_battery_voltage = self.cell_count * 2.80
 
             self.cells = [Cell(False) for _ in range(self.cell_count)]

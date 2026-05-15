@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from enum import Enum, IntFlag
 from struct import pack, Struct, error as StructError
 from typing import ClassVar, Dict, Optional, Type, TypeVar
-from utils import SOC_CALCULATION, logger, read_serialport_data, AUTO_RESET_SOC, UP16S_REQUIRE_DIRECT_CONNECTION
+from utils import MAX_CELL_VOLTAGE, USE_BMS_DVCC_VALUES, SOC_CALCULATION, logger, read_serialport_data, AUTO_RESET_SOC, UP16S_REQUIRE_DIRECT_CONNECTION
 import serial
 import time
 import termios
@@ -431,18 +431,21 @@ class LltJbd_Up16s(Battery):
                 pack_status.discharge_current_limit = individual_pack_status.discharge_current_limit
 
         # Take the minimum of the aggregated and non-aggregated current, in case master knows something we don't and reduced the aggregated current.
-        self.max_battery_charge_current = self.apply_aggregated_current_limit_from_master(
-            self.from_raw_current_to_amps(pack_status.charge_current_limit),
-            shared_data.master_aggregated_charge_current_limit_amps,
-            shared_data.master_aggregated_last_update_timestamp,
-        )
-        self.max_battery_discharge_current = self.apply_aggregated_current_limit_from_master(
-            self.from_raw_current_to_amps(pack_status.discharge_current_limit),
-            shared_data.master_aggregated_discharge_current_limit_amps,
-            shared_data.master_aggregated_last_update_timestamp,
-        )
-        self.min_battery_voltage = self.from_raw_dvcc_voltage_to_volts(pack_status.minimum_discharge_voltage)
-        self.max_battery_voltage = self.from_raw_dvcc_voltage_to_volts(pack_status.maximum_charge_voltage)
+        if USE_BMS_DVCC_VALUES:
+            self.max_battery_charge_current = self.apply_aggregated_current_limit_from_master(
+                self.from_raw_current_to_amps(pack_status.charge_current_limit),
+                shared_data.master_aggregated_charge_current_limit_amps,
+                shared_data.master_aggregated_last_update_timestamp,
+            )
+            self.max_battery_discharge_current = self.apply_aggregated_current_limit_from_master(
+                self.from_raw_current_to_amps(pack_status.discharge_current_limit),
+                shared_data.master_aggregated_discharge_current_limit_amps,
+                shared_data.master_aggregated_last_update_timestamp,
+            )
+            self.min_battery_voltage = self.from_raw_dvcc_voltage_to_volts(pack_status.minimum_discharge_voltage)
+            self.max_battery_voltage = self.from_raw_dvcc_voltage_to_volts(pack_status.maximum_charge_voltage)
+        elif pack_status.cell_count:
+            self.max_battery_voltage = round(MAX_CELL_VOLTAGE * pack_status.cell_count, 2)
 
         pack_status_soc = self.from_raw_high_resolution_percentage(pack_status.soc)
         if pack_params_2:

@@ -16,6 +16,7 @@ from battery import Battery, Cell
 from utils import (
     get_connection_error_message,
     logger,
+    USE_BMS_DVCC_VALUES,
 )
 from struct import unpack_from
 from time import sleep
@@ -221,10 +222,11 @@ class LltJbd_Can(Battery):
                 discharge_current_limit = unpack_from("<H", data, 4)[0] / 10
                 discharge_voltage = unpack_from("<H", data, 6)[0] / 10
 
-                self.max_battery_charge_current = charge_current_limit
-                self.max_battery_discharge_current = discharge_current_limit
-                self.max_battery_voltage = charge_voltage
-                self.min_battery_voltage = discharge_voltage
+                if USE_BMS_DVCC_VALUES:
+                    self.max_battery_charge_current = charge_current_limit
+                    self.max_battery_discharge_current = discharge_current_limit
+                    self.max_battery_voltage = charge_voltage
+                    self.min_battery_voltage = discharge_voltage
 
             # 0x355: SOC and SOH
             elif frame_id in self.CAN_FRAMES[self.SOC_SOH]:

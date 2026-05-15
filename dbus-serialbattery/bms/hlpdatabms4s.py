@@ -4,7 +4,7 @@
 # Updated by https://github.com/peterohman
 
 from battery import Battery, Cell
-from utils import get_connection_error_message, logger
+from utils import get_connection_error_message, logger, USE_BMS_DVCC_VALUES
 import serial
 from time import sleep
 import sys
@@ -103,16 +103,18 @@ class HLPdataBMS4S(Battery):
             logger.error(">>> ERROR: BatterySize")
             return False
         self.capacity = int(par)
-        v = get_par("VoltHigh= ", s)
-        if v is False:
-            logger.error(">>> ERROR: VoltHigh")
-            return False
-        self.max_battery_voltage = float(v) * float(4)
-        v = get_par("VoltLow= ", s)
-        if v is False:
-            logger.error(">>> ERROR: VoltLow")
-            return False
-        self.min_battery_voltage = float(v) * float(4)
+
+        if USE_BMS_DVCC_VALUES:
+            v = get_par("VoltHigh= ", s)
+            if v is False:
+                logger.error(">>> ERROR: VoltHigh")
+                return False
+            self.max_battery_voltage = float(v) * float(4)
+            v = get_par("VoltLow= ", s)
+            if v is False:
+                logger.error(">>> ERROR: VoltLow")
+                return False
+            self.min_battery_voltage = float(v) * float(4)
         return True
 
     def read_status_data(self):
