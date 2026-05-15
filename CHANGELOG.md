@@ -24,6 +24,7 @@
 
 ### What's Changed
 
+* Added: temperature sensor compensation, see config.default.ini for info by @mike-s123
 * Added: `/CapacityBms` and `/ConsumedAmphoursBms` D-Bus paths to expose the raw BMS remaining/consumed Ah values alongside the calculated ones when `SOC_CALCULATION` or `EXTERNAL_SENSOR_DBUS_PATH_SOC` is active, mirroring the existing `/SocBms` path. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/414 by @mr-manuel
 * Added: aiobmsble library (https://github.com/patman15/aiobmsble), which adds a lot of Bluetooth batteries to Venus OS by @mr-manuel
 * Added: Daren 485 BMS - Read SoH with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/344 by @kopierschnitte
