@@ -30,6 +30,12 @@ VICTRON_SETTINGS_IFACE_NAME = "com.victronenergy.Settings"
 _SENTINEL = object()
 
 
+def _adjust_temperature(value, adjustment):
+    if value is None:
+        return None
+    return (value * adjustment[1]) + adjustment[0]
+
+
 class _CachedDbusProxy:
     """Thin proxy around VeDbusService that suppresses redundant D-Bus writes.
 
@@ -976,11 +982,11 @@ class DbusHelper:
                 self.battery.set_calculated_data()
 
                 # Adjust temperature readings
-                self.battery.temperature_1 = (self.battery.temperature_1 * utils.TEMPERATURE_1_ADJUST[1]) + utils.TEMPERATURE_1_ADJUST[0]
-                self.battery.temperature_2 = (self.battery.temperature_2 * utils.TEMPERATURE_2_ADJUST[1]) + utils.TEMPERATURE_2_ADJUST[0]
-                self.battery.temperature_3 = (self.battery.temperature_3 * utils.TEMPERATURE_3_ADJUST[1]) + utils.TEMPERATURE_3_ADJUST[0]
-                self.battery.temperature_4 = (self.battery.temperature_4 * utils.TEMPERATURE_4_ADJUST[1]) + utils.TEMPERATURE_4_ADJUST[0]
-                self.battery.temperature_mos = (self.battery.temperature_mos * utils.TEMPERATURE_MOS_ADJUST[1]) + utils.TEMPERATURE_MOS_ADJUST[0]
+                self.battery.temperature_1 = _adjust_temperature(self.battery.temperature_1, utils.TEMPERATURE_1_ADJUST)
+                self.battery.temperature_2 = _adjust_temperature(self.battery.temperature_2, utils.TEMPERATURE_2_ADJUST)
+                self.battery.temperature_3 = _adjust_temperature(self.battery.temperature_3, utils.TEMPERATURE_3_ADJUST)
+                self.battery.temperature_4 = _adjust_temperature(self.battery.temperature_4, utils.TEMPERATURE_4_ADJUST)
+                self.battery.temperature_mos = _adjust_temperature(self.battery.temperature_mos, utils.TEMPERATURE_MOS_ADJUST)
 
                 # This is to manage CVCL
                 self.battery.manage_charge_voltage()

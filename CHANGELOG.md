@@ -78,6 +78,7 @@
 * Changed: GUIv2 - With Venus OS `v3.80~21` GUIv2 plugins are used instead of fully customized GUI by @mr-manuel
 * Changed: GUIv2: Add cell diff to mean and improve calculations to reduce CPU load. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/360 by @mr-manuel
 * Changed: History values: Fix calculation of some values by @mr-manuel
+* Changed: Temperature compensation - Preserve missing temperature sensor values instead of crashing when applying adjustment settings. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/457 by @akmhatey-ai
 * Changed: HLPDATA BMS - Fixed wrong charge/discharge fet assignment @mr-manuel
 * Changed: HLPDATA BMS - Fixed wrong charge/discharge fet assignment @mr-manuel
 * Changed: Improved BMS Cable Alarm Logic. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/309 by @mr-manuel
