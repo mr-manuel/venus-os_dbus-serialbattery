@@ -275,7 +275,12 @@ class Jkbms_pb(Battery):
 
             # hardware newer than 15A and 15A with fw >= 15.41 support the dedicated heating temperature setting
             # older combinations fall back to the Bat Charge Under Temperature and Reset value
-            if hw_version > "15A" or (hw_version == "15A" and sw_version >= "15.41"):
+            try:
+                sw_version_tuple = tuple(int(part) for part in sw_version.split("."))
+            except ValueError:
+                sw_version_tuple = ()
+
+            if hw_version > "15A" or (hw_version == "15A" and sw_version_tuple >= (15, 41)):
                 self.heater_temperature_start = TMPStartHeating
                 self.heater_temperature_stop = TMPStopHeating
             else:
