@@ -287,7 +287,7 @@ class Jkbms_pb(Battery):
 
             ODDRunTime = unpack_from("<I", status_data, 38)[0]  # 1 unit32 # runtime of the system in seconds
             PWROnTimes = unpack_from("<I", status_data, 42)[0]  # 1 unit32 # how many startups the system has done
-            serial_nr = status_data[46:61].decode("utf-8").split("\x00", 1)[0]  # serialnumber 16 chars max
+            serial_nr = status_data[46:61].decode("utf-8").split("\x00", 1)[0].strip()  # serialnumber 16 chars max
             usrData = status_data[102:117].decode("utf-8").split("\x00", 1)[0]  # usrData 16 chars max
             pin = status_data[118:133].decode("utf-8").split("\x00", 1)[0]  # pin 16 chars max
             usrData2 = status_data[134:149].decode("utf-8").split("\x00", 1)[0]  # usrData 2 16 chars max
