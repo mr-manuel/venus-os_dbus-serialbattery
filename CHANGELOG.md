@@ -39,6 +39,7 @@
 * Added: JKBMS PB - Performance and stability improvements with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/428 by @hsteinhaus
 * Added: KS48100 BMS - Read SoH with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/344 by @kopierschnitte
 * Added: LLT/JBD BLE: Add BLE UUID auto-detection for JBD/DH04 variants with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/441 by @alexsanzder
+* Added: Pace BMS: Supports now addresses with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/477 by @KoljaWindeler
 * Added: Prevent GUI modification installations by setting `GUI_INSTALL_CUSTOMIZATIONS` to `False` by @mr-manuel
 * Added: Set SOC manually via GUI if SOC_CALCULATION is enabled by @mr-manuel
 * Added: Temperature sensor compensation, see config.default.ini for info by @mike-s123

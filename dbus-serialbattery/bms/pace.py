@@ -23,27 +23,51 @@ class Pace(Battery):
     LENGTH_POS = 2  # ignored
     LENGTH_SIZE = "H"  # ignored
 
+    def _build_command(self, cmd_part: bytes) -> bytes:
+        # 1. Basis-Header (SOI + Version)
+        soi_and_version = b"\x7e" + b"25"
+
+        # 2. Adresse  b'\x01' -> b'01')
+        if isinstance(self.address, bytes):
+            addr_val = self.address[0] if len(self.address) > 0 else 0
+        else:
+            addr_val = int(self.address)
+        addr_ascii = f"{addr_val:02X}".encode("ascii")
+
+        # 3. connect
+        cmd_without_crc = soi_and_version + addr_ascii + cmd_part
+
+        # 4. Checksu
+        cal_chk = 0
+        for i in range(1, len(cmd_without_crc)):
+            cal_chk += cmd_without_crc[i]
+
+        cal_chk = 0xFFFF - cal_chk % 65536 + 1
+        crc_ascii = f"{cal_chk:04X}".encode("ascii")
+
+        logger.debug((cmd_without_crc + crc_ascii + b"\x0d").hex(" "))
+        return cmd_without_crc + crc_ascii + b"\x0d"
+
     @property
     def command_status(self):
-        return b"\x7e\x32\x35\x30\x30\x34\x36\x34\x32\x45\x30\x30\x32\x46\x46\x46\x44\x30\x36\x0d"
+        return self._build_command(b"4642E002FF")
 
     @property
     def command_software_version(self):
-        return b"\x7e\x32\x35\x30\x30\x34\x36\x43\x31\x30\x30\x30\x30\x46\x44\x39\x42\x0d"
+        return self._build_command(b"46C10000")
 
     @property
     def command_serial_nr(self):
-        return b"\x7e\x32\x35\x30\x30\x34\x36\x43\x32\x30\x30\x30\x30\x46\x44\x39\x41\x0d"
+        return self._build_command(b"46C20000")
 
     @property
-    def command_fuses(self):  # warn information
-        return b"\x7e\x32\x35\x30\x30\x34\x36\x34\x34\x45\x30\x30\x32\x30\x31\x46\x44\x32\x46\x0d"
+    def command_fuses(self):
+        return self._build_command(b"4644E00201")
 
     def test_connection(self):
         # call a function that will connect to the battery, send a command and retrieve the result.
         # The result or call should be unique to this BMS. Battery name or version, etc.
         # Return True if success, False for failure
-
         try:
             result = self.get_settings()
             result = result and self.read_status_data()
@@ -443,6 +467,10 @@ class Pace(Battery):
             self.LENGTH_SIZE,  # ignored
             battery_online=self.online,
         )
+
+        logger.debug("received:")
+        logger.debug(data.hex(" "))
+
         if data is False:
             return False
 
@@ -450,6 +478,12 @@ class Pace(Battery):
             logger.debug("SOI found")
             logger.debug("Version: " + chr(data[1]) + chr(data[2]))
             logger.debug("Adr: " + chr(data[3]) + chr(data[4]))
+            received_addr_int = int(data[3:5], 16)
+            current_addr_int = self.address[0] if isinstance(self.address, bytes) else int(self.address)
+            if received_addr_int != current_addr_int:
+                logger.error(">>> ERROR: return address incorrect expected " + str(current_addr_int) + " but got " + str(received_addr_int))
+                return False
+
             payload_length = int(data[10:13], 16)
             if len(data) >= (13 + payload_length + 5):
                 # CRC check
