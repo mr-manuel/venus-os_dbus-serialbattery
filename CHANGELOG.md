@@ -94,6 +94,7 @@
 * Changed: LiTime BLE BMS - Fixed unbounded cell-array growth in `parse_status` that flooded the log with `KeyError('/Voltages/CellN')` exceptions because `dbushelper` only registers paths for the initial cell count. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/440
 * Changed: LLT/JBD BLE BMS - Fixed wrong charge/discharge fet assignment @mr-manuel
 * CHanged: LLT/JBD BMS - Fixed issue with checksum missing bytes by @TheRealSbs
+* Changed: LLT/JBD UP16S BMS - Fixed reading 4 fault/alarm values @dmitrych5
 * Changed: Made some dbus settings silent to not flood the localsettings service log by @mr-manuel
 * Changed: Mechanism to reset SOC via GUI, since it was not possible to set the same SOC twice by @mr-manuel
 * Changed: RV-C CAN BMS - Fixed wrong charge/discharge fet assignment @mr-manuel
