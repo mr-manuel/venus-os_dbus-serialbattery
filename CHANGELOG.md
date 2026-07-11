@@ -50,6 +50,7 @@
 * Changed: Daly BMS & Daly CAN BMS: Fix high charge/discharge current alarm. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/378 by @mr-manuel
 * Changed: Daren 485 BMS - Fixed charge/discharge calculation with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/343 by @kopierschnitte
 * Changed: dbushelper.py - Ensure loading of newest battery data if more than one duplicate exists by @lex2k0
+* Changed: dbushelper.py - Refresh the `LastSeen` setting daily while the driver is running. Previously it was written only at startup, so after more than 30 days of continuous uptime a restart deleted the settings (device instance, custom name, history) of all other batteries sharing the port by @dmitrych5
 * Changed: dbushelper.py - Reworked save settings methods by @lex2k0
 * Changed: Decoupled SOC Reset after x days from the need that the battery has to switch to bulk charge, thus after every x days are passed by there will be a bulk charge / top balancing by @lex2k0
 * Changed: Default ProductName now includes the BMS unique identifier and the serial-port basename (e.g. `SerialBattery BB02 @ ttyUSB0 (JKBMS PB Model)`) so the GUI label tracks the current port across USB renumbering; the default CustomName is left empty so it acts as a pure user-override slot. Applies to any BMS class that does not override `custom_name()` / `product_name()` by @hsteinhaus
