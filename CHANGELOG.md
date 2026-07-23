@@ -69,6 +69,7 @@
 * Changed: EG4-LL BMS - Improved USB-RS485 (CH341) connection reliability on startup by keeping the serial port open between retry attempts, adding a 60-second connection timeout loop, and disabling DTR/RTS hardware flow control to prevent adapter resets by @tuxntoast
 * Changed: enable.sh - Skip the unconditional kill cycle when invoked from `rc.local` with `--boot`, preventing a ~30 s outage at boot that broke downstream consumers like `dbus-aggregate-batteries` which poll dbus once at startup by @hsteinhaus
 * Changed: Exit behavior for excluded devices to behave like Victron services by @mr-manuel
+* Changed: Felicity BMS: derive real cell_count and filter 0x7FFF temp sentinel with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/484 from @talas9
 * Changed: Fix dbus connection leak which fixes problems on systems which multiple batteries with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/402 by @cgoudie
 * Changed: Fix issue with published JsonData, where None values were published as empty strings by @mr-manuel
 * Changed: Fix wrong current if charging/discharging is blocked and current map is used by @mr-manuel
