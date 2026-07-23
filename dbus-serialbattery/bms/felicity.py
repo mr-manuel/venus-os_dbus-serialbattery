@@ -29,7 +29,7 @@ class Felicity(Battery):
 
     command_read = b"\x03"
     command_cell_voltages = b"\x13\x2a\x00\x10"  # Registers 4906
-    command_bms_temperature_1_3 = b"\x13\x39\x00\x05"  # Register  4929-4931 (tempsensor1-3)
+    command_bms_temperature_1_3 = b"\x13\x39\x00\x05"  # Register 4921-4925 (offset 0 unused, tempsensor1-3 at offsets 1-3)
 
     command_dvcc = b"\x13\x1c\x00\x04"  # Registers  4892(charger and discharger informations)
     command_status = b"\x13\x02\x00\x03"  # Registers 4866(battery status and fault informations)
@@ -114,7 +114,21 @@ class Felicity(Battery):
         self.serial_number = s1 + s2 + s3 + s4 + s5
         logger.debug(">>> INFO: Battery Serialnumber: %s", self.serial_number)
 
-        self.cell_count = 16
+        # Register 4906 exposes 16 cell voltage slots regardless of how many
+        # cells are physically wired; unpopulated slots read back 0x7FFF.
+        # Count only populated slots instead of assuming all 16 are real
+        # (confirmed on a 2-pack / 8S felicity unit where slots 8-15 read 0x7FFF).
+        cell_volt_data = self.read_serial_data_felicity(self.command_cell_voltages)
+        if cell_volt_data is False or len(cell_volt_data) != 32:
+            logger.error(">>> INFO: Cell Data size are wrong, cannot determine cell_count")
+            return False
+
+        self.cell_count = 0
+        for c in range(16):
+            if unpack_from(">H", cell_volt_data, c * 2)[0] == 0x7FFF:
+                continue
+            self.cell_count += 1
+
         for c in range(self.cell_count):
             self.cells.append(Cell(False))
 
@@ -238,14 +252,22 @@ class Felicity(Battery):
         if len(temperature_1_3_data) != 10:
             logger.error(">>> INFO: Temp Data size are wrong: %s", len(temperature_1_3_data))
         else:
-            self.temperature_1 = unpack_from(">h", temperature_1_3_data, 1 * 2)[0]
-            self.temperature_2 = unpack_from(">h", temperature_1_3_data, 2 * 2)[0]
-            self.temperature_3 = unpack_from(">h", temperature_1_3_data, 3 * 2)[0]
+            temp_1 = unpack_from(">h", temperature_1_3_data, 1 * 2)[0]
+            temp_2 = unpack_from(">h", temperature_1_3_data, 2 * 2)[0]
+            temp_3 = unpack_from(">h", temperature_1_3_data, 3 * 2)[0]
+
+            # 0x7FFF marks an unpopulated sensor slot on this BMS. Left as-is
+            # it is not None, so battery.py's get_filtered_temperature_map()
+            # will not exclude it, and it drags get_temperature()'s average
+            # up by thousands of degrees.
+            self.temperature_1 = temp_1 if temp_1 != 0x7FFF else None
+            self.temperature_2 = temp_2 if temp_2 != 0x7FFF else None
+            self.temperature_3 = temp_3 if temp_3 != 0x7FFF else None
 
             logger.debug(">>> INFO: Battery TempMos: %f C", self.temperature_mos)
-            logger.debug(">>> INFO: Battery Temperature_1: %f C", self.temperature_1)
-            logger.debug(">>> INFO: Battery Temperature_2: %f C", self.temperature_2)
-            logger.debug(">>> INFO: Battery Temperature_3: %f C", self.temperature_3)
+            logger.debug(">>> INFO: Battery Temperature_1: %s C", self.temperature_1)
+            logger.debug(">>> INFO: Battery Temperature_2: %s C", self.temperature_2)
+            logger.debug(">>> INFO: Battery Temperature_3: %s C", self.temperature_3)
 
         return True
 
