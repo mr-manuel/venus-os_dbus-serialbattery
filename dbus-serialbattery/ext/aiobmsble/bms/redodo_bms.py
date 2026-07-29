@@ -97,8 +97,6 @@ class BMS(BaseBMS):
         """Return 16-bit UUID of characteristic that provides write property."""
         return "ffe2"
 
-    # async def _fetch_device_info(self) -> BMSInfo: use default
-
     def _notification_handler(
         self, _sender: BleakGATTCharacteristic, data: bytearray
     ) -> None:
@@ -142,7 +140,7 @@ class BMS(BaseBMS):
                 next(
                     i
                     for i in range(BMS._MAX_TEMP, 1, -1)
-                    if result["temp_values"][i - 1] != 0
+                    if result["temp_values"][i - 1] != 0.0
                 ),
             )
         result["temp_values"] = result["temp_values"][: self._temp_sensors]

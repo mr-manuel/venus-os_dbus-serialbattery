@@ -130,7 +130,7 @@ class BMS(BaseBMS):
             values=min(16, result.get("temp_sensors", 0)),
             start=BMS._TEMP_POS + 2,
             divider=10,
-        )
+        )  # TODO: add other sensors, but all are 0 in test.
 
         await self._await_msg(self._cmd_modbus(dev_id=0x30, addr=0x13EC, count=0x8))
         result["problem_code"] = int.from_bytes(self._msg[3:17], byteorder="big") & (

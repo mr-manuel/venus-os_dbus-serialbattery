@@ -60,7 +60,7 @@ class TestCase(unittest.TestCase):
         super(TestCase, self).__init__(*args, **kwds)
 
 
-# for pickle tests
+## for pickle tests
 try:
     class Stooges(Enum):
         LARRY = 1
@@ -140,7 +140,7 @@ try:
 except Exception:
     DeathForm = sys.exc_info()[1]
 
-# for pickle test and subclass tests
+## for pickle test and subclass tests
 try:
     class Name(StrEnum):
         BDFL = 'Guido van Rossum'
@@ -168,7 +168,7 @@ try:
 except Exception:
     ThatsIt = sys.exc_info()[1]
 
-# for doctests
+## for doctests
 try:
     class Fruit(Enum):
         tomato = 1
@@ -214,7 +214,7 @@ if PY3:
 if pyver >= PY3_7:
     from .test_v37 import TestEnumV37
 
-# for subclassing tests
+## for subclassing tests
 
 class classproperty(object):
 
@@ -230,7 +230,7 @@ class classproperty(object):
         return self.fget(ownerclass)
 
 
-# tests
+## tests
 class TestOrder(TestCase):
     """
     Test _order_ extra/missing members.
@@ -2122,23 +2122,23 @@ class TestEnum(TestCase):
         #         )
 
     def test_meta_reconfigure(self):
-
+        #
         def identity(*args):
             if len(args) == 1:
                 return args[0]
             return args
-
+        #
         JSONEnum = None
 
         class JSONEnumMeta(EnumMeta):
-
+            #
             @classmethod
             def __prepare__(metacls, cls, bases, init=None, start=None, settings=()):
                 return {}
-
+            #
             def __init__(cls, *args , **kwds):
                 super(JSONEnumMeta, cls).__init__(*args)
-
+            #
             def __new__(metacls, cls, bases, clsdict, init=None, start=None, settings=()):
                 import json
                 members = []
@@ -2185,10 +2185,9 @@ class TestEnum(TestCase):
                 for name, value in members:
                     enum_dict[name] = value
                 return super(JSONEnumMeta, metacls).__new__(metacls, cls, bases, enum_dict, init, start, settings)
-
         # for use with both Python 2/3
         JSONEnum = JSONEnumMeta('JsonEnum', (Enum, ), {})
-
+        #
         test_file = os.path.join(tempdir, 'test_json.json')
         with open(test_file, 'w') as f:
             f.write(
@@ -2196,7 +2195,7 @@ class TestEnum(TestCase):
                 '{"name":"Åland Islands","alpha-2":"AX","country-code":"248","notes":{"description":"serene"}},'
                 '{"name":"Albania","alpha-2":"AL","country-code":"008","notes":{"description":"exciting"}},'
                 '{"name":"Algeria","alpha-2":"DZ","country-code":"012","notes":{"description":"scarce"}}]')
-
+        #
         class Country(JSONEnum):
             _init_ = 'abbr code country_name description'
             _file = test_file
@@ -2207,7 +2206,7 @@ class TestEnum(TestCase):
                     3: ('name', None),
                     4: (('notes','description'), lambda s: s.title()),
                     }
-
+        #
         self.assertEqual([Country.AF, Country.AX, Country.AL, Country.DZ], list(Country))
         self.assertEqual(Country.AF.abbr, 'AF')
         self.assertEqual(Country.AX.code, 248)
@@ -2502,21 +2501,21 @@ class TestEnum(TestCase):
         globals()['SomeTuple'] = SomeTuple
         test_pickle_dump_load(self.assertTrue, SomeTuple.first)
 
-    # def test_duplicate_values_give_unique_enum_items(self):
-    #     class NumericEnum(AutoNumberEnum):
-    #         __order__ = 'enum_m enum_d enum_y'
-    #         enum_m = ()
-    #         enum_d = ()
-    #         enum_y = ()
-    #         def __int__(self):
-    #             return int(self._value_)
-    #     self.assertEqual(int(NumericEnum.enum_d), 2)
-    #     self.assertEqual(NumericEnum.enum_y.value, 3)
-    #     self.assertTrue(NumericEnum(1) is NumericEnum.enum_m)
-    #     self.assertEqual(
-    #         list(NumericEnum),
-    #         [NumericEnum.enum_m, NumericEnum.enum_d, NumericEnum.enum_y],
-    #         )
+    def test_duplicate_values_give_unique_enum_items(self):
+        class NumericEnum(AutoNumberEnum):
+            __order__ = 'enum_m enum_d enum_y'
+            enum_m = ()
+            enum_d = ()
+            enum_y = ()
+            def __int__(self):
+                return int(self._value_)
+        self.assertEqual(int(NumericEnum.enum_d), 2)
+        self.assertEqual(NumericEnum.enum_y.value, 3)
+        self.assertTrue(NumericEnum(1) is NumericEnum.enum_m)
+        self.assertEqual(
+            list(NumericEnum),
+            [NumericEnum.enum_m, NumericEnum.enum_d, NumericEnum.enum_y],
+            )
 
     def test_inherited_new_from_enhanced_enum(self):
         class AutoNumber2(Enum):
@@ -2694,12 +2693,12 @@ class TestEnum(TestCase):
         self.assertEqual(Color(4), Color.value)
         self.assertEqual(Color['value'], Color.value)
         self.assertEqual(Color.red.value, 1)
-
+    #
     CONTINUE = 100, 'Continue', 'Request received, please continue'
     SWITCHING_PROTOCOLS = (101, 'Switching Protocols',
             'Switching to new protocol; obey Upgrade header')
     PROCESSING = 102, 'Processing'
-
+    #
     def test_no_duplicates(self):
         def bad_duplicates():
             class Color1(UniqueEnum):
@@ -2893,7 +2892,7 @@ class TestEnum(TestCase):
         self.assertEqual([Dupes.first, Dupes.second, Dupes.third], list(Dupes))
 
     def test_auto_value_with_auto(self):
-
+        #
         class SelectionEnum(Enum):
             _init_ = 'db user'
             def __new__(cls, *args, **kwds):
@@ -2911,7 +2910,7 @@ class TestEnum(TestCase):
             _order_ = 'this that'
             this = auto('these')
             that = auto('those')
-
+        #
         self.assertEqual(list(Test), [Test.this, Test.that])
         self.assertEqual(Test.this.name, 'this')
         self.assertEqual(Test.this.value, ('this', 'these'))
@@ -2923,7 +2922,7 @@ class TestEnum(TestCase):
         self.assertEqual(Test.that.user, 'those')
 
     def test_auto_value_with_autovalue(self):
-
+        #
         class SelectionEnum(Enum):
             _init_ = 'db user'
             def __new__(cls, *args, **kwds):
@@ -2935,12 +2934,12 @@ class TestEnum(TestCase):
             @staticmethod
             def _generate_next_value_(name, start, count, values, *args, **kwds):
                 return (name, ) + args
-
+        #
         class Test(SelectionEnum):
             _order_ = 'this that'
             this = 'these'
             that = 'those'
-
+        #
         self.assertEqual(list(Test), [Test.this, Test.that])
         self.assertEqual(Test.this.name, 'this')
         self.assertEqual(Test.this.value, ('this', 'these'))
@@ -3175,26 +3174,26 @@ class TestEnum(TestCase):
             VENUS = 4.869e+24, 6.0518e6  # doesn't work
         self.assertEqual(Planet.MERCURY.value, 'MERCURY')
 
-    # def test_AutoNumberEnum_and_property(self):
-    #     class Color(aenum.AutoNumberEnum):
-    #         red = ()
-    #         green = ()
-    #         blue = ()
-    #         @property
-    #         def cap_name(self):
-    #             return self.name.title()
-    #     self.assertEqual(Color.blue.cap_name, 'Blue')
+    def test_AutoNumberEnum_and_property(self):
+        class Color(aenum.AutoNumberEnum):
+            red = ()
+            green = ()
+            blue = ()
+            @property
+            def cap_name(self):
+                return self.name.title()
+        self.assertEqual(Color.blue.cap_name, 'Blue')
 
-    # def test_AutoNumberEnum(self):
-    #     class Color(aenum.AutoNumberEnum):
-    #         _order_ = 'red green blue'
-    #         red = ()
-    #         green = ()
-    #         blue = ()
-    #     self.assertEqual(list(Color), [Color.red, Color.green, Color.blue])
-    #     self.assertEqual(Color.red.value, 1)
-    #     self.assertEqual(Color.green.value, 2)
-    #     self.assertEqual(Color.blue.value, 3)
+    def test_AutoNumberEnum(self):
+        class Color(aenum.AutoNumberEnum):
+            _order_ = 'red green blue'
+            red = ()
+            green = ()
+            blue = ()
+        self.assertEqual(list(Color), [Color.red, Color.green, Color.blue])
+        self.assertEqual(Color.red.value, 1)
+        self.assertEqual(Color.green.value, 2)
+        self.assertEqual(Color.blue.value, 3)
 
     def test_MultiValue_with_init_wo_value(self):
         class Color(Enum):
@@ -4222,6 +4221,14 @@ class TestFlag(TestCase):
             CE = 1<<19
         self.Open = Open
 
+        class Sticky(Flag):
+            NORTH = auto()
+            SOUTH = auto()
+            EAST = auto()
+            WEST = auto()
+            __repr__ = aenum._enum.global_flag_repr
+        self.Sticky = Sticky
+
     def test_closed_invert_expectations(self):
         class ClosedAB(Flag):
             _order_ = 'A B'
@@ -4507,6 +4514,10 @@ class TestFlag(TestCase):
         self.assertEqual(repr(~Open.AC), '<Open.CE: 524288>')
         self.assertEqual(repr(~(Open.RO | Open.CE)), '<Open.AC: 3>')
         self.assertEqual(repr(~(Open.WO | Open.CE)), '<Open.RW: 2>')
+
+        Sticky = self.Sticky
+        self.assertEqual(repr(Sticky.NORTH), '__main__.NORTH')
+        self.assertEqual(repr(Sticky(0)), '__main__.Sticky(0)')
 
     def test_name_lookup(self):
         Color = self.Color

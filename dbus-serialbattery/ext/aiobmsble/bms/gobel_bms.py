@@ -12,7 +12,7 @@ from typing import Final
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice
 
-from aiobmsble import BMSDp, BMSInfo, BMSSample, MatcherPattern
+from aiobmsble import BMSDp, BMSInfo, BMSSample, MatcherPattern, TempSensor
 from aiobmsble.basebms import BaseBMS, b2str, crc_modbus
 
 
@@ -196,12 +196,12 @@ class BMS(BaseBMS):
         )
 
         # Append MOSFET temperature if valid (0xFFFF indicates no sensor)
-        mos_temp: list[int | float] = BMS._temp_values(
+        mos_temp: list[TempSensor] = BMS._temp_values(
             self._msg,
-            values=1,
             start=BMS._TEMP_MOS_OFFSET,
             signed=True,
             divider=10,
+            types=(TempSensor.T.MOSFET,),
         )
         if mos_temp[0] != -0.1:
             result["temp_values"].append(mos_temp[0])

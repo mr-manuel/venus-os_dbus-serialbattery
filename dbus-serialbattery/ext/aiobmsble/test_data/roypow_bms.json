@@ -9,6 +9,7 @@
         "0000ffe0-0000-1000-8000-00805f9b34fb",
         "0000ffe7-0000-1000-8000-00805f9b34fb"
       ],
+      "platform_data": ["12:6C:14:00:00:00"],
       "rssi": -87
     },
     "type": "roypow_bms",
@@ -19,9 +20,11 @@
   },
   {
     "advertisement": {
+      "local_name": " B12100A xxxxxxxxx ",
       "manufacturer_data": {
         "2865": "88a0126c1439281f"
       },
+      "platform_data": ["12:6C:14:00:00:00"],
       "service_uuids": [
         "0000ffe0-0000-1000-8000-00805f9b34fb",
         "0000fee7-0000-1000-8000-00805f9b34fb"
@@ -31,11 +34,12 @@
     "type": "roypow_bms",
     "_comments": [
       "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/186)",
-      "no name advertised"
+      "no name advertised - due to RPi"
     ]
   },
   {
     "advertisement": {
+      "local_name": " B12100A xxxxxxxxx ",
       "manufacturer_data": {
         "35579": "88a0c66c1508a7e9"
       },
@@ -43,12 +47,13 @@
         "0000ffe0-0000-1000-8000-00805f9b34fb",
         "0000fee7-0000-1000-8000-00805f9b34fb"
       ],
+      "platform_data": ["C6:6C:15:00:00:00"],
       "rssi": -66
     },
     "type": "roypow_bms",
     "_comments": [
       "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/186)",
-      "no name advertised"
+      "no name advertised - due to RPi"
     ]
   },
   {
@@ -83,6 +88,22 @@
     "_comments": [
       "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/661)",
       "PowerUrus 12V 100AH LiFePO4 Deep Cycle"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": " S12200A  LE00006",
+      "platform_data": ["12:6C:14:00:00:00"],
+      "rssi": -59,
+      "manufacturer_data": { "20228": "88a0126c14386c14" },
+      "service_uuids": [
+        "0000ffe0-0000-1000-8000-00805f9b34fb",
+        "0000fee7-0000-1000-8000-00805f9b34fb"
+      ]
+    },
+    "type": "roypow_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/702)"
     ]
   }
 ]

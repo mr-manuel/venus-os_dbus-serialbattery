@@ -12,7 +12,7 @@ from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice
 from bleak.uuids import normalize_uuid_str
 
-from aiobmsble import BMSInfo, BMSSample, MatcherPattern
+from aiobmsble import BMSInfo, BMSSample, MatcherPattern, TempSensor
 from aiobmsble.basebms import BaseBMS
 
 
@@ -81,10 +81,10 @@ class BMS(BaseBMS):
         """Fetch the device information via BLE."""
         await self._await_msg(BMS._CMD_PRE + BMS._CMD_BI)
         return {
-            "fw_version": self._msg.get("M1SwVer", []),
-            "sw_version": self._msg.get("version", []),
-            "model_id": self._msg.get("Type", []),
-            "serial_number": self._msg.get("DevSN", []),
+            "fw_version": str(self._msg.get("M1SwVer", "")),
+            "sw_version": str(self._msg.get("version", "")),
+            "model_id": str(self._msg.get("Type", "")),
+            "serial_number": str(self._msg.get("DevSN", "")),
         }
 
     def _notification_handler(
@@ -127,8 +127,8 @@ class BMS(BaseBMS):
         return [value / 1000 for value in data.get("BatcelList", [])[0]]
 
     @staticmethod
-    def _conv_temp(data: dict[str, Any]) -> list[float]:
-        return [value / 10 for value in data.get("BtemList", [])[0] if value != 0x7FFF]
+    def _conv_temp(data: dict[str, Any]) -> list[TempSensor]:
+        return [TempSensor(value / 10) for value in data.get("BtemList", [])[0] if value != 0x7FFF]
 
     async def _async_update(self) -> BMSSample:
         """Update battery status information."""

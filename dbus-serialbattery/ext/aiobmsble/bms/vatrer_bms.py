@@ -9,7 +9,7 @@ from typing import Final
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice
 
-from aiobmsble import BMSDp, BMSInfo, BMSSample, MatcherPattern
+from aiobmsble import BMSDp, BMSInfo, BMSSample, MatcherPattern, TempSensor
 from aiobmsble.basebms import BaseBMS, crc_modbus
 
 
@@ -62,8 +62,6 @@ class BMS(BaseBMS):
                 "connectable": True,
             }
         ]
-
-    # async def _fetch_device_info(self) -> BMSInfo: use default
 
     @staticmethod
     def uuid_services() -> tuple[str, ...]:
@@ -119,7 +117,11 @@ class BMS(BaseBMS):
             self._msg[0x3E], cells=result.get("cell_count", 0), start=5
         )
         result["temp_values"] = BMS._temp_values(
-            self._msg[0x24], values=result.get("temp_sensors", 0) + 2, start=5
-        )  # MOS sensor is last (pos 6 of 4)
+            self._msg[0x24],
+            values=result.get("temp_sensors", 0) + 2,
+            start=5,
+            types=(TempSensor.T.GENERIC,) * (result.get("temp_sensors", 0) + 1)
+            + (TempSensor.T.MOSFET,),
+        )
 
         return result

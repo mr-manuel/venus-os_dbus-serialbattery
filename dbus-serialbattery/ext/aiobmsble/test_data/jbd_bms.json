@@ -599,5 +599,21 @@
     "_comments": [
       "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/683)"
     ]
+  },
+  {
+    "advertisement": {
+      "local_name": "LSG-48100Y250930-113",
+      "platform_data": ["BB:30:00:05:31:35"],
+      "rssi": -59,
+      "service_uuids": [
+        "0000ff00-0000-1000-8000-00805f9b34fb",
+        "00000001-0000-1000-8000-00805f9b34fb"
+      ]
+    },
+    "type": "jbd_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/aiobmsble/issues/199)",
+      "Lossigy 48V 100Ah LiFePO4"
+    ]
   }
 ]

@@ -4,7 +4,7 @@ Project: aiobmsble, https://pypi.org/p/aiobmsble/
 License: Apache-2.0, http://www.apache.org/licenses/
 """
 
-from functools import cache
+from functools import lru_cache
 from string import hexdigits
 from typing import Final
 
@@ -129,7 +129,7 @@ class BMS(BaseBMS):
         return (sum((length >> (i * 4)) & 0xF for i in range(3)) ^ 0xF) + 1 & 0xF
 
     @staticmethod
-    @cache
+    @lru_cache(maxsize=32)
     def _cmd(cmd: int, dev_id: int = 1, data: bytes = b"") -> bytes:
         """Assemble a Seplos VB series command."""
         assert len(data) <= 0xFFF

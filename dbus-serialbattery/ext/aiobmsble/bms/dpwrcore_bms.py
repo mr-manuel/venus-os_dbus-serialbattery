@@ -5,7 +5,7 @@ License: Apache-2.0, http://www.apache.org/licenses/
 """
 
 from enum import IntEnum
-from functools import cache
+from functools import lru_cache
 from string import hexdigits
 from typing import Final
 
@@ -13,7 +13,7 @@ from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice
 from bleak.uuids import normalize_uuid_str
 
-from aiobmsble import BMSDp, BMSInfo, BMSSample, MatcherPattern
+from aiobmsble import BMSDp, BMSInfo, BMSSample, MatcherPattern, TempSensor
 from aiobmsble.basebms import BaseBMS
 
 
@@ -41,7 +41,7 @@ class BMS(BaseBMS):
     _MAX_CELLS: Final[int] = 32
     _FIELDS: Final[tuple[BMSDp, ...]] = (
         BMSDp("voltage", 6, 2, False, lambda x: x / 10, Cmd.LEGINFO1),
-        BMSDp("current", 8, 2, True, idx=Cmd.LEGINFO1),
+        BMSDp("current", 8, 2, True, lambda x: x / 10, Cmd.LEGINFO1),
         BMSDp("battery_level", 14, 1, False, idx=Cmd.LEGINFO1),
         BMSDp("cycle_charge", 12, 2, False, lambda x: x / 1000, Cmd.LEGINFO1),
         BMSDp(
@@ -49,7 +49,7 @@ class BMS(BaseBMS):
             12,
             2,
             False,
-            lambda x: [round(x / 10 - 273.15, 3)],
+            lambda x: [TempSensor(round(x / 10 - 273.15, 3))],
             Cmd.LEGINFO2,
         ),
         BMSDp(
@@ -78,7 +78,6 @@ class BMS(BaseBMS):
         return [
             {
                 "local_name": pattern,
-                "service_uuid": BMS.uuid_services()[0],
                 "connectable": True,
             }
             for pattern in ("DXB-*", "TBA-*")
@@ -98,8 +97,6 @@ class BMS(BaseBMS):
     def uuid_tx() -> str:
         """Return 16-bit UUID of characteristic that provides write property."""
         return "fff3"
-
-    # async def _fetch_device_info(self) -> BMSInfo: use default
 
     async def _notification_handler(
         self, _sender: BleakGATTCharacteristic, data: bytearray
@@ -142,7 +139,7 @@ class BMS(BaseBMS):
         return sum(data) + 8
 
     @staticmethod
-    @cache
+    @lru_cache(maxsize=32)
     def _cmd(cmd: Cmd, data: bytes) -> bytes:
         frame: bytearray = bytearray([cmd.value, 0x00, 0x00]) + data
         checksum: Final[int] = BMS._crc(frame)

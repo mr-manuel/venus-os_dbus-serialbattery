@@ -28,5 +28,18 @@
       "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/509)",
       "MAC address correct"
     ]
+  },
+  {
+    "advertisement": {
+      "local_name": "Bat1",
+      "platform_data": ["CC:45:A5:00:00:00"],
+      "rssi": -53,
+      "manufacturer_data": { "17868": "a5000000" }
+    },
+    "type": "eg4_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/699)",
+      "SunGoldPower battery"
+    ]
   }
 ]

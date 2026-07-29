@@ -10,7 +10,7 @@ from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice
 from bleak.uuids import normalize_uuid_str
 
-from aiobmsble import BMSDp, BMSInfo, BMSSample, MatcherPattern
+from aiobmsble import BMSDp, BMSInfo, BMSSample, MatcherPattern, TempSensor
 from aiobmsble.basebms import BaseBMS, b2str, crc_modbus
 
 
@@ -128,19 +128,19 @@ class BMS(BaseBMS):
 
                 if self._mos_avail is None and self._msg[
                     BMS._MOSTEMP_POS : BMS._MOSTEMP_POS + 2
-                ] in (
-                    b"\x00\x00",
-                    b"\xff\xff",
-                ):
+                ] in (b"\x00\x00", b"\xff\xff"):
                     self._log.debug("MOS temperature invalid, deactivating")
                     self._mos_avail = False
                 else:
                     result["temp_values"] = [
-                        int.from_bytes(
-                            self._msg[BMS._MOSTEMP_POS : BMS._MOSTEMP_POS + 2],
-                            byteorder="big",
+                        TempSensor(
+                            int.from_bytes(
+                                self._msg[BMS._MOSTEMP_POS : BMS._MOSTEMP_POS + 2],
+                                byteorder="big",
+                            )
+                            - 40,
+                            TempSensor.T.MOSFET,
                         )
-                        - 40
                     ]
                     self._mos_avail = True
             except TimeoutError:

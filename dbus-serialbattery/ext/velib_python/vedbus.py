@@ -247,7 +247,8 @@ class VeDbusRootTracker(object):
 	def __init__(self, bus, serviceName):
 		self.importers = defaultdict(weakref.WeakSet)
 		self.serviceName = serviceName
-		self._match = bus.get_object(serviceName, '/', introspect=False).connect_to_signal(
+		self._match = bus.get_object(serviceName, '/',
+			introspect=False, follow_name_owner_changes=True).connect_to_signal(
 			"ItemsChanged", weak_functor(self._items_changed_handler))
 
 	def __del__(self):

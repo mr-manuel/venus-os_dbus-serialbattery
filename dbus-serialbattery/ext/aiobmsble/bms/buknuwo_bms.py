@@ -10,7 +10,7 @@ from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice
 from bleak.uuids import normalize_uuid_str
 
-from aiobmsble import BMSDp, BMSInfo, BMSSample, MatcherPattern
+from aiobmsble import BMSDp, BMSInfo, BMSSample, MatcherPattern, TempSensor
 from aiobmsble.basebms import BaseBMS, crc_modbus
 
 
@@ -110,7 +110,7 @@ class BMS(BaseBMS):
 
         await self._await_msg(BMS._cmd_modbus(dev_id=0x1, addr=0x39, count=0x1))
         result["temp_values"] = BMS._temp_values(
-            self._msg, values=1, start=3, divider=10
+            self._msg, start=3, divider=10, types=(TempSensor.T.MOSFET,)
         )
 
         await self._await_msg(
@@ -119,7 +119,11 @@ class BMS(BaseBMS):
         result["temp_sensors"] = int.from_bytes(self._msg[3:5], "big")
         result["temp_values"].extend(
             BMS._temp_values(
-                self._msg, values=result.get("temp_sensors", 0), start=5, divider=10
+                self._msg,
+                values=result.get("temp_sensors", 0),
+                start=5,
+                divider=10,
+                types=(TempSensor.T.CELL,) * result.get("temp_sensors", 0),
             )
         )
 

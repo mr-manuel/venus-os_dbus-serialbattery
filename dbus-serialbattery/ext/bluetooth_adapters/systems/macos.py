@@ -21,6 +21,8 @@ class MacOSAdapters(BluetoothAdapters):
                 vendor_id="Unknown",
                 product_id="Unknown",
                 adapter_type=None,  # Unknown for macOS
+                advertise=True,
+                powered=True,
             )
         }
 

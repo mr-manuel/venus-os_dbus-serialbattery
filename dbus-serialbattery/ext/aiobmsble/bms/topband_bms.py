@@ -12,7 +12,7 @@ from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice
 from bleak.uuids import normalize_uuid_str
 
-from aiobmsble import BMSDp, BMSInfo, BMSSample, MatcherPattern
+from aiobmsble import BMSDp, BMSInfo, BMSSample, MatcherPattern, TempSensor as TS
 from aiobmsble.basebms import BaseBMS, crc_sum
 
 
@@ -34,7 +34,7 @@ class BMS(BaseBMS):
         BMSDp("battery_level", 14, 2, False),
         BMSDp("cycle_charge", 8, 4, False, lambda x: x / 1000),
         BMSDp("cycles", 12, 2, False),
-        BMSDp("temp_values", 16, 2, False, lambda x: [round(x / 10 - 273.15, 3)]),
+        BMSDp("temp_values", 16, 2, False, lambda x: [TS(round(x / 10 - 273.15, 3))]),
         BMSDp("problem_code", 18, 1, False),
     )
 

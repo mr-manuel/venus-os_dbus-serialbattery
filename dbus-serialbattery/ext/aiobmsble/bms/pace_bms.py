@@ -4,14 +4,14 @@ Project: aiobmsble, https://pypi.org/p/aiobmsble/
 License: Apache-2.0, http://www.apache.org/licenses/
 """
 
-from functools import cache
+from functools import lru_cache
 from typing import Final
 
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice
 from bleak.uuids import normalize_uuid_str
 
-from aiobmsble import BMSDp, BMSInfo, BMSSample, MatcherPattern
+from aiobmsble import BMSDp, BMSInfo, BMSSample, MatcherPattern, TempSensor
 from aiobmsble.basebms import BaseBMS, b2str, crc_modbus
 
 
@@ -108,7 +108,7 @@ class BMS(BaseBMS):
         self._msg_event.set()
 
     @staticmethod
-    @cache
+    @lru_cache(maxsize=32)
     def _cmd(cmd: bytes, data: bytes = b"") -> bytes:
         """Assemble a Pace BMS command."""
         frame: bytearray = bytearray(BMS._HEAD) + cmd + len(data).to_bytes(1) + data
@@ -140,11 +140,13 @@ class BMS(BaseBMS):
         )
         result["temp_values"] = BMS._temp_values(
             self._msg,
-            values=result["cell_count"],
+            values=6,
             start=14,
             gap=2,
             signed=False,
             offset=2731,
             divider=10,
+            types=(TempSensor.T.CELL,) * 4
+            + (TempSensor.T.MOSFET, TempSensor.T.AMBIENT),
         )
         return result

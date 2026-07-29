@@ -260,7 +260,7 @@ def unwrap_dbus_value(val):
 		return bool(val)
 	return val
 
-# When supported, only name owner changes for the the given namespace are reported. This
+# When supported, only name owner changes for the given namespace are reported. This
 # prevents spending cpu time at irrelevant changes, like scripts accessing the bus temporarily.
 def add_name_owner_changed_receiver(dbus, name_owner_changed, namespace="com.victronenergy"):
 	# support for arg0namespace is submitted upstream, but not included at the time of

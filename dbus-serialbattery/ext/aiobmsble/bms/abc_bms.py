@@ -5,7 +5,7 @@ License: Apache-2.0, http://www.apache.org/licenses/
 """
 
 import contextlib
-from functools import cache
+from functools import lru_cache
 from typing import Final
 
 from bleak.backends.characteristic import BleakGATTCharacteristic
@@ -99,7 +99,7 @@ class BMS(BaseBMS):
         """Fetch the device information via BLE."""
         info: BMSInfo = await super()._fetch_device_info()
         self._exp_reply = BMS._EXP_REPLY[0xC0].copy()
-        await self._await_msg(BMS._cmd(b"\xc0"))
+        await self._await_msg(BMS._cmd(0xC0))
         info.update({"model": b2str(self._msg[0xF1][2:-1])})
         return info
 
@@ -132,12 +132,12 @@ class BMS(BaseBMS):
             self._msg_event.set()
 
     @staticmethod
-    @cache
-    def _cmd(cmd: bytes) -> bytes:
+    @lru_cache(maxsize=32)
+    def _cmd(cmd: int) -> bytes:
         """Assemble a ABC BMS command."""
-        frame = bytearray([BMS._HEAD_CMD, cmd[0], 0x00, 0x00, 0x00])
-        frame.append(crc8(frame))
-        return bytes(frame)
+        assert 0 <= cmd <= 0xFF
+        frame = bytes([BMS._HEAD_CMD, cmd, 0x00, 0x00, 0x00])
+        return frame + crc8(frame).to_bytes(1)
 
     async def _async_update(self) -> BMSSample:
         """Update battery status information."""
@@ -146,7 +146,7 @@ class BMS(BaseBMS):
         for cmd in (0xC1, 0xC2, 0xC4):
             self._exp_reply.update(BMS._EXP_REPLY[cmd])
             with contextlib.suppress(TimeoutError):
-                await self._await_msg(BMS._cmd(bytes([cmd])))
+                await self._await_msg(BMS._cmd(cmd))
 
         # check all responses are here, 0xF9 is not mandatory (not all BMS report it)
         if not BMS._RESPS.issubset(self._msg.keys() | {0xF9}):

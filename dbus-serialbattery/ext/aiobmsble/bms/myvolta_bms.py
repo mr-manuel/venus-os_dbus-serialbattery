@@ -44,9 +44,7 @@ class BMS(BaseBMS):
         "default_manufacturer": "Voltagen Power Solutions",
         "default_model": "MyVolta BLE HW",
     }
-    _PRB_MASK: Final[int] = (
-        0xFF00FFFF  # mask to extract problem code from problem_code field (bits 16-23)
-    )
+    _PRB_MASK: Final[int] = 0xFF00FFFF  # mask to extract problem code (byte 3 unused)
     _FIELDS: Final[tuple[BMSDp, ...]] = (
         BMSDp("voltage", 0, 2, False, lambda x: x / 1000, MsgT.METRICS),
         BMSDp("current", 2, 2, True, lambda x: x / 100, MsgT.METRICS),
@@ -56,7 +54,11 @@ class BMS(BaseBMS):
     )
 
     _MSG_SET: Final[frozenset[int]] = frozenset(
-        {MsgT.METRICS, MsgT.INFO, 0x11, 0x12, 0x13, 0x14}
+        {
+            MsgT.METRICS,
+            MsgT.INFO,
+        }
+        | set(range(MsgT.CELL_VOLTAGES1, MsgT.CELL_VOLTAGES4 + 1))
         | set(range(MsgT.TEMPS3, MsgT.TEMPS5 + 1))
     )  # set of message types that must be received for a complete update
 
@@ -107,6 +109,10 @@ class BMS(BaseBMS):
         if not (frame := self.parser.feed(data)):
             return
 
+        if len(frame) < 9:
+            self._log.debug("frame too short: %s", frame)
+            return
+
         # check command ID and pack ID, data length
         if frame[0] != 0x1 or frame[2] != 0x2 or frame[6] != 0x8:
             self._log.debug("incorrect frame header: %s", frame)
@@ -118,7 +124,7 @@ class BMS(BaseBMS):
             return
 
         self._msg[frame[1]] = frame
-        self._log.debug("received message type 0x%X: %s", frame[1], frame)
+        self._log.debug("received message type 0x%X", frame[1])
         if BMS._MSG_SET.issubset(self._msg.keys()):
             self._msg_event.set()
 

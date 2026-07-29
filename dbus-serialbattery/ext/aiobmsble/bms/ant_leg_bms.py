@@ -2,7 +2,7 @@
 
 import contextlib
 from enum import IntEnum
-from functools import cache
+from functools import lru_cache
 from typing import Final
 
 from bleak.backends.characteristic import BleakGATTCharacteristic
@@ -38,7 +38,7 @@ class BMS(BaseBMS):
         BMSDp("voltage", 4, 2, False, lambda x: x / 10),
         BMSDp("current", 70, 4, True, lambda x: x / -10),
         BMSDp("battery_level", 74, 1, False),
-        BMSDp("design_capacity", 75, 4, False, lambda x: x // 1e6),
+        BMSDp("design_capacity", 75, 4, False, lambda x: x // 10**6),
         BMSDp("cycle_charge", 79, 4, False, lambda x: x / 1e6),
         BMSDp("total_charge", 83, 4, False, lambda x: x // 1000),
         BMSDp("runtime", 87, 4, False),
@@ -72,10 +72,10 @@ class BMS(BaseBMS):
         """Provide BluetoothMatcher definition."""
         return [
             {
-                "local_name": "ANT-BLE[01]*",
+                "local_name": pattern,
                 "service_uuid": BMS.uuid_services()[0],
                 "connectable": True,
-            }
+            } for pattern in ("ANT-BLE[01]*", "ANT-BLE22*")
         ]
 
     @staticmethod
@@ -92,8 +92,6 @@ class BMS(BaseBMS):
     def uuid_tx() -> str:
         """Return 16-bit UUID of characteristic that provides write property."""
         return "ffe1"
-
-    # async def _fetch_device_info(self) -> BMSInfo: unknown, use default
 
     def _notification_handler(
         self, _sender: BleakGATTCharacteristic, data: bytearray
@@ -134,13 +132,14 @@ class BMS(BaseBMS):
         self._msg_event.set()
 
     @staticmethod
-    @cache
+    @lru_cache(maxsize=32)
     def _cmd(cmd: CMD, adr: ADR, value: int = 0x0000) -> bytes:
         """Assemble a ANT BMS command."""
-        _frame = bytearray((cmd, cmd, adr))
-        _frame.extend(value.to_bytes(2, "big"))
-        _frame.extend(crc_sum(_frame[2:], 1).to_bytes(1, "big"))
-        return bytes(_frame)
+        assert cmd in BMS.CMD
+        assert adr in BMS.ADR
+        assert 0 <= value <= 0xFFFF
+        _frame: bytes = bytes((cmd, cmd, adr)) + value.to_bytes(2, "big")
+        return bytes(_frame) + crc_sum(_frame[2:]).to_bytes(1, "big")
 
     async def _async_update(self) -> BMSSample:
         """Update battery status information."""

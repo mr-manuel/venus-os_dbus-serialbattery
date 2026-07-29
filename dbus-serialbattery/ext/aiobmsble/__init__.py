@@ -12,9 +12,10 @@ License: Apache-2.0, http://www.apache.org/licenses/
 
 from collections.abc import Callable
 from contextlib import suppress
-from enum import IntEnum
+from dataclasses import dataclass
+from enum import IntEnum, auto, unique
 from importlib.metadata import PackageNotFoundError, version
-from typing import Any, Literal, NamedTuple, TypedDict
+from typing import Any, Literal, NamedTuple, Self, TypedDict
 
 __version__: str = "0.0.0.dev0"
 with suppress(PackageNotFoundError):
@@ -68,6 +69,49 @@ class BMSMode(IntEnum):
     FLOAT = 0x02
 
 
+@dataclass(frozen=True, slots=True)
+class TempSensor:
+    """Represents a temperature sensor reading from the BMS."""
+
+    @unique
+    class T(IntEnum):
+        """Enumeration of temperature sensor source types."""
+
+        GENERIC = 0x0
+        CELL = auto()
+        CELL_MAX = auto()
+        CELL_MIN = auto()
+        MOSFET = auto()
+        PCB = auto()
+        HEATER = auto()
+        BALANCER = auto()
+        AMBIENT = auto()
+
+    value: float
+    type: T = T.GENERIC
+
+    def __eq__(self: Self, other: object) -> bool:
+        """Compare against other TempSensor including type or int | float."""
+
+        if isinstance(other, TempSensor):
+            return (self.type, self.value) == (other.type, other.value)
+        if isinstance(other, (int, float)):
+            return self.value == other
+        return False
+
+    def __float__(self) -> float:
+        """Return the temperature value as a float."""
+        return float(self.value)
+
+    def __hash__(self) -> int:
+        """Hash the TempSensor based on its value and type."""
+        return hash((self.value, self.type))
+
+    def __repr__(self) -> str:
+        """Return the string representation of the sensor value/type."""
+        return f"{self.__class__.__name__}({self.value!r}, {self.type!r})"
+
+
 class BMSSample(TypedDict, total=False):
     """Dictionary representing a sample of battery management system (BMS) data."""
 
@@ -95,7 +139,7 @@ class BMSSample(TypedDict, total=False):
     design_capacity: int  # [Ah]
     pack_count: int  # [#]
     temp_sensors: int  # [#]
-    temp_values: list[int | float]  # [°C]
+    temp_values: list[TempSensor]  # [°C]
     problem_code: int  # BMS specific code, 0 no problem, max. 64 bit
 
     # BMS switches

@@ -5,7 +5,7 @@ License: Apache-2.0, http://www.apache.org/licenses/
 """
 
 from collections.abc import Callable
-from functools import cache
+from functools import lru_cache
 from struct import unpack_from
 from typing import Any, Final, Literal
 
@@ -13,12 +13,14 @@ from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice
 from bleak.uuids import normalize_uuid_str
 
-from aiobmsble import BMSInfo, BMSSample, BMSValue, MatcherPattern
+from aiobmsble import BMSInfo, BMSSample, BMSValue, MatcherPattern, TempSensor
 from aiobmsble.basebms import BaseBMS, b2str, crc_sum
 
 
 class BMS(BaseBMS):
     """Neey smart BMS class implementation."""
+
+    type FieldList = tuple[tuple[BMSValue, int, str, Callable[[int], Any]], ...]
 
     INFO: BMSInfo = {"default_manufacturer": "Neey", "default_model": "Balancer"}
     _BT_MODULE_MSG: Final = b"\x41\x54\x0d\x0a"  # AT\r\n from BLE module
@@ -27,11 +29,19 @@ class BMS(BaseBMS):
     _TAIL: Final[int] = 0xFF  # end of message
     _TYPE_POS: Final[int] = 4  # frame type is right after the header
     _MIN_FRAME: Final[int] = 10  # header length
-    _FIELDS: Final[tuple[tuple[BMSValue, int, str, Callable[[int], Any]], ...]] = (
+    _FIELDS: Final[FieldList] = (
         ("voltage", 201, "<f", lambda x: round(x, 3)),
         ("delta_voltage", 209, "<f", lambda x: round(x, 3)),
         ("problem_code", 216, "B", lambda x: x if x in {1, 3, 7, 8, 9, 10, 11} else 0),
         ("balancer", 216, "B", lambda x: (x == 0x5)),
+        ("balance_current", 218, "<f", lambda x: round(x, 3)),
+        ("current", 222, "<f", lambda x: round(x, 3)),
+        ("design_capacity", 242, "<f", int),
+        ("cycle_charge", 246, "<f", lambda x: round(x, 3)),
+        ("battery_level", 250, "<f", lambda x: round(x, 3)),
+    )
+    _FIELDS_v1: Final[FieldList] = (
+        *_FIELDS[:4],
         ("balance_current", 217, "<f", lambda x: round(x, 3)),
     )
 
@@ -44,9 +54,10 @@ class BMS(BaseBMS):
     ) -> None:
         """Initialize private BMS members."""
         super().__init__(ble_device, keep_alive, secret, logger_name)
-        self._msg: bytes = b""
         self._bms_info: dict[str, str] = {}
         self._exp_len: int = BMS._MIN_FRAME
+        self._msg: bytes = b""
+        self._proto: str = "v1"
         self._valid_reply: int = 0x02
 
     @staticmethod
@@ -81,8 +92,11 @@ class BMS(BaseBMS):
         self._valid_reply = 0x01
         await self._await_msg(self._cmd(b"\x01"))
         self._valid_reply = 0x02
+        if (model := b2str(self._msg[8:24])).startswith("EK-B"):
+            self._proto = "v2"
+
         return {
-            "model": b2str(self._msg[8:24]),
+            "model": model,
             "hw_version": b2str(self._msg[24:32]),
             "sw_version": b2str(self._msg[32:40]),
         }
@@ -152,7 +166,7 @@ class BMS(BaseBMS):
         self._valid_reply = 0x02  # cell information
 
     @staticmethod
-    @cache
+    @lru_cache(maxsize=32)
     def _cmd(cmd: bytes, reg: int = 0, value: list[int] | None = None) -> bytes:
         """Assemble a Neey BMS command."""
         value = [] if value is None else value
@@ -170,8 +184,14 @@ class BMS(BaseBMS):
             self._log.debug("requesting cell info")
             await self._await_msg(data=BMS._cmd(b"\x02"))
 
-        data: BMSSample = self._conv_data(self._msg)
-        data["temp_values"] = BMS._temp_sensors(self._msg, 2)
+        data: BMSSample = self._conv_data(
+            (BMS._FIELDS if self._proto == "v2" else BMS._FIELDS_v1), self._msg
+        )
+        data["temp_values"] = (
+            BMS._temp_values(self._msg, values=4, start=226)
+            if self._proto == "v2"
+            else BMS._temp_values(self._msg, values=2, start=221)
+        )
 
         data["cell_voltages"] = BMS._cell_voltages(
             self._msg, cells=24, start=9, byteorder="little", size=4
@@ -186,7 +206,7 @@ class BMS(BaseBMS):
         *,
         cells: int,
         start: int,
-        size: int = 2,
+        size: int = 4,
         gap: int = 0,
         byteorder: Literal["little", "big"] = "little",
         divider: int = 1,
@@ -199,17 +219,29 @@ class BMS(BaseBMS):
         ]
 
     @staticmethod
-    def _temp_sensors(data: bytes, sensors: int) -> list[int | float]:
+    def _temp_values(
+        data: bytes,
+        *,
+        start: int,
+        values: int = 1,
+        size: int = 4,
+        gap: int = 0,
+        byteorder: Literal["little", "big"] = "little",
+        signed: bool = True,
+        offset: float = 0,
+        divider: int = 1,
+        types: tuple[TempSensor.T, ...] = (),
+    ) -> list[TempSensor]:
         return [
-            round(unpack_from("<f", data, 221 + idx * 4)[0], 2)
-            for idx in range(sensors)
+            TempSensor(round(unpack_from("<f", data, start + idx * size)[0], 2))
+            for idx in range(values)
         ]
 
     @staticmethod
-    def _conv_data(data: bytes) -> BMSSample:
+    def _conv_data(fields: FieldList, data: bytes) -> BMSSample:
         """Return BMS data from status message."""
         result: BMSSample = {}
-        for key, idx, fmt, func in BMS._FIELDS:
+        for key, idx, fmt, func in fields:
             result[key] = func(unpack_from(fmt, data, idx)[0])
 
         return result

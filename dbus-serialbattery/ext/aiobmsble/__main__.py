@@ -11,6 +11,7 @@ import json
 import logging
 from typing import Any, Final
 
+import aiooui
 from bleak import BleakScanner
 from bleak.backends.device import BLEDevice
 from bleak.backends.scanner import AdvertisementData
@@ -20,6 +21,8 @@ from aiobmsble import BMSInfo, BMSSample, __version__
 from aiobmsble.basebms import BaseBMS
 from aiobmsble.test_data import adv_dict_to_advdata
 from aiobmsble.utils import bms_identify
+
+_MIN_RSSI: Final[int] = -75
 
 logging.basicConfig(
     format="%(levelname)s: %(message)s",
@@ -71,6 +74,34 @@ async def _try_query(
     return True
 
 
+async def log_advertisement_issues(adv_dict: dict[str, Any]) -> None:
+    """Log potential issues with the advertisement data that may affect BMS detection.
+
+    Args:
+        adv_dict: Dictionary containing advertisement data fields.
+    """
+
+    if adv_dict.get("connectable", False) is False:
+        logger.error(
+            "Advertisement reports device is not actively connectable. This blocks communication with the device."
+        )
+
+    if adv_dict.get("rssi", -127) < _MIN_RSSI:
+        logger.warning(
+            "Advertisement RSSI %d dBm is below recommended level of %d dBm. Reduce distance to the device.",
+            adv_dict.get("rssi", -127),
+            _MIN_RSSI,
+        )
+
+    await aiooui.async_load()
+    vendor: str | None = aiooui.get_vendor(adv_dict.get("source", ""))
+    if vendor and vendor.startswith("Raspberry Pi"):
+        logger.warning(
+            "Advertisement is received via a Raspberry Pi device. This is likely to cause reception issues. "
+            "See https://www.home-assistant.io/integrations/bluetooth/#cypress-based-adapters"
+        )
+
+
 async def identify_bms_from_json(json_str: str) -> None:
     """Identify BMS type from advertisement data provided as JSON string.
 
@@ -99,12 +130,13 @@ async def identify_bms_from_json(json_str: str) -> None:
         logger.error("Failed to convert advertisement data: %s", exc)
         return
 
+    await log_advertisement_issues(adv_dict)  # Log any potential issues
+
     # Identify BMS
     if (
         bms_cls_result := await bms_identify(adv_data, adv_dict.get("address", ""))
     ) is not None:
-
-        logger.info("BMS Type: %s", bms_cls_result.bms_id())
+        logger.info("Detected BMS type: %s", bms_cls_result.bms_id())
         return
 
     logger.info("No matching BMS type found for the given advertisement data")
@@ -169,7 +201,7 @@ def main() -> None:
         "-v", "--verbose", action="store_true", help="Enable debug logging"
     )
 
-    args = parser.parse_args()
+    args: argparse.Namespace = parser.parse_args()
     setup_logging(args)
 
     if args.json:

@@ -5,14 +5,21 @@ License: Apache-2.0, http://www.apache.org/licenses/
 """
 
 from collections.abc import Callable
-from functools import cache
+from functools import lru_cache
 from typing import Any, Final
 
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice
 from bleak.uuids import normalize_uuid_str
 
-from aiobmsble import BMSDp, BMSInfo, BMSpackvalue, BMSSample, MatcherPattern
+from aiobmsble import (
+    BMSDp,
+    BMSInfo,
+    BMSpackvalue,
+    BMSSample,
+    MatcherPattern,
+    TempSensor,
+)
 from aiobmsble.basebms import BaseBMS, crc_modbus, swap32
 
 
@@ -65,10 +72,9 @@ class BMS(BaseBMS):
         ("pack_battery_health", 12, False, lambda x: x / 10),
         ("pack_cycles", 14, False, lambda x: x),
     )  # Protocol Seplos V3
-    _CMDS: Final = frozenset(
-        {field[2] for field in _QUERY.values()}
-        | {field[2] for field in _PQUERY.values()}
-    )
+    _CMDS: Final = frozenset({field[2] for field in _QUERY.values()})
+    _PCMDS: Final = frozenset({field[2] for field in _PQUERY.values()})
+    _VALID_CMDS: Final = frozenset(_CMDS | _PCMDS)
 
     def __init__(
         self,
@@ -157,7 +163,7 @@ class BMS(BaseBMS):
             self._frame.clear()
             return
 
-        if self._frame[2] >> 1 not in BMS._CMDS or self._frame[1] & 0x80:
+        if self._frame[2] >> 1 not in BMS._VALID_CMDS or self._frame[1] & 0x80:
             self._log.debug(
                 "unknown message: %s, length: %s", self._frame[0:2], self._frame[2]
             )
@@ -185,7 +191,7 @@ class BMS(BaseBMS):
         self._pkglen = 0
 
     @staticmethod
-    @cache
+    @lru_cache(maxsize=32)
     def _cmd(device: int, cmd: int, start: int, count: int) -> bytes:
         """Assemble a Seplos BMS command."""
         assert device >= 0x00 and (device <= 0x10 or device in (0xC0, 0xE0))
@@ -193,14 +199,19 @@ class BMS(BaseBMS):
         assert start >= 0 and count > 0 and start + count <= 0xFFFF
         frame: bytearray = bytearray([device, cmd])
         frame.extend(int.to_bytes(start, 2, byteorder="big"))
-        frame.extend(int.to_bytes(count * (0x10 if cmd == 0x1 else 0x1), 2, byteorder="big"))
+        frame.extend(
+            int.to_bytes(count * (0x10 if cmd == 0x1 else 0x1), 2, byteorder="big")
+        )
         frame.extend(int.to_bytes(crc_modbus(frame), 2, byteorder="little"))
         return bytes(frame)
 
     async def _async_update(self) -> BMSSample:
         """Update battery status information."""
+        self._msg.clear()
         for block in BMS._QUERY.values():
             await self._await_msg(BMS._cmd(0x0, *block))
+        if not BMS._CMDS.issubset(self._msg.keys()):
+            raise ValueError("BMS data incomplete.")
 
         data: BMSSample = BMS._decode_data(BMS._FIELDS, self._msg, start=BMS._HEAD_LEN)
 
@@ -209,6 +220,8 @@ class BMS(BaseBMS):
         for pack in range(1, 1 + self._pack_count):
             for block in BMS._PQUERY.values():
                 await self._await_msg(self._cmd(pack, *block))
+            if not {pack << 8 | cmd for cmd in BMS._PCMDS}.issubset(self._msg.keys()):
+                raise ValueError("BMS data incomplete.")
 
             for key, idx, sign, func in BMS._PFIELDS:
                 data.setdefault(key, []).append(
@@ -242,11 +255,19 @@ class BMS(BaseBMS):
                     signed=False,
                     offset=2731,
                     divider=10,
+                    types=(TempSensor.T.CELL,) * 4,
+                )
+                + BMS._temp_values(
+                    self._msg[pack << 8 | BMS._PIB_LEN],
+                    values=2,
+                    start=BMS._TEMP_START + 16,
+                    signed=False,
+                    offset=2731,
+                    divider=10,
+                    types=(TempSensor.T.AMBIENT, TempSensor.T.MOSFET),
                 )
             )
             # calculate cell_count instead of querying SPA
             data["cell_count"] = len(data.get("cell_voltages", [])) // self._pack_count
-
-        self._msg.clear()
 
         return data

@@ -14,5 +14,63 @@
     "_comments": [
       "source advmon (https://github.com/patman15/aiobmsble/issues/65)"
     ]
+  },
+  {
+    "advertisement": {
+      "local_name": "ECOE934",
+      "manufacturer_data": {
+        "1301": "d5000000"
+      },
+      "platform_data": ["15:05:D5:00:00:00"],
+      "service_uuids": [
+        "0000ff00-0000-1000-8000-00805f9b34fb",
+        "00000001-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -56
+    },
+    "type": "humsienk_bms",
+    "_comments": [
+      "source btsnoop (Android HCI log, ECO-WORTHY 12V 150AH LiFePO4)",
+      "https://github.com/patman15/aiobmsble/pull/209",
+      "device name: BMC1_E934",
+      "manufacturer: RB Controls Co. Ltd (0x0515)",
+      "MAC address, correct, public"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "ECOBF9F",
+      "platform_data": ["ED:0B:CE:00:00:00"],
+      "rssi": -72,
+      "manufacturer_data": { "3053": "ce000000" },
+      "service_uuids": [
+        "00000001-0000-1000-8000-00805f9b34fb",
+        "00001800-0000-1000-8000-00805f9b34fb",
+        "00001801-0000-1000-8000-00805f9b34fb",
+        "0000ff00-0000-1000-8000-00805f9b34fb"
+      ]
+    },
+    "type": "humsienk_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/aiobmsble/issues/317)"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "ECO0AA8",
+      "manufacturer_data": {
+        "64590": "6661643630616138"
+      },
+      "service_uuids": [
+        "0000ff00-0000-1000-8000-00805f9b34fb",
+        "00000001-0000-1000-8000-00805f9b34fb"
+      ],
+      "rssi": -80
+    },
+    "type": "humsienk_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/282)",
+      "MAC address, no OUI, correct"
+    ]
   }
 ]

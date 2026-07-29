@@ -11,7 +11,7 @@ from typing import Final
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice
 
-from aiobmsble import BMSDp, BMSInfo, BMSSample, MatcherPattern
+from aiobmsble import BMSDp, BMSInfo, BMSSample, MatcherPattern, TempSensor
 from aiobmsble.basebms import BaseBMS, crc_sum
 
 
@@ -46,7 +46,7 @@ class BMS(BaseBMS):
         BMSDp("battery_level", 61, 1, False, idx=Cmd.RT),
         BMSDp("cycle_charge", 7, 2, False, lambda x: x / 10, Cmd.CAP),
         BMSDp(
-            "temp_values", 48, 1, False, lambda x: [x - 40], Cmd.RT
+            "temp_values", 48, 1, False, lambda x: [TempSensor(x - 40)], Cmd.RT
         ),  # only 1st sensor relevant
         BMSDp("cycles", 57, 2, False, idx=Cmd.RT),
         BMSDp(

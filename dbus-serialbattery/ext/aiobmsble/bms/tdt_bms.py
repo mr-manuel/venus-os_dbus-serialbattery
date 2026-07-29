@@ -4,14 +4,14 @@ Project: aiobmsble, https://pypi.org/p/aiobmsble/
 License: Apache-2.0, http://www.apache.org/licenses/
 """
 
-from functools import cache
+from functools import lru_cache
 from typing import Final
 
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice
 from bleak.uuids import normalize_uuid_str
 
-from aiobmsble import BMSDp, BMSInfo, BMSSample, MatcherPattern
+from aiobmsble import BMSDp, BMSInfo, BMSSample, MatcherPattern, TempSensor
 from aiobmsble.basebms import BaseBMS, b2str, crc_modbus
 
 
@@ -54,12 +54,16 @@ class BMS(BaseBMS):
         super().__init__(ble_device, keep_alive, secret, logger_name)
         self._msg: dict[int, bytes] = {}
         self._cmd_heads: set[int] = BMS._CMD_HEADS
+        self._valid_reply: int = 0  # expected reply type
         self._exp_len: int = 0
 
     @staticmethod
     def matcher_dict_list() -> list[MatcherPattern]:
         """Provide BluetoothMatcher definition."""
-        return [{"manufacturer_id": 54976, "connectable": True}]
+        return [
+            {"manufacturer_id": 54976, "connectable": True},
+            {"local_name": "HS02*", "connectable": True},
+        ]
 
     @staticmethod
     def uuid_services() -> tuple[str, ...]:
@@ -80,6 +84,7 @@ class BMS(BaseBMS):
         """Fetch the device information via BLE."""
         for head in self._cmd_heads:
             try:
+                self._valid_reply = 0x92
                 await self._await_msg(BMS._cmd(0x92, cmd_head=head))
                 break
             except TimeoutError:
@@ -110,7 +115,6 @@ class BMS(BaseBMS):
         self, _sender: BleakGATTCharacteristic, data: bytearray
     ) -> None:
         """Handle the RX characteristics notify event (new data arrives)."""
-        self._log.debug("RX BLE data: %s", data)
 
         if (
             len(data) > BMS._INFO_LEN
@@ -141,6 +145,10 @@ class BMS(BaseBMS):
             self._log.debug("BMS reported error code: 0x%X", self._frame[4])
             return
 
+        if self._frame[5] != self._valid_reply:
+            self._log.debug("BMS sent unexpected reply.")
+            return
+
         if not self._check_integrity(
             self._frame,
             crc_modbus,
@@ -153,7 +161,7 @@ class BMS(BaseBMS):
         self._msg_event.set()
 
     @staticmethod
-    @cache
+    @lru_cache(maxsize=32)
     def _cmd(cmd: int, data: bytes = b"", cmd_head: int = _RSP_HEAD) -> bytes:
         """Assemble a TDT BMS command."""
         assert cmd in (0x8C, 0x8D, 0x92)  # allow only read commands
@@ -170,6 +178,7 @@ class BMS(BaseBMS):
         for head in self._cmd_heads:
             try:
                 for cmd in BMS._CMDS:
+                    self._valid_reply = cmd
                     await self._await_msg(BMS._cmd(cmd, cmd_head=head))
                 if len(self._cmd_heads) > 1:
                     self._log.debug("detected command head: 0x%X", head)
@@ -197,6 +206,8 @@ class BMS(BaseBMS):
             signed=False,
             offset=2731,
             divider=10,
+            types=(TempSensor.T.AMBIENT, TempSensor.T.MOSFET)
+            + (TempSensor.T.CELL,) * 4,
         )
         idx: Final[int] = result.get("cell_count", 0) + result.get("temp_sensors", 0)
 

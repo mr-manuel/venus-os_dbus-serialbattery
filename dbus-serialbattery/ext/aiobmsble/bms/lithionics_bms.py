@@ -11,7 +11,7 @@ from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice
 from bleak.uuids import normalize_uuid_str
 
-from aiobmsble import BMSInfo, BMSSample, MatcherPattern
+from aiobmsble import BMSInfo, BMSSample, MatcherPattern, TempSensor
 from aiobmsble.basebms import BaseBMS
 
 
@@ -102,8 +102,8 @@ class BMS(BaseBMS):
     @staticmethod
     def _parse_primary(fields: list[str]) -> BMSSample:
         # BMS reports temperatures in Fahrenheit.
-        temp_values: Final[list[float]] = [
-            round((int(fields[idx]) - 32) * 5 / 9, 3) for idx in (5, 6)
+        temp_values: Final[list[TempSensor]] = [
+            TempSensor(round((int(fields[idx]) - 32) * 5 / 9, 3)) for idx in (5, 6)
         ]
 
         return {

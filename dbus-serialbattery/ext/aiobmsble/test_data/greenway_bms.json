@@ -1,0 +1,15 @@
+[
+  {
+    "advertisement": {
+      "local_name":"56C00253A00037",
+      "service_uuids": ["0000fff0-0000-1000-8000-00805f9b34fb"],
+      "platform_data": ["C4:A9:B8:00:00:00"],
+      "rssi": -58
+    },
+    "type": "greenway_bms",
+    "_comments": [
+      "source LOG (https://github.com/patman15/BMS_BLE-HA/issues/700",
+      "Talaria motorcycle, Changzhou Coolfly Intelligent Technology Co., Ltd"
+    ]
+  }
+]

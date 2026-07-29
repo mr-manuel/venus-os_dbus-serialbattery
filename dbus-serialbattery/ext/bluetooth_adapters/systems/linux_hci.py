@@ -20,6 +20,9 @@ HCI_MAX_DEV = 16
 HCIGETDEVLIST = 0x800448D2  # _IOR('H', 210, int)
 HCIGETDEVINFO = 0x800448D3  # _IOR('H', 211, int)
 
+HCI_UP = 0  # HCI device flag
+LMP_LE = 0x40  # LMP capabilities
+
 
 class hci_dev_req(ctypes.Structure):
     _fields_ = [("dev_id", ctypes.c_uint16), ("dev_opt", ctypes.c_uint32)]
@@ -94,6 +97,10 @@ def get_adapters_from_hci() -> dict[int, dict[str, Any]]:
             info = {str(k): getattr(dev, k) for k, *v_ in dev._fields_}
             info["bdaddr"] = str(info["bdaddr"])
             info["name"] = info["name"].decode()
+            info["powered"] = bool(info["flags"] & (1 << HCI_UP))
+            info["advertise"] = bool(
+                info["features"][4] & LMP_LE
+            )  # assume advertising supported if device supports LE
             out[int(dev.dev_id)] = info
     except OSError as error:
         _LOGGER.debug("Error while getting HCI devices: %s", error)

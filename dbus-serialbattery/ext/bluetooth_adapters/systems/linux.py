@@ -94,6 +94,8 @@ class LinuxAdapters(BluetoothAdapters):
                         vendor_id=None,
                         product_id=None,
                         adapter_type=None,  # Unknown for hci-only adapters
+                        advertise=hci_details["advertise"],
+                        powered=hci_details["powered"],
                     )
             adapter_details = self._bluez.adapter_details
             for adapter, details in adapter_details.items():
@@ -106,6 +108,7 @@ class LinuxAdapters(BluetoothAdapters):
                 vendor_id: str | None = None
                 product_id: str | None = None
                 adapter_type: str | None = None
+                powered = adapter1["Powered"]
                 if isinstance(device, USBBluetoothDevice):
                     adapter_type = "usb"
                     usb_device = device.usb_device
@@ -149,6 +152,8 @@ class LinuxAdapters(BluetoothAdapters):
                     vendor_id=vendor_id,
                     product_id=product_id,
                     adapter_type=adapter_type,
+                    advertise="org.bluez.LEAdvertisingManager1" in details,
+                    powered=powered,
                 )
             self._adapters = adapters
         return self._adapters

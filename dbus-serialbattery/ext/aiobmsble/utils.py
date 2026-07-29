@@ -11,7 +11,7 @@ import importlib
 import pkgutil
 import re
 from types import ModuleType
-from typing import Final, cast
+from typing import Final
 
 from bleak.backends.scanner import AdvertisementData
 
@@ -79,7 +79,7 @@ def load_bms_plugins() -> set[ModuleType]:
 
     This function scans the 'aiobmsble/bms' directory for all Python modules,
     dynamically imports each discovered module, and returns a set containing
-    the imported module objects required to end with "_bms".
+    the imported module objects required to end with "_bms" and be subclass of BaseBMS.
 
     Returns:
         set[ModuleType]: A set of imported BMS plugin modules.
@@ -87,13 +87,23 @@ def load_bms_plugins() -> set[ModuleType]:
     Raises:
         ImportError: If a module cannot be imported.
         OSError: If the plugin directory cannot be accessed.
+        AttributeError: If a discovered module does not define a 'BMS' class.
+        TypeError: If a discovered module does not define a valid BMS class.
 
     """
-    return {
-        importlib.import_module(f"aiobmsble.bms.{module_name}")
-        for _, module_name, _ in pkgutil.iter_modules(aiobmsble.bms.__path__)
-        if module_name.endswith(_MODULE_POSTFIX)
-    }
+
+    modules: set[ModuleType] = set()
+    for _, module_name, _ in pkgutil.iter_modules(aiobmsble.bms.__path__):
+        if not module_name.endswith(_MODULE_POSTFIX):
+            continue
+
+        module: ModuleType = importlib.import_module(f"aiobmsble.bms.{module_name}")
+        if not issubclass(getattr(module, "BMS"), BaseBMS):
+            continue
+
+        modules.add(module)
+
+    return modules
 
 
 async def bms_cls(name: str) -> type[BaseBMS] | None:
@@ -116,7 +126,11 @@ async def bms_cls(name: str) -> type[BaseBMS] | None:
     except ModuleNotFoundError:
         return None
 
-    return cast(type[BaseBMS], bms_module.BMS)
+    bms_class: type[BaseBMS] | None = getattr(bms_module, "BMS")
+    if not (isinstance(bms_class, type) and issubclass(bms_class, BaseBMS)):
+        return None
+
+    return bms_class
 
 
 async def bms_matching(
@@ -215,7 +229,6 @@ class StreamParser:
         escaped: bool = self._escaped
         buffer: bytearray = self._buffer
 
-
         for b in data:
             if not in_frame:
                 # Look for escaped STX to start a frame
@@ -224,7 +237,7 @@ class StreamParser:
                     buffer.clear()
                     escaped = False
                     continue
-                escaped = (b in (DLE, STX))
+                escaped = b in (DLE, STX, ETX)
                 continue
 
             # Inside a frame

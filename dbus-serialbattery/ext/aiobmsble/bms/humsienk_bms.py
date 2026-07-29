@@ -4,14 +4,14 @@ Project: aiobmsble, https://pypi.org/p/aiobmsble/
 License: Apache-2.0, http://www.apache.org/licenses/
 """
 
-from functools import cache
+from functools import lru_cache
 from typing import Final
 
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice
 from bleak.uuids import normalize_uuid_str
 
-from aiobmsble import BMSDp, BMSInfo, BMSSample, MatcherPattern
+from aiobmsble import BMSDp, BMSInfo, BMSSample, MatcherPattern, TempSensor
 from aiobmsble.basebms import BaseBMS, b2str, crc_sum
 
 
@@ -61,10 +61,11 @@ class BMS(BaseBMS):
         """Provide BluetoothMatcher definition."""
         return [
             {
-                "local_name": "HS*",
+                "local_name": pattern,
                 "service_uuid": BMS.uuid_services()[0],
                 "connectable": True,
             }
+            for pattern in ("HS*", "ECO????")
         ]
 
     @staticmethod
@@ -125,7 +126,7 @@ class BMS(BaseBMS):
         self._msg_event.set()
 
     @staticmethod
-    @cache
+    @lru_cache(maxsize=32)
     def _cmd(cmd: bytes) -> bytes:
         """Assemble a Humsienk BMS command."""
         frame: Final[bytes] = cmd[:1] + b"\x00"
@@ -155,7 +156,12 @@ class BMS(BaseBMS):
             self._msg[0x22], cells=24, start=3, byteorder="little"
         )
         result["temp_values"] = BMS._temp_values(
-            self._msg[0x21], values=6, start=23, size=1, byteorder="little"
+            self._msg[0x21],
+            values=6,
+            start=23,
+            size=1,
+            byteorder="little",
+            types=(TempSensor.T.MOSFET,),
         )
 
         # Add problem for cell disconnect bitmap

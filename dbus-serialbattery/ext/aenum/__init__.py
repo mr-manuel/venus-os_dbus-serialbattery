@@ -1,7 +1,7 @@
 """Python Advanced Enumerations & NameTuples"""
 from __future__ import print_function
 
-version = 3, 1, 16
+version = 3, 1, 17
 
 # imports
 from ._common import *

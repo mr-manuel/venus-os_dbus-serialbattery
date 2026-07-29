@@ -5,14 +5,14 @@ License: Apache-2.0, http://www.apache.org/licenses/
 """
 
 import asyncio
-from functools import cache
+from functools import lru_cache
 from typing import Final
 
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice
 from bleak.uuids import normalize_uuid_str
 
-from aiobmsble import BMSDp, BMSInfo, BMSMode, BMSSample, MatcherPattern
+from aiobmsble import BMSDp, BMSInfo, BMSMode, BMSSample, MatcherPattern, TempSensor
 from aiobmsble.basebms import BaseBMS, b2str, crc_sum, lstr2int
 
 
@@ -90,8 +90,10 @@ class BMS(BaseBMS):
     async def _fetch_device_info(self) -> BMSInfo:
         """Fetch the device information via BLE."""
         self._valid_reply = 0x03
-        await self._await_msg(self._cmd(b"\x97"), char=self._char_write_handle)
-        self._valid_reply = 0x02
+        try:
+            await self._await_msg(self._cmd(0x97), char=self._char_write_handle)
+        finally:
+            self._valid_reply = 0x02
         return {
             "model": b2str(self._msg[6:22]),
             "hw_version": b2str(self._msg[22:30]),
@@ -131,10 +133,9 @@ class BMS(BaseBMS):
         # check that message type is expected
         if self._frame[BMS._TYPE_POS] != self._valid_reply:
             self._log.debug(
-                "unexpected message type 0x%X (length %i): %s",
+                "unexpected message type 0x%X (length %i)",
                 self._frame[BMS._TYPE_POS],
                 len(self._frame),
-                self._frame,
             )
             return
 
@@ -150,7 +151,7 @@ class BMS(BaseBMS):
 
         # trim message in case oversized
         if len(self._frame) > BMS._INFO_LEN:
-            self._log.debug("wrong data length (%i): %s", len(self._frame), self._frame)
+            self._log.debug("wrong data length (%i)", len(self._frame))
             del self._frame[BMS._INFO_LEN :]
 
         if not self._check_integrity(
@@ -170,9 +171,7 @@ class BMS(BaseBMS):
         self._bms_ready = False
 
         for service in self._client.services:
-            self._log.debug("SRV %s", service)
             for char in service.characteristics:
-                self._log.debug("  CHR %s: %s", char, ",".join(char.properties))
                 if char.uuid == normalize_uuid_str(
                     BMS.uuid_rx()
                 ) or char.uuid == normalize_uuid_str(BMS.uuid_tx()):
@@ -183,15 +182,15 @@ class BMS(BaseBMS):
                         or "write-without-response" in char.properties
                     ):
                         self._char_write_handle = char.handle
+        self._log.debug(
+            "received characteristic handles #%i (notify), #%i (write).",
+            char_notify_handle,
+            self._char_write_handle,
+        )
         if char_notify_handle == -1 or self._char_write_handle == -1:
             self._log.debug("failed to detect characteristics")
             await self._client.disconnect()
             raise ConnectionError(f"Failed to detect characteristics from {self.name}.")
-        self._log.debug(
-            "using characteristics handle #%i (notify), #%i (write).",
-            char_notify_handle,
-            self._char_write_handle,
-        )
 
         await super()._init_connection()
 
@@ -206,31 +205,45 @@ class BMS(BaseBMS):
         self._valid_reply = 0x02  # cell information
 
     @staticmethod
-    @cache
-    def _cmd(cmd: bytes, value: list[int] | None = None) -> bytes:
+    @lru_cache(maxsize=32)
+    def _cmd(cmd: int, value: bytes = b"") -> bytes:
         """Assemble a Jikong BMS command."""
-        value = [] if value is None else value
         assert len(value) <= 13
-        frame: bytearray = bytearray(
-            [*BMS._HEAD_CMD, cmd[0], len(value), *value]
-        ) + bytes(13 - len(value))
-        frame.append(crc_sum(frame))
-        return bytes(frame)
+        assert 0 <= cmd <= 0xFF
+        frame: bytes = (
+            BMS._HEAD_CMD + bytes([cmd, len(value)]) + value + bytes(13 - len(value))
+        )
 
-    def _temp_pos(self) -> list[tuple[int, int]]:
+        return bytes(frame) + crc_sum(frame).to_bytes(1)
+
+    def _temp_pos(self) -> list[tuple[int, int, TempSensor.T]]:
+        sensors_v11: Final = [
+            (0, 144, TempSensor.T.MOSFET),
+            (1, 162, TempSensor.T.GENERIC),
+            (2, 164, TempSensor.T.GENERIC),
+            (3, 254, TempSensor.T.MOSFET),
+        ]
         if self._sw_version >= 14:
-            return [(0, 144), (1, 162), (2, 164), (3, 254), (4, 256), (5, 258)]
+            return [
+                *sensors_v11,
+                (4, 256, TempSensor.T.GENERIC),
+                (5, 258, TempSensor.T.GENERIC),
+            ]
         if self._sw_version >= 11:
-            return [(0, 144), (1, 162), (2, 164), (3, 254)]
-        return [(0, 130), (1, 132), (2, 134)]
+            return sensors_v11
+        return [
+            (0, 130, TempSensor.T.GENERIC),
+            (1, 132, TempSensor.T.GENERIC),
+            (2, 134, TempSensor.T.MOSFET),
+        ]
 
     @staticmethod
     def _temp_sensors(
-        data: bytes, temp_pos: list[tuple[int, int]], mask: int
-    ) -> list[int | float]:
+        data: bytes, temp_pos: list[tuple[int, int, TempSensor.T]], mask: int
+    ) -> list[TempSensor]:
         return [
-            (value / 10)
-            for idx, pos in temp_pos
+            TempSensor(value / 10, T)
+            for idx, pos, T in temp_pos
             if mask & (1 << idx)
             and (
                 value := int.from_bytes(
@@ -272,7 +285,7 @@ class BMS(BaseBMS):
         if not self._msg_event.is_set() or self._msg[4] != 0x02:
             # request cell info (only if data is not constantly published)
             self._log.debug("requesting cell info")
-            await self._await_msg(data=BMS._cmd(b"\x96"), char=self._char_write_handle)
+            await self._await_msg(data=BMS._cmd(0x96), char=self._char_write_handle)
 
         data: BMSSample = self._conv_data(
             self._msg, self._prot_offset, self._sw_version

@@ -99,46 +99,6 @@ def export(collection, namespace=None):
         raise TypeError('%r is not a supported collection' % (collection,) )
     return collection
 
-def bit_count(num):
-    """
-    return number of set bits
-
-    Counting bits set, Brian Kernighan's way*
-
-        unsigned int v;          // count the number of bits set in v
-        unsigned int c;          // c accumulates the total bits set in v
-        for (c = 0; v; c++)
-        {   v &= v - 1;  }       //clear the least significant bit set
-
-    This method goes through as many iterations as there are set bits. So if we
-    have a 32-bit word with only the high bit set, then it will only go once
-    through the loop.
-
-    * The C Programming Language 2nd Ed., Kernighan & Ritchie, 1988.
-
-    This works because each subtraction "borrows" from the lowest 1-bit. For
-    example:
-
-          loop pass 1     loop pass 2
-          -----------     -----------
-               101000          100000
-             -      1        -      1
-             = 100111        = 011111
-             & 101000        & 100000
-             = 100000        =      0
-
-    It is an excellent technique for Python, since the size of the integer need
-    not be determined beforehand.
-
-    (from https://wiki.python.org/moin/BitManipulation)
-    """
-    count = 0
-    while num:
-        num &= num - 1
-        count += 1
-    return count
-
-
 def _iter_bits_lsb(value):
     """
     Return each bit value one at a time.
@@ -367,42 +327,44 @@ def bits(num):
         result = '1' + ''.join(['10'[d=='1'] for d in result])
     return result
 
-
 def bit_count(num):
     """
-        return number of set bits
+    return number of set bits
 
-        Counting bits set, Brian Kernighan's way*
+    Counting bits set, Brian Kernighan's way*
 
-            unsigned int v;          // count the number of bits set in v
-            unsigned int c;          // c accumulates the total bits set in v
-            for (c = 0; v; c++)
-            {   v &= v - 1;  }       //clear the least significant bit set
+        unsigned int v;          // count the number of bits set in v
+        unsigned int c;          // c accumulates the total bits set in v
+        for (c = 0; v; c++)
+        {   v &= v - 1;  }       //clear the least significant bit set
 
-        This method goes through as many iterations as there are set bits. So if we
-        have a 32-bit word with only the high bit set, then it will only go once
-        through the loop.
+    This method goes through as many iterations as there are set bits. So if we
+    have a 32-bit word with only the high bit set, then it will only go once
+    through the loop.
 
-        * The C Programming Language 2nd Ed., Kernighan & Ritchie, 1988.
+    * The C Programming Language 2nd Ed., Kernighan & Ritchie, 1988.
 
-        This works because each subtraction "borrows" from the lowest 1-bit. For example:
+    This works because each subtraction "borrows" from the lowest 1-bit. For
+    example:
 
-              loop pass 1     loop pass 2
-              -----------     -----------
-                   101000          100000
-                 -      1        -      1
-                 = 100111        = 011111
-                 & 101000        & 100000
-                 = 100000        =      0
+          loop pass 1     loop pass 2
+          -----------     -----------
+               101000          100000
+             -      1        -      1
+             = 100111        = 011111
+             & 101000        & 100000
+             = 100000        =      0
 
-        It is an excellent technique for Python, since the size of the integer need not
-        be determined beforehand.
+    It is an excellent technique for Python, since the size of the integer need
+    not be determined beforehand.
+
+    (from https://wiki.python.org/moin/BitManipulation)
     """
     count = 0
-    while(num):
+    while num:
         num &= num - 1
         count += 1
-    return(count)
+    return count
 
 def bit_len(num):
     length = 0
@@ -3285,7 +3247,7 @@ def global_flag_repr(self):
     cls_name = self.__class__.__name__
     if self._name_ is None:
         return "%s.%s(%r)" % (module, cls_name, self._value_)
-    if is_single_bit(self):
+    if is_single_bit(self._value_):
         return '%s.%s' % (module, self._name_)
     if self._boundary_ is not FlagBoundary.KEEP:
         return '|'.join(['%s.%s' % (module, name) for name in self.name.split('|')])

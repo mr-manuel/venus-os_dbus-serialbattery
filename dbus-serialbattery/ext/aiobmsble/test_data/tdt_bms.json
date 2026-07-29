@@ -7,8 +7,23 @@
       "rssi": -127
     },
     "type": "tdt_bms",
+    "_comments": ["source PCAP"]
+  },
+  {
+    "advertisement": {
+      "local_name": "HS020603AW26030934",
+      "platform_data": ["63:A1:00:00:00:00"],
+      "rssi": -77,
+      "manufacturer_data": { "31526": "88a063a10006b35a" },
+      "service_uuids": [
+        "0000ffe1-0000-1000-8000-00805f9b34fb",
+        "0000ffe0-0000-1000-8000-00805f9b34fb"
+      ]
+    },
+    "type": "tdt_bms",
     "_comments": [
-      "source PCAP"
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/728)",
+      "Humsienk 100AH 51.2V Golf Cart Battery"
     ]
   }
 ]

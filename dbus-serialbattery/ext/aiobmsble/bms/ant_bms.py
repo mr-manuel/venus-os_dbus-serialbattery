@@ -4,14 +4,14 @@ Project: aiobmsble, https://pypi.org/p/aiobmsble/
 License: Apache-2.0, http://www.apache.org/licenses/
 """
 
-from functools import cache
+from functools import lru_cache
 from typing import Final
 
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice
 from bleak.uuids import normalize_uuid_str
 
-from aiobmsble import BMSDp, BMSInfo, BMSSample, MatcherPattern
+from aiobmsble import BMSDp, BMSInfo, BMSSample, MatcherPattern, TempSensor
 from aiobmsble.basebms import BaseBMS, b2str, crc_modbus
 
 
@@ -33,7 +33,7 @@ class BMS(BaseBMS):
     _FIELDS: Final[tuple[BMSDp, ...]] = (
         BMSDp("voltage", 38, 2, False, lambda x: x / 100),
         BMSDp("current", 40, 2, True, lambda x: x / 10),
-        BMSDp("design_capacity", 50, 4, False, lambda x: x // 1e6),
+        BMSDp("design_capacity", 50, 4, False, lambda x: x // 10**6),
         BMSDp("battery_level", 42, 2, False),
         BMSDp("battery_health", 44, 2, False),
         BMSDp(
@@ -72,10 +72,10 @@ class BMS(BaseBMS):
         """Provide BluetoothMatcher definition."""
         return [
             {
-                "local_name": "ANT?BLE[23]*",
+                "local_name": pattern,
                 "service_uuid": BMS.uuid_services()[0],
                 "connectable": True,
-            }
+            } for pattern in ("ANT?BLE24*", "ANT?BLE3*")
         ]
 
     @staticmethod
@@ -168,9 +168,13 @@ class BMS(BaseBMS):
         self._msg_event.set()
 
     @staticmethod
-    @cache
+    @lru_cache(maxsize=32)
     def _cmd(cmd: int, adr: int, length: int, data: bytes = b"") -> bytes:
         """Assemble an ANT BMS command."""
+        assert 0 <= cmd <= 0xFF
+        assert 0 <= adr <= 0xFFFF
+        assert 0 <= length <= 0xFF
+
         frame: bytearray = (
             bytearray([*BMS._HEAD, cmd & 0xFF])
             + adr.to_bytes(2, "little")
@@ -179,13 +183,6 @@ class BMS(BaseBMS):
         )
         frame.extend(int.to_bytes(crc_modbus(frame[1:]), 2, "little"))
         return bytes(frame) + BMS._TAIL
-
-    @staticmethod
-    def _temp_sensors(data: bytes, sensors: int, offs: int) -> list[float]:
-        return [
-            float(int.from_bytes(data[idx : idx + 2], byteorder="little", signed=True))
-            for idx in range(offs, offs + sensors * 2, 2)
-        ]
 
     async def _await_msg(
         self,
@@ -213,10 +210,13 @@ class BMS(BaseBMS):
             byteorder="little",
         )
         result["temp_sensors"] = min(self._msg[BMS._TEMP_POS], BMS._MAX_TEMPS)
-        result["temp_values"] = BMS._temp_sensors(
+        result["temp_values"] = BMS._temp_values(
             self._msg,
-            result["temp_sensors"] + 2,  # + MOSFET, balancer temperature
-            BMS._CELL_POS + result["cell_count"] * 2,
+            values=result["temp_sensors"] + 2,  # + MOSFET, balancer temperature
+            start=BMS._CELL_POS + result["cell_count"] * 2,
+            byteorder="little",
+            types=(TempSensor.T.GENERIC,) * result["temp_sensors"]
+            + (TempSensor.T.MOSFET, TempSensor.T.BALANCER),
         )
         result.update(
             BMS._decode_data(

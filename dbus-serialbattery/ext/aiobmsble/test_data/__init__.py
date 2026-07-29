@@ -4,15 +4,16 @@ Project: aiobmsble, https://pypi.org/p/aiobmsble/
 License: Apache-2.0, http://www.apache.org/licenses/
 """
 
-from functools import cache
+from collections.abc import Generator
+from functools import lru_cache
 from importlib import resources
 import json
 from string import hexdigits
-from typing import Any
+from typing import Any, Literal
 
 from bleak.backends.scanner import AdvertisementData
 
-type BmsAdvList = list[tuple[AdvertisementData, str, str, list[str]]]
+type BmsAdvSample = tuple[AdvertisementData, str, str, list[str]]
 
 
 def adv_dict_to_advdata(adv_dict: dict[str, Any]) -> AdvertisementData:
@@ -27,13 +28,14 @@ def adv_dict_to_advdata(adv_dict: dict[str, Any]) -> AdvertisementData:
         "tx_power": None,
     }
 
+    val_dict: dict[str, Any] = adv_dict.copy()
     if "manufacturer_data" in adv_dict:
-        adv_dict["manufacturer_data"] = {
+        val_dict["manufacturer_data"] = {
             int(k): bytes.fromhex(v) if isinstance(v, str) else v
             for k, v in adv_dict["manufacturer_data"].items()
         }
     if "service_data" in adv_dict:
-        adv_dict["service_data"] = {
+        val_dict["service_data"] = {
             k: bytes.fromhex(v) if isinstance(v, str) else v
             for k, v in adv_dict["service_data"].items()
         }
@@ -46,13 +48,34 @@ def adv_dict_to_advdata(adv_dict: dict[str, Any]) -> AdvertisementData:
         assert len(parts) == 6 and all(
             len(part) == 2 and all(c in hexdigits for c in part) for part in parts
         ), "first entry of platform_data only accepts MAC addresses"
-        adv_dict["platform_data"] = tuple(pdata)
+        val_dict["platform_data"] = tuple(pdata)
 
-    return AdvertisementData(**(ADVERTISEMENT_DATA_DEFAULTS | adv_dict))
+    return AdvertisementData(**(ADVERTISEMENT_DATA_DEFAULTS | val_dict))
 
 
-@cache
-def bms_advertisements(bms_filter: str | None = None) -> BmsAdvList:
+def parse_adv_from_json(entry: dict[str, Any], text_key: Literal['type', 'reason']) -> BmsAdvSample:
+    """Parse a JSON string into an AdvertisementData instance."""
+    assert isinstance(entry, dict)
+    assert {"advertisement", text_key, "_comments"}.issubset(entry.keys())
+    adv: AdvertisementData = adv_dict_to_advdata(entry["advertisement"])
+    mac_addr: str = (
+        adv.platform_data[0]
+        if isinstance(adv.platform_data, tuple)
+        and isinstance(adv.platform_data[0], str)
+        else ""
+    )
+    bms_type: str = entry[text_key]
+    comments: list[str] = entry["_comments"]
+
+    assert isinstance(adv, AdvertisementData)
+    assert isinstance(bms_type, str)
+    assert isinstance(comments, list)
+    assert all(isinstance(c, str) for c in comments)
+
+    return (adv, mac_addr, bms_type, comments)
+
+@lru_cache(maxsize=32)
+def bms_advertisements(bms_filter: str | None = None) -> tuple[BmsAdvSample, ...]:
     """Provide all available BMS advertisements from test data directory.
 
     Load *_bms.json files from the packaged test data directory.
@@ -62,77 +85,49 @@ def bms_advertisements(bms_filter: str | None = None) -> BmsAdvList:
         bms_filter (str|None): BMS type for which the advertisements should be returned.
 
     Returns:
-        BmsAdvList: List of tuples containing advertisement, mac_addr, bms type,
-        and a list of comments, i.e. list[tuple[AdvertisementData, str, list[str]]]
+        tuple[BmsAdvSample, ...]: List of tuples containing advertisement, mac_addr, bms type,
+        and a list of comments, i.e. tuple[AdvertisementData, str, str, list[str]]
 
     """
-    all_data: BmsAdvList = []
 
-    for resource in resources.files(__package__).iterdir():
-        if bms_filter and not resource.name.startswith(bms_filter):
-            continue
-        if not resource.name.endswith("_bms.json"):
-            continue
-        with resource.open("r", encoding="UTF-8") as f:
-            raw_data: Any = json.load(f)
-            assert isinstance(raw_data, list)
+    def generate_entries() -> Generator[BmsAdvSample, Any, None]:
+        for resource in resources.files(__package__).iterdir():
+            if bms_filter and not resource.name.startswith(bms_filter):
+                continue
+            if not resource.name.endswith("_bms.json"):
+                continue
+            with resource.open("r", encoding="UTF-8") as f:
+                raw_data: Any = json.load(f)
+                assert isinstance(raw_data, list)
 
-            for entry in raw_data:
-                assert isinstance(entry, dict)
-                assert {"advertisement", "type"}.issubset(set(entry.keys()))
-                adv: AdvertisementData = adv_dict_to_advdata(entry["advertisement"])
-                mac_addr: str = (
-                    adv.platform_data[0]
-                    if isinstance(adv.platform_data, tuple)
-                    and isinstance(adv.platform_data[0], str)
-                    else ""
-                )
-                bms_type: str = entry["type"]
-                comments: list[str] = entry["_comments"]
+                for entry in raw_data:
+                    adv, mac_addr, bms_type, comments= parse_adv_from_json(entry, "type")
+                    assert resource.name == f"{bms_type}.json"
+                    yield (adv, mac_addr, bms_type, comments)
 
-                assert isinstance(adv, AdvertisementData)
-                assert isinstance(bms_type, str)
-                assert isinstance(comments, list)
-                assert all(isinstance(c, str) for c in comments)
-                assert resource.name == f"{bms_type}.json"
+    return tuple(generate_entries())
 
-                all_data.append((adv, mac_addr, bms_type, comments))
-    return all_data
-
-
-def ignore_advertisements() -> BmsAdvList:
+def ignore_advertisements() -> tuple[BmsAdvSample, ...]:
     """Provide a list of advertisements that shall not be identified as a valid BMS.
 
     Load ignore.json files from the packaged test data directory.
 
     Returns:
         BmsAdvList: List of tuples containing advertisement, reason why not to detect,
-        and a list of comments, i.e. list[tuple[AdvertisementData, str, list[str]]]
+        and a list of comments, i.e. list[tuple[AdvertisementData, str, str, list[str]]]
 
     """
-    data: BmsAdvList = []
+    def generate_entries() -> Generator[BmsAdvSample, Any, None]:
+        with (
+            resources.files(__package__)
+            .joinpath("ignore.json")
+            .open("r", encoding="UTF-8") as f
+        ):
+            raw_data: Any = json.load(f)
+            assert isinstance(raw_data, list)
 
-    with (
-        resources.files(__package__)
-        .joinpath("ignore.json")
-        .open("r", encoding="UTF-8") as f
-    ):
-        raw_data: Any = json.load(f)
-        assert isinstance(raw_data, list)
+            for entry in raw_data:
+                adv, mac_addr, reason, comments= parse_adv_from_json(entry, "reason")
+                yield (adv, mac_addr, reason, comments)
 
-        for entry in raw_data:
-            assert isinstance(entry, dict)
-            assert {"advertisement", "reason"}.issubset(set(entry.keys()))
-            adv: AdvertisementData = adv_dict_to_advdata(entry["advertisement"])
-            mac_addr: str = adv.platform_data[0] if "platform" in adv else ""
-            reason: str = entry["reason"]
-            comments: list[str] = entry["_comments"]
-
-            assert isinstance(adv, AdvertisementData)
-            assert isinstance(reason, str)
-            assert isinstance(comments, list)
-            assert all(isinstance(c, str) for c in comments)
-
-            data.append((adv, mac_addr, reason, comments))
-
-    return data
+    return tuple(generate_entries())

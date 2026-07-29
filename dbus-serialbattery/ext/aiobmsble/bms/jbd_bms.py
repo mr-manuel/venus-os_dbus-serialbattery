@@ -4,7 +4,7 @@ Project: aiobmsble, https://pypi.org/p/aiobmsble/
 License: Apache-2.0, http://www.apache.org/licenses/
 """
 
-from functools import cache
+from functools import lru_cache
 from typing import Final
 
 from bleak.backends.characteristic import BleakGATTCharacteristic
@@ -66,6 +66,7 @@ class BMS(BaseBMS):
             for pattern in (
                 "DWF*",  # Daren BMS, Docan battery
                 "JBD-*",
+                "LSG-*",  # Lossigy battery
                 "N-?????BL*",  # Nordström battery
                 "SX1*",  # Supervolt v3
                 "SX60*",  # Supervolt Ultra
@@ -216,14 +217,14 @@ class BMS(BaseBMS):
         return 0x10000 - sum(frame)
 
     @staticmethod
-    @cache
+    @lru_cache(maxsize=32)
     def _cmd(cmd: int, data: bytes = b"") -> bytes:
         """Assemble a JBD BMS command."""
-        frame = bytearray(
-            BMS._HEAD_CMD + cmd.to_bytes(1) + len(data).to_bytes(1) + data
-        )
-        frame.extend([*BMS._crc(frame[2:]).to_bytes(2, "big"), BMS._TAIL])
-        return bytes(frame)
+        assert 0 <= cmd <= 0xFF
+        assert len(data) <= 0xFF
+        frame = bytes(BMS._HEAD_CMD + cmd.to_bytes(1) + len(data).to_bytes(1) + data)
+
+        return frame + BMS._crc(frame[2:]).to_bytes(2, "big") + BMS._TAIL.to_bytes(1)
 
     async def _await_cmd_resp(self, cmd: int) -> None:
         msg: Final[bytes] = BMS._cmd(cmd)

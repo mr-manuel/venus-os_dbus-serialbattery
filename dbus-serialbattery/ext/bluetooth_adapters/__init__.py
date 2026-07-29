@@ -1,4 +1,4 @@
-__version__ = "2.1.1"
+__version__ = "2.4.0"
 
 
 from platform import system
@@ -24,10 +24,12 @@ from .history import AdvertisementHistory, load_history_from_managed_objects
 from .mac_lookup import get_manufacturer_from_mac
 from .models import (
     ADAPTER_ADDRESS,
+    ADAPTER_ADVERTISE,
     ADAPTER_CONNECTION_SLOTS,
     ADAPTER_HW_VERSION,
     ADAPTER_MANUFACTURER,
     ADAPTER_PASSIVE_SCAN,
+    ADAPTER_POWERED,
     ADAPTER_PRODUCT,
     ADAPTER_PRODUCT_ID,
     ADAPTER_SW_VERSION,
@@ -49,10 +51,12 @@ from .util import adapter_human_name, adapter_model, adapter_unique_name
 
 __all__ = [
     "ADAPTER_ADDRESS",
+    "ADAPTER_ADVERTISE",
     "ADAPTER_CONNECTION_SLOTS",
     "ADAPTER_HW_VERSION",
     "ADAPTER_MANUFACTURER",
     "ADAPTER_PASSIVE_SCAN",
+    "ADAPTER_POWERED",
     "ADAPTER_PRODUCT",
     "ADAPTER_PRODUCT_ID",
     "ADAPTER_SW_VERSION",

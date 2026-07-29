@@ -2,17 +2,23 @@
   {
     "advertisement": {
       "local_name": "TBA-13500277",
-      "service_uuids": [
-        "00001800-0000-1000-8000-00805f9b34fb",
-        "00001801-0000-1000-8000-00805f9b34fb",
-        "0000180a-0000-1000-8000-00805f9b34fb",
-        "0000fff0-0000-1000-8000-00805f9b34fb"
-      ],
+      "platform_data": ["B0:D2:78:00:00:00"],
       "rssi": -72
     },
     "type": "dpwrcore_bms",
     "_comments": [
-      "source BTctl (https://github.com/patman15/BMS_BLE-HA/issues/52#issuecomment-2390048120)"
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/52)"
+    ]
+  },
+  {
+    "advertisement": {
+      "local_name": "TBA-11100169",
+      "platform_data": ["3C:E4:B0:00:00:00"],
+      "rssi": -75
+    },
+    "type": "dpwrcore_bms",
+    "_comments": [
+      "source advmon (https://github.com/patman15/BMS_BLE-HA/issues/734)"
     ]
   }
 ]
