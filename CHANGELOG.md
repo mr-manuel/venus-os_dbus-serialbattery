@@ -103,6 +103,7 @@
 * Changed: RV-C CAN BMS - Fixed wrong charge/discharge fet assignment @mr-manuel
 * Changed: Seplos BMS - Fix problems with unique identifier when daisy chained by @KoljaWindeler
 * Changed: Service runscripts now derive the serial port name from the service-directory suffix, so manually-created service entries (e.g. for socat-bridged PTYs) no longer depend on the `TTY` sentinel substitution by serial-starter. Fixes https://github.com/hsteinhaus/venus-os_dbus-serialbattery/issues/2 by @hsteinhaus
+* Changed: Startup BMS recognition sequence changed to startup faster for most used BMS by @mr-manuel
 * Changed: Temperature compensation - Preserve missing temperature sensor values instead of crashing when applying adjustment settings. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/457 by @akmhatey-ai
 * Changed: UBMS CAN code style to snake_case, various improvements and fixes by @gimx
 * Changed: Use Bluetooth MAC address as unique identifier for all Bluetooth BMS by @mr-manuel

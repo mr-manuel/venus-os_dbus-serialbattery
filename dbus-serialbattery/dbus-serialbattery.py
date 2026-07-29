@@ -62,26 +62,29 @@ if "Sinowealth" in BMS_TYPE:
     from bms.sinowealth import Sinowealth
 
 supported_bms_types = [
+    # group of most popular BMS types are tried first
+    {"bms": Jkbms, "baud": 115200},
+    {"bms": Jkbms_pb, "baud": 115200, "address": b"\x01"},
+    {"bms": LltJbd, "baud": 9600, "address": b"\x00"},
+    {"bms": LltJbd_Up16s, "baud": 9600, "address": b"\x01"},
     {"bms": Daly, "baud": 9600, "address": b"\x40"},
     {"bms": Daly, "baud": 9600, "address": b"\x80"},
+    # group of less popular BMS types are tried afterwards
     {"bms": Daren485, "baud": 9600, "address": b"\x01"},
     {"bms": Daren485, "baud": 19200, "address": b"\x01"},
     {"bms": Ecs, "baud": 19200},
     {"bms": EG4_Lifepower, "baud": 9600, "address": b"\x01"},
-    {"bms": EG4_LL, "baud": 9600, "address": b"\x01"},
     {"bms": Felicity, "baud": 9600, "address": b"\x01"},
     {"bms": HeltecModbus, "baud": 9600, "address": b"\x01"},
     {"bms": HLPdataBMS4S, "baud": 9600},
-    {"bms": Jkbms, "baud": 115200},
-    {"bms": Jkbms_pb, "baud": 115200, "address": b"\x01"},
     {"bms": KS48100, "baud": 9600, "address": b"\x01"},
-    {"bms": LltJbd, "baud": 9600, "address": b"\x00"},
-    {"bms": LltJbd_Up16s, "baud": 9600, "address": b"\x01"},
     {"bms": Pace, "baud": 9600, "address": b"\x00"},
     {"bms": Renogy, "baud": 9600, "address": b"\x30"},
     {"bms": Renogy, "baud": 9600, "address": b"\xf7"},
     {"bms": Seplos, "baud": 19200, "address": b"\x00"},
     {"bms": Seplosv3, "baud": 19200},
+    # moved as last because of long recognition timeouts
+    {"bms": EG4_LL, "baud": 9600, "address": b"\x01"},
 ]
 
 # enabled only if explicitly set in config under "BMS_TYPE"

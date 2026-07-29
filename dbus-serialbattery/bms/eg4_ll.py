@@ -89,7 +89,7 @@ class EG4_LL(Battery):
             # Keep port open between framework rounds - closing resets the CH341 settling clock
             if not hasattr(self, "ser") or self.ser is None or not self.ser.is_open:
                 self.ser = self.open_serial()
-                logger.info(f"Waiting for BMS ID {self.Id} to initialize...")
+                logger.info(f"  |- Waiting for BMS ID {self.Id} to initialize...")
                 sleep(3.0)
             self.ser.reset_input_buffer()
             self.ser.reset_output_buffer()
@@ -105,14 +105,14 @@ class EG4_LL(Battery):
                     break
                 remaining = self.CONNECTION_TIMEOUT - (time.time() - t_start)
                 if remaining > 3.0:
-                    logger.debug(f"BMS ID {self.Id} not ready, retrying... ({remaining:.0f}s remaining)")
+                    logger.debug(f"  |- BMS ID {self.Id} not ready, retrying... ({remaining:.0f}s remaining)")
                     sleep(3.0)
             self._connecting = False
             if reply is False:
                 return False
             else:
                 serial = reply[33:48].decode("utf-8") + str(self.Id)
-                logger.error(f"Connected to BMS ID: {pformat(serial)}")
+                logger.error(f"  |- Connected to BMS ID: {pformat(serial)}")
                 self.serial_number = serial
                 self.poll_interval = (self.serialTimeout * 1000) * 3
                 self.custom_field = self.BATTERYTYPE + ":" + format(self.Id, "02d")
