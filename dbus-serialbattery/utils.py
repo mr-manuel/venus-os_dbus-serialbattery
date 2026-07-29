@@ -2,6 +2,7 @@
 # Standard library imports
 import bisect
 import configparser
+import json
 import logging
 import sys
 from pathlib import Path
@@ -36,11 +37,13 @@ logger = logging.getLogger("SerialBattery")
 
 PATH_CONFIG_DEFAULT: str = "config.default.ini"
 PATH_CONFIG_USER: str = "config.ini"
+PATH_BMS_DETECTION_CACHE: str = "bms_detection_cache.json"
 
 config = configparser.ConfigParser()
 path = Path(__file__).parents[0]
 default_config_file_path = str(path.joinpath(PATH_CONFIG_DEFAULT).absolute())
 custom_config_file_path = str(path.joinpath(PATH_CONFIG_USER).absolute())
+bms_detection_cache_file_path = str(path.joinpath(PATH_BMS_DETECTION_CACHE).absolute())
 try:
     config.read([default_config_file_path, custom_config_file_path])
 
@@ -719,6 +722,48 @@ def bytearray_to_string(data: bytearray) -> str:
     :return: Converted string
     """
     return "".join(f"\\x{byte:02x}" for byte in data)
+
+
+def get_bms_detection_cache_key(port: str, address: bytearray = None) -> str:
+    """
+    Build the cache key used to store/look up the last detected BMS type for a port.
+    A port can host more than one BMS (BATTERY_ADDRESSES, CAN), so the bus address
+    - if any - is appended to keep those entries separate.
+
+    :param port: The port the BMS is connected to
+    :param address: The Modbus/CAN address of the BMS, if any
+    :return: The cache key
+    """
+    return port if not address else f"{port}#{bytearray_to_string(address)}"
+
+
+def load_bms_detection_cache() -> dict:
+    """
+    Load the cache that stores the last detected BMS type per port.
+    Returns an empty dict if the cache file does not exist or is invalid.
+
+    :return: Dictionary of cache key to BMS class name
+    """
+    try:
+        with open(bms_detection_cache_file_path, "r") as file:
+            data = json.load(file)
+            return data if isinstance(data, dict) else {}
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return {}
+
+
+def save_bms_detection_cache(cache: dict) -> None:
+    """
+    Persist the cache that stores the last detected BMS type per port.
+
+    :param cache: Dictionary of cache key to BMS class name
+    :return: None
+    """
+    try:
+        with open(bms_detection_cache_file_path, "w") as file:
+            json.dump(cache, file)
+    except OSError as error_message:
+        logger.warning(f"Could not save BMS detection cache: {error_message}")
 
 
 def get_connection_error_message(battery_online: bool, suffix: str = None) -> None:

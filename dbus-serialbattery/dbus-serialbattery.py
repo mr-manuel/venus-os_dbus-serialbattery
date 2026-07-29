@@ -22,11 +22,14 @@ from utils import (
     EXTERNAL_SENSOR_DBUS_DEVICE,
     EXTERNAL_SENSOR_DBUS_PATH_CURRENT,
     EXTERNAL_SENSOR_DBUS_PATH_SOC,
+    get_bms_detection_cache_key,
     get_venus_os_version,
     get_venus_os_image_type,
     get_venus_os_device_type,
+    load_bms_detection_cache,
     logger,
     POLL_INTERVAL,
+    save_bms_detection_cache,
     validate_config_values,
 )
 
@@ -218,10 +221,83 @@ def main():
         """
         Attempts to establish a connection to the battery and returns the battery object if successful.
 
+        The BMS type that was last detected on this port (and bus address, if any) is tried
+        first, since it's cached to disk. Only if that fails 3 times does this fall back to
+        the full auto detection scan across all supported BMS types.
+
         :param _port: The port to connect to.
         :param _bus_address: The Modbus/CAN address to connect to (optional).
         :return: The battery object if a connection is established, otherwise None.
         """
+
+        def try_test(test: dict) -> Union[Battery, None]:
+            """
+            Instantiate a single BMS type/address/baud combination and run its connection test.
+
+            :param test: Entry from supported_bms_types/expected_bms_types
+            :return: The battery object if the connection test succeeds, otherwise None
+            """
+            # noinspection PyBroadException
+            try:
+                if _bus_address is not None:
+                    # Convert hex string to bytes
+                    _bms_address = bytes.fromhex(_bus_address.replace("0x", ""))
+                elif "address" in test:
+                    _bms_address = test["address"]
+                else:
+                    _bms_address = None
+
+                logger.info(
+                    "  Testing "
+                    + test["bms"].__name__
+                    + (' at address "' + bytearray_to_string(_bms_address) + '"' if _bms_address is not None else "")
+                    + (" with " + str(test["baud"]) + " baud" if "baud" in test else "")
+                )
+                batteryClass = test["bms"]
+                baud = test["baud"] if "baud" in test else None
+                battery: Battery = batteryClass(port=_port, baud=baud, address=_bms_address)
+                battery.set_can_transport_interface(can_transport_interface)
+                if battery.test_connection() and battery.validate_data():
+                    logger.info("-- Connection established to " + battery.__class__.__name__)
+                    return battery
+            except KeyboardInterrupt:
+                raise
+            except Exception:
+                (
+                    exception_type,
+                    exception_object,
+                    exception_traceback,
+                ) = sys.exc_info()
+                file = exception_traceback.tb_frame.f_code.co_filename
+                line = exception_traceback.tb_lineno
+                logger.error("Non blocking exception occurred: " + f"{repr(exception_object)} of type {exception_type} in {file} line #{line}")
+                # Ignore any malfunction test_function()
+            return None
+
+        bms_detection_cache = load_bms_detection_cache()
+        cache_key = get_bms_detection_cache_key(_port, bytes.fromhex(_bus_address.replace("0x", "")) if _bus_address is not None else None)
+        cached_bms_name = bms_detection_cache.get(cache_key)
+
+        # Try the BMS type that was found on this port/address last time first. This is a lot
+        # faster than the full scan below, especially for BMS types that are slow to recognize.
+        if cached_bms_name:
+            cached_tests = [test for test in expected_bms_types if test["bms"].__name__ == cached_bms_name]
+            if cached_tests:
+                logger.info(f"-- Found cached BMS type '{cached_bms_name}' for {_port}, trying it first")
+                for retry in range(1, 4):
+                    logger.info(f"-- Testing cached BMS type '{cached_bms_name}': {retry} of 3 rounds")
+                    for test in cached_tests:
+                        try:
+                            battery = try_test(test)
+                        except KeyboardInterrupt:
+                            return None
+                        if battery:
+                            bms_detection_cache[cache_key] = battery.__class__.__name__
+                            save_bms_detection_cache(bms_detection_cache)
+                            return battery
+                    sleep(0.5)
+                logger.info(f"-- Cached BMS type '{cached_bms_name}' not found on {_port}, falling back to auto detection")
+
         # Try to establish communications with the battery 3 times, else exit
         retry = 1
         retries = 3
@@ -232,42 +308,14 @@ def main():
             logger.info("-- Testing BMS: " + str(retry) + " of " + str(retries) + " rounds")
             # Create a new battery object that can read the battery and run connection test
             for test in expected_bms_types:
-                # noinspection PyBroadException
                 try:
-                    if _bus_address is not None:
-                        # Convert hex string to bytes
-                        _bms_address = bytes.fromhex(_bus_address.replace("0x", ""))
-                    elif "address" in test:
-                        _bms_address = test["address"]
-                    else:
-                        _bms_address = None
-
-                    logger.info(
-                        "  Testing "
-                        + test["bms"].__name__
-                        + (' at address "' + bytearray_to_string(_bms_address) + '"' if _bms_address is not None else "")
-                        + (" with " + str(test["baud"]) + " baud" if "baud" in test else "")
-                    )
-                    batteryClass = test["bms"]
-                    baud = test["baud"] if "baud" in test else None
-                    battery: Battery = batteryClass(port=_port, baud=baud, address=_bms_address)
-                    battery.set_can_transport_interface(can_transport_interface)
-                    if battery.test_connection() and battery.validate_data():
-                        logger.info("-- Connection established to " + battery.__class__.__name__)
-                        return battery
+                    battery = try_test(test)
                 except KeyboardInterrupt:
                     return None
-                except Exception:
-                    (
-                        exception_type,
-                        exception_object,
-                        exception_traceback,
-                    ) = sys.exc_info()
-                    file = exception_traceback.tb_frame.f_code.co_filename
-                    line = exception_traceback.tb_lineno
-                    logger.error("Non blocking exception occurred: " + f"{repr(exception_object)} of type {exception_type} in {file} line #{line}")
-                    # Ignore any malfunction test_function()
-                    pass
+                if battery:
+                    bms_detection_cache[cache_key] = battery.__class__.__name__
+                    save_bms_detection_cache(bms_detection_cache)
+                    return battery
             retry += 1
             sleep(0.5)
 
