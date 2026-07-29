@@ -46,6 +46,7 @@
 * Added: Venus OS 3.7x GUIv2 support by @mr-manuel
 * Added: XDZN/WattCycle BLE BMS - Added new BMS driver for XDZN_001 and WT-prefixed devices (e.g. WattCycle 314Ah LiFePO4) communicating over Bluetooth by @synergiaenergia
 * Changed: Added integer conversion for Daly Can BMS Set SOC GUI method by @lex2k0
+* Changed: aiobmsble - Correctly assign temperature sensor slots using the `TempSensor` type added upstream (https://github.com/patman15/aiobmsble/pull/202): MOSFET always maps to slot 0, other sensor types fill the remaining slots 1-4 in the order provided, extra readings are logged as a warning instead of being silently mismapped by @mr-manuel
 * Changed: D-bus charge limits - Skip None writes to `/Info/MaxChargeCurrent` and `/Info/MaxDischargeCurrent` so consumers like `dbus-aggregate-batteries` don't crash with `TypeError: unsupported operand type(s) for *: 'NoneType' and 'int'` during the brief window before the first charge-control decision lands by @hsteinhaus
 * Changed: Daly BMS & Daly CAN BMS: Fix high charge/discharge current alarm. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/378 by @mr-manuel
 * Changed: Daren 485 BMS - Fixed charge/discharge calculation with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/343 by @kopierschnitte

@@ -26,7 +26,7 @@ sys.path.insert(1, os.path.join(os.path.dirname(__file__), "ext"))
 from bleak import BleakScanner  # noqa: E402
 from bleak.backends.device import BLEDevice  # noqa: E402
 from bleak.exc import BleakError  # noqa: E402
-from aiobmsble import BMSInfo, BMSSample  # noqa: E402
+from aiobmsble import BMSInfo, BMSSample, TempSensor  # noqa: E402
 
 
 class Generic_AioBmsBle(Battery):
@@ -531,14 +531,32 @@ class Generic_AioBmsBle(Battery):
             # state of charge in percent (float)
             self.soc = self.aiobmsble_data["battery_level"]
 
-            # temperature sensors (safe checks)
-            # TODO: upstream, there is no clear separation between mosfet and normal temperatures
-            #       normally index 0 is mosfet, but only for batteries that provide it
-            #       in the meanwhile use full range
+            # temperature sensors
+            # MOSFET temperature always goes to sensor slot 0, all other sensor
+            # types are assigned to the remaining slots 1-4 in the order provided
             temp_values = self.aiobmsble_data.get("temp_values", [])
-            for i in range(0, 5):
-                if len(temp_values) >= i + 1 and temp_values[i] is not None:
-                    self.to_temperature(i, temp_values[i])
+            other_slot = 1
+            ignored_temps = []
+            for sensor in temp_values:
+                if sensor is None:
+                    continue
+                sensor_type = getattr(sensor, "type", TempSensor.T.GENERIC)
+                temperature = float(sensor)
+                if sensor_type == TempSensor.T.MOSFET:
+                    self.to_temperature(0, temperature)
+                elif other_slot <= 4:
+                    self.to_temperature(other_slot, temperature)
+                    other_slot += 1
+                else:
+                    ignored_temps.append(temperature)
+
+                logger.debug(f'Battery "{self.BATTERYTYPE}" with MAC "{self.address}" temperature sensor {sensor_type.name}: {temperature} °C')
+
+            if ignored_temps:
+                logger.warning(
+                    f'Battery "{self.BATTERYTYPE}" with MAC "{self.address}" provided {len(ignored_temps)} more temperature '
+                    f"value(s) than the supported 4 slots; ignoring the extra reading(s): {ignored_temps} °C"
+                )
 
             # cell voltages in volts (list of float)
             cell_voltages = self.aiobmsble_data.get("cell_voltages", [])
@@ -570,11 +588,6 @@ class Generic_AioBmsBle(Battery):
 
             # state of health in percent (float)
             self.soh = self.aiobmsble_data.get("battery_health", None)
-
-            # temperature sensor MOSFET in °C (float)
-            temperature_mos = self.aiobmsble_data.get("temp_mosfet", None)
-            if temperature_mos is not None:
-                self.to_temperature(0, temperature_mos)
 
             # status of the battery if balancing is allowed (bool)
             # self.balance_fet = VALUE_FROM_BMS
