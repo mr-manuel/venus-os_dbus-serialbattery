@@ -940,6 +940,7 @@ class DbusHelper:
             _refresh_start = time()
             result = self.battery.refresh_data()
             self.battery.last_refresh_duration = time() - _refresh_start
+            utils.capture_decoded_data(self.battery.port, self.battery.last_refresh_duration, result, self.battery)
 
             # Check if external sensor is still connected
             if utils.EXTERNAL_SENSOR_DBUS_DEVICE is not None and (

@@ -8,6 +8,7 @@ from utils import (
     LIPRO_CELL_COUNT,
     LIPRO_END_ADDRESS,
     LIPRO_START_ADDRESS,
+    wrap_modbus_capture,
 )
 import ext.minimalmodbus as minimalmodbus
 import sys
@@ -44,6 +45,7 @@ class Ecs(Battery):
         try:
             mbdev = minimalmodbus.Instrument(self.port, GREENMETER_ADDRESS)
             mbdev.serial.parity = minimalmodbus.serial.PARITY_EVEN
+            wrap_modbus_capture(mbdev, self.port)
             tmpId = mbdev.read_register(0, 0)
             if tmpId in range(self.GREENMETER_ID_500A, self.GREENMETER_ID_125A + 1):
                 if tmpId == self.GREENMETER_ID_500A:
@@ -88,6 +90,7 @@ class Ecs(Battery):
             try:
                 mbdev = minimalmodbus.Instrument(self.port, cell_address)
                 mbdev.serial.parity = minimalmodbus.serial.PARITY_EVEN
+                wrap_modbus_capture(mbdev, self.port)
 
                 tmpId = mbdev.read_register(0, 0)
                 if tmpId in range(self.LIPRO1X_ID_V1, self.LIPRO1X_ID_V3 + 1):
@@ -124,6 +127,7 @@ class Ecs(Battery):
         try:
             mbdev = minimalmodbus.Instrument(self.port, GREENMETER_ADDRESS)
             mbdev.serial.parity = minimalmodbus.serial.PARITY_EVEN
+            wrap_modbus_capture(mbdev, self.port)
 
             self.max_battery_discharge_current = abs(mbdev.read_register(30, 0, 3, True))
             self.max_battery_charge_current = mbdev.read_register(31, 0, 3, True)
@@ -141,6 +145,7 @@ class Ecs(Battery):
         try:
             mbdev = minimalmodbus.Instrument(self.port, GREENMETER_ADDRESS)
             mbdev.serial.parity = minimalmodbus.serial.PARITY_EVEN
+            wrap_modbus_capture(mbdev, self.port)
 
             self.voltage = mbdev.read_long(108, 3, True, minimalmodbus.BYTEORDER_LITTLE_SWAP) / 1000
             self.current = mbdev.read_long(114, 3, True, minimalmodbus.BYTEORDER_LITTLE_SWAP) / 1000
@@ -177,6 +182,7 @@ class Ecs(Battery):
             try:
                 mbdev = minimalmodbus.Instrument(self.port, self.LiProCells[cell])
                 mbdev.serial.parity = minimalmodbus.serial.PARITY_EVEN
+                wrap_modbus_capture(mbdev, self.port)
 
                 self.cells[cell].voltage = mbdev.read_register(100, 0, 3, False) / 1000
                 self.cells[cell].balance = True if mbdev.read_register(102, 0, 3, False) > 50 else False

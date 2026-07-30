@@ -12,7 +12,7 @@ import re
 from asyncio import CancelledError
 from time import sleep
 from typing import Union, Optional
-from utils import get_connection_error_message, logger, BLUETOOTH_FORCE_RESET_BLE_STACK
+from utils import get_connection_error_message, logger, BLUETOOTH_FORCE_RESET_BLE_STACK, capture_raw_data
 from utils_ble import restart_ble_hardware_and_bluez_driver
 from bleak import BleakClient, BleakScanner, BLEDevice
 from bleak.exc import BleakDBusError
@@ -246,6 +246,7 @@ class LltJbd_Ble(LltJbd):
 
     def _rx_callback(self, sender, rx: bytearray):
         """Persistent BLE notification callback"""
+        capture_raw_data(self.address, "rx", rx)
         self.response_buffer.extend(rx)
         if len(self.response_buffer) >= 4:
             length = self.response_buffer[self.LENGTH_POS]
@@ -276,6 +277,7 @@ class LltJbd_Ble(LltJbd):
         self.response_future = self.bt_loop.create_future()
 
         # Send command
+        capture_raw_data(self.address, "tx", command)
         await self.bt_client.write_gatt_char(tx_uuid, command, False)
 
         try:

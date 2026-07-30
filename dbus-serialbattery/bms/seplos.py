@@ -5,7 +5,7 @@
 # https://github.com/Louisvdw/dbus-serialbattery/pull/530
 
 from battery import Protection, Battery, Cell
-from utils import SOC_CALCULATION, get_connection_error_message, logger
+from utils import SOC_CALCULATION, get_connection_error_message, logger, capture_raw_data
 import serial
 import sys
 
@@ -304,9 +304,11 @@ class Seplos(Battery):
             ser.flushOutput()
             ser.flushInput()
             written = ser.write(command)
+            capture_raw_data(self.port, "tx", command)
             logger.debug("wrote {} bytes to serial port {}, command={}".format(written, self.port, command))
 
             data = ser.readline()
+            capture_raw_data(self.port, "rx", data)
 
             if not Seplos.is_valid_frame(data):
                 return False

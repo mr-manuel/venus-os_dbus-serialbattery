@@ -42,6 +42,7 @@
 * Added: LLT/JBD BLE: Add BLE UUID auto-detection for JBD/DH04 variants with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/441 by @alexsanzder
 * Added: Pace BMS: Supports now addresses with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/477 by @KoljaWindeler
 * Added: Prevent GUI modification installations by setting `GUI_INSTALL_CUSTOMIZATIONS` to `False` by @mr-manuel
+* Added: Raw BMS data capture for troubleshooting - when `BMS_CAPTURE_RAW_DATA` is enabled, every raw request/response exchanged with the BMS plus the decoded values and timing (timestamp and time since the previous cycle) are written to a size-capped `capture/<port>.jsonl` file, making it possible to reconstruct/replay an issue (including timing issues) without needing physical access to the battery by @mr-manuel
 * Added: Set SOC manually via GUI if SOC_CALCULATION is enabled by @mr-manuel
 * Added: Temperature sensor compensation, see config.default.ini for info by @mike-s123
 * Added: Venus OS 3.7x GUIv2 support by @mr-manuel

@@ -2,7 +2,7 @@
 import threading
 import can
 import subprocess
-from utils import logger
+from utils import logger, capture_raw_data
 from time import sleep, time
 
 
@@ -102,6 +102,7 @@ class CanReceiverThread(threading.Thread):
                             self.message_cache[message.arbitration_id] = message.data
                             self._last_received_time[message.arbitration_id] = last_message_time_stamp  # update last received time
 
+                        capture_raw_data(self.channel, "rx", {"id": hex(message.arbitration_id), "data": message.data})
                         logger.debug(f"[{self.channel}] Received: ID={hex(message.arbitration_id)}, Daten={message.data}")
 
                 except can.exceptions.CanOperationError as e:

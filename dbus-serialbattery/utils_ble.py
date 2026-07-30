@@ -4,7 +4,7 @@ import subprocess
 import sys
 from bleak import BleakClient
 from time import sleep
-from utils import logger, BLUETOOTH_FORCE_RESET_BLE_STACK
+from utils import logger, BLUETOOTH_FORCE_RESET_BLE_STACK, capture_raw_data
 
 
 # Class that enables synchronous writing and reading to a bluetooh device
@@ -83,12 +83,14 @@ class Syncron_Ble:
 
     # saves response and tells the command sender that the response has arived
     def notify_read_callback(self, sender, data: bytearray):
+        capture_raw_data(self.address, "rx", data)
         self.response_data = data
         self.response_event.set()
 
     async def ble_thread_send_com(self, command):
         self.response_event = asyncio.Event()
         self.response_data = False
+        capture_raw_data(self.address, "tx", command)
         await self.client.write_gatt_char(self.write_characteristic, command, True)
         await asyncio.wait_for(self.response_event.wait(), timeout=1)  # Wait for the response notification
         self.response_event = False

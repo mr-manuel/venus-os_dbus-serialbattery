@@ -4,6 +4,7 @@ import spidev
 import time
 import math
 from gpiozero import LED
+from utils import capture_raw_data
 
 
 def init_spi(self):
@@ -101,6 +102,7 @@ def spi_xfer_MAX17(RW, Adr, xdata):
     txdata[3] = 0 ^ (xdata << 4) & 0xFF ^ RW << 3 ^ crcb & 0x7
 
     rxdata = spi.xfer(txdata)  #
+    capture_raw_data("mnb_spi", "tx" if RW else "rx", {"rw": RW, "addr": hex(Adr), "xdata": xdata, "rxdata": rxdata})
 
     flags = rxdata[0]
     crcs = flags & 0x07

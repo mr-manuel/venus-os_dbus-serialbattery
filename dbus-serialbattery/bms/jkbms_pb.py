@@ -4,7 +4,7 @@
 # Added by https://github.com/KoljaWindeler
 
 from battery import Battery, Cell
-from utils import BATTERY_ADDRESSES, SOC_CALCULATION, logger
+from utils import BATTERY_ADDRESSES, SOC_CALCULATION, logger, capture_raw_data
 from struct import unpack_from
 import serial
 import sys
@@ -541,6 +541,7 @@ class Jkbms_pb(Battery):
 
         modbus_msg = self.address + command + self.modbusCrc(self.address + command)
         ser.write(modbus_msg)
+        capture_raw_data(ser.port, "tx", modbus_msg)
         ser.flush()
         Jkbms_pb._last_command_time = time.monotonic()
 
@@ -576,6 +577,7 @@ class Jkbms_pb(Battery):
                 else:
                     time.sleep(0.005)
 
+        capture_raw_data(ser.port, "rx", data)
         return data
 
     def _validate_response(self, data, command):

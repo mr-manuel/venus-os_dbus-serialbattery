@@ -18,5 +18,6 @@ venv.bak/
 .DS_Store
 dbus-serialbattery/config.ini
 dbus-serialbattery/bms_detection_cache.json
+dbus-serialbattery/capture/
 venus-data.tar.gz
 *.bak

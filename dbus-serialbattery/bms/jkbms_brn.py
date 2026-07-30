@@ -22,8 +22,11 @@ if __name__ == "__main__":
     def bytearray_to_string(data):
         return "".join("\\x" + format(byte, "02x") for byte in data)
 
+    def capture_raw_data(port, direction, data):
+        pass
+
 else:
-    from utils import bytearray_to_string, logger
+    from utils import bytearray_to_string, logger, capture_raw_data
 
 # zero means parse all incoming data (every second)
 CELL_INFO_REFRESH_S = 0
@@ -346,6 +349,7 @@ class Jkbms_Brn:
                     self._new_data_callback()
 
     def ncallback(self, sender: int, data: bytearray):
+        capture_raw_data(self.address, "rx", data)
         logger.debug(f"--> NEW PACKAGE! length:  {len(data)}")
         logger.debug("ncallback(): " + bytearray_to_string(data))
         self.assemble_frame(data)
@@ -391,6 +395,7 @@ class Jkbms_Brn:
         # BleakError('Multiple Characteristics with this UUID, refer to your desired
         #             characteristic by the `handle` attribute instead.')
         # failover in this case and use handle instead of UUID
+        capture_raw_data(self.address, "tx", frame)
         try:
             await bleakC.write_gatt_char(CHAR_HANDLE, frame, response=awaitresponse)
         except exc.BleakError:

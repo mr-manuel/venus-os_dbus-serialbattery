@@ -28,7 +28,7 @@ import struct
 from typing import Optional
 
 from battery import Battery, Cell
-from utils import logger, MAX_CELL_VOLTAGE, MAX_BATTERY_CHARGE_CURRENT, MAX_BATTERY_DISCHARGE_CURRENT
+from utils import logger, MAX_CELL_VOLTAGE, MAX_BATTERY_CHARGE_CURRENT, MAX_BATTERY_DISCHARGE_CURRENT, capture_raw_data
 
 # ── BLE UUIDs ──────────────────────────────────────────────────────────────
 
@@ -251,6 +251,7 @@ class Xdzn_Ble(Battery):
             self._client = None
 
     def _on_notify(self, _sender, data: bytearray):
+        capture_raw_data(self.address, "rx", data)
         self._buf.extend(data)
         if self._expected is None and len(self._buf) >= 8:
             self._expected = _expected_len(bytes(self._buf))
@@ -264,6 +265,7 @@ class Xdzn_Ble(Battery):
         self._expected = None
 
         cmd = _build_frame(dp, self.frame_head)
+        capture_raw_data(self.address, "tx", cmd)
         await self._client.write_gatt_char(WRITE_UUID, cmd, response=False)
 
         try:

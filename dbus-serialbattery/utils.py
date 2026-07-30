@@ -4,6 +4,8 @@ import bisect
 import configparser
 import json
 import logging
+import logging.handlers
+import re
 import sys
 from pathlib import Path
 from struct import Struct, unpack_from
@@ -15,7 +17,7 @@ import serial
 import time
 
 # CONSTANTS
-DRIVER_VERSION: str = "2.1.20260515dev"
+DRIVER_VERSION: str = "2.1.20260729dev"
 """
 current version of the driver
 """
@@ -597,6 +599,11 @@ MQTT_TLS_INSECURE: bool = get_bool_from_config("DEFAULT", "MQTT_TLS_INSECURE")
 MQTT_USERNAME: str = config["DEFAULT"]["MQTT_USERNAME"]
 MQTT_PASSWORD: str = config["DEFAULT"]["MQTT_PASSWORD"]
 
+# --------- Raw BMS data capture (for troubleshooting) ---------
+CAPTURE_RAW_DATA: bool = get_bool_from_config("DEFAULT", "BMS_CAPTURE_RAW_DATA")
+CAPTURE_RAW_DATA_MAX_SIZE_MB: int = get_int_from_config("DEFAULT", "BMS_CAPTURE_RAW_DATA_MAX_SIZE_MB", 5)
+CAPTURE_RAW_DATA_BACKUP_COUNT: int = get_int_from_config("DEFAULT", "BMS_CAPTURE_RAW_DATA_BACKUP_COUNT", 3)
+
 
 # FUNCTIONS
 def constrain(val: float, min_val: float, max_val: float) -> float:
@@ -796,6 +803,150 @@ def generate_unique_identifier(port: str, address) -> str:
     return str(port).replace("/dev/", "") + "__" + (bytearray_to_string(address).replace("\\", "0") if address is not None else "0x01")
 
 
+# --------- Raw BMS data capture (for troubleshooting) ---------
+_capture_loggers: dict = {}
+_capture_last_time: dict = {}
+_capture_dir = path.joinpath("capture")
+
+
+def _capture_id(port: Any) -> str:
+    """
+    Turn a port/address (e.g. "/dev/ttyUSB0", a BLE MAC, a CAN interface name) into a filesystem-safe id.
+
+    :param port: Port, address or other connection identifier of the BMS
+    :return: Filesystem-safe id
+    """
+    return re.sub(r"[^A-Za-z0-9_.-]", "_", str(port)) or "unknown"
+
+
+def _get_capture_logger(capture_id: str) -> logging.Logger:
+    """
+    Get (or lazily create) the rotating JSON Lines logger used to capture raw/decoded data for one BMS.
+
+    :param capture_id: Filesystem-safe id, see _capture_id()
+    :return: Logger writing to capture/<capture_id>.jsonl
+    """
+    if capture_id not in _capture_loggers:
+        cap_logger = logging.getLogger(f"SerialBattery.capture.{capture_id}")
+        cap_logger.setLevel(logging.INFO)
+        cap_logger.propagate = False
+        if not cap_logger.handlers:
+            _capture_dir.mkdir(exist_ok=True)
+            handler = logging.handlers.RotatingFileHandler(
+                str(_capture_dir.joinpath(f"{capture_id}.jsonl")),
+                maxBytes=CAPTURE_RAW_DATA_MAX_SIZE_MB * 1024 * 1024,
+                backupCount=CAPTURE_RAW_DATA_BACKUP_COUNT,
+            )
+            handler.setFormatter(logging.Formatter("%(message)s"))
+            cap_logger.addHandler(handler)
+        _capture_loggers[capture_id] = cap_logger
+    return _capture_loggers[capture_id]
+
+
+def _capture_serialize(value: Any) -> Any:
+    """
+    Recursively reduce a value to something JSON serializable for the capture log.
+    Objects that look like battery.Cell (duck-typed via .voltage/.balance) are unwrapped to a dict,
+    everything else that isn't a plain primitive/list/dict is replaced by its type name so that
+    non-serializable internals (serial ports, BLE clients, ...) never break the capture.
+
+    :param value: Value to serialize
+    :return: JSON-serializable representation of the value
+    """
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, (bytes, bytearray)):
+        return value.hex()
+    if hasattr(value, "voltage") and hasattr(value, "balance"):
+        return {"voltage": value.voltage, "balance": value.balance}
+    if isinstance(value, dict):
+        return {str(k): _capture_serialize(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_capture_serialize(v) for v in value]
+    return f"<{type(value).__name__}>"
+
+
+def capture_raw_data(port: Any, direction: str, data: Any) -> None:
+    """
+    Append a raw tx/rx record to the capture log for this BMS connection, if BMS_CAPTURE_RAW_DATA is enabled.
+    No-op (and virtually free) when disabled.
+
+    :param port: Port, address or other connection identifier of the BMS
+    :param direction: "tx" for data sent to the BMS, "rx" for data received from it
+    :param data: Raw bytes (or any other request/response payload, e.g. Modbus registers or a CAN frame)
+    """
+    if not CAPTURE_RAW_DATA or not data:
+        return
+    try:
+        record = {
+            "t": time.time(),
+            "dir": direction,
+            "raw": data.hex() if isinstance(data, (bytes, bytearray)) else _capture_serialize(data),
+        }
+        _get_capture_logger(_capture_id(port)).info(json.dumps(record))
+    except Exception:
+        logger.exception("capture_raw_data exception")
+
+
+def capture_decoded_data(port: Any, duration: float, success: bool, battery_obj: object) -> None:
+    """
+    Append a decoded-data + timing record to the capture log for this BMS connection, if
+    BMS_CAPTURE_RAW_DATA is enabled. No-op (and virtually free) when disabled.
+
+    :param port: Port, address or other connection identifier of the BMS
+    :param duration: How long the refresh_data() call took, in seconds
+    :param success: Whether refresh_data() reported success
+    :param battery_obj: The battery instance to snapshot (its __dict__ is serialized)
+    """
+    if not CAPTURE_RAW_DATA:
+        return
+    try:
+        capture_id = _capture_id(port)
+        now = time.time()
+        dt_since_last = now - _capture_last_time.get(capture_id, now)
+        _capture_last_time[capture_id] = now
+        record = {
+            "t": now,
+            "dir": "decoded",
+            "dt_since_last": round(dt_since_last, 3),
+            "duration_ms": round(duration * 1000, 1),
+            "success": success,
+            "decoded": _capture_serialize(vars(battery_obj)),
+        }
+        _get_capture_logger(capture_id).info(json.dumps(record))
+    except Exception:
+        logger.exception("capture_decoded_data exception")
+
+
+def wrap_modbus_capture(instrument: object, port: Any) -> object:
+    """
+    Wrap a minimalmodbus.Instrument's read_* methods so each call (register/address requested and the
+    value returned) is appended to the raw capture log, if BMS_CAPTURE_RAW_DATA is enabled. Modbus
+    abstracts away the wire bytes, so the request/response at the register level is the earliest point
+    "raw-ish" data is available without patching the vendored ext/minimalmodbus.py library.
+    No-op (returns the instrument unchanged) when disabled.
+
+    :param instrument: A minimalmodbus.Instrument instance
+    :param port: Port, address or other connection identifier of the BMS
+    :return: The same instrument, with read_* methods wrapped if capturing is enabled
+    """
+    if not CAPTURE_RAW_DATA:
+        return instrument
+
+    def make_wrapper(name: str, func: Callable) -> Callable:
+        def wrapper(*args, **kwargs):
+            result = func(*args, **kwargs)
+            capture_raw_data(port, "rx", {"call": name, "args": args, "result": result})
+            return result
+
+        return wrapper
+
+    for method_name in ("read_register", "read_registers", "read_long", "read_string", "read_bit", "read_float"):
+        if hasattr(instrument, method_name):
+            setattr(instrument, method_name, make_wrapper(method_name, getattr(instrument, method_name)))
+    return instrument
+
+
 def open_serial_port(port: str, baud: int) -> Union[serial.Serial, None]:
     """
     Open a serial port.
@@ -840,6 +991,7 @@ def read_serialport_data(
     try:
         ser.reset_input_buffer()
         ser.write(request)
+        capture_raw_data(ser.port, "tx", request)
 
         length_struct = Struct(">" + payload_length_size)
         if length_fixed is None:
@@ -864,6 +1016,7 @@ def read_serialport_data(
 
             # Check if we have the complete message
             if payload_length is not None and len(data) >= bytes_needed:
+                capture_raw_data(ser.port, "rx", data)
                 return data
 
             # Sleep to prevent busy-waiting
@@ -902,6 +1055,7 @@ def read_serialport_data_deprecated(
         ser.flushOutput()
         ser.flushInput()
         ser.write(command)
+        capture_raw_data(ser.port, "tx", command)
 
         if length_size.upper() == "B":
             length_byte_size = 1
@@ -945,6 +1099,7 @@ def read_serialport_data_deprecated(
                 get_connection_error_message(battery_online, "[len:" + str(len(data)) + "/" + str(length + length_check) + "]")
                 return False
 
+        capture_raw_data(ser.port, "rx", data)
         return data
 
     except serial.SerialException as e:

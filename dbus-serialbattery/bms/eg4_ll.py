@@ -13,7 +13,7 @@ from pprint import pformat
 from time import sleep
 
 from battery import Battery, Cell
-from utils import logger
+from utils import logger, capture_raw_data
 
 #    Author: Pfitz
 #    Date: 31 Jan 2026
@@ -723,6 +723,7 @@ class EG4_LL(Battery):
                     self.ser.reset_input_buffer()
                     self.ser.reset_output_buffer()
                     self.ser.write(command)
+                    capture_raw_data(self.ser.port, "tx", command)
                     sleep(0.035)
                     buffer = bytearray()
                     start_time = time.time()
@@ -736,6 +737,7 @@ class EG4_LL(Battery):
                         else:
                             sleep(0.01)
                     received_len = len(buffer)
+                    capture_raw_data(self.ser.port, "rx", buffer)
                     # Check length
                     if received_len >= reply_length:
                         reply_data = bytes(buffer[:reply_length])

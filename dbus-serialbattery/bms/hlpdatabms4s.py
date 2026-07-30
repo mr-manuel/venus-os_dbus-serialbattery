@@ -4,7 +4,7 @@
 # Updated by https://github.com/peterohman
 
 from battery import Battery, Cell
-from utils import get_connection_error_message, logger, USE_BMS_DVCC_VALUES
+from utils import get_connection_error_message, logger, USE_BMS_DVCC_VALUES, capture_raw_data
 import serial
 from time import sleep
 import sys
@@ -241,9 +241,11 @@ def read_serialport_data(ser, command, time, min_len):
             ser.flushOutput()
             ser.flushInput()
             ser.write(command)
+            capture_raw_data(ser.port, "tx", command)
             sleep(time)
             toread = ser.inWaiting()
             res = ser.read(toread)
+            capture_raw_data(ser.port, "rx", res)
             if len(res) >= min_len:
                 return res
         return False

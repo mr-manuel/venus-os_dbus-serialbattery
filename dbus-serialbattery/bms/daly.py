@@ -14,6 +14,7 @@ from utils import (
     BATTERY_CAPACITY,
     INVERT_CURRENT_MEASUREMENT,
     MIN_CELL_VOLTAGE,
+    capture_raw_data,
 )
 from struct import unpack_from, pack_into
 from time import sleep, time
@@ -705,7 +706,9 @@ class Daly(Battery):
         time_start = time()
         ser.flushOutput()
         ser.flushInput()
-        ser.write(self.generate_command(command))
+        cmd_bytes = self.generate_command(command)
+        ser.write(cmd_bytes)
+        capture_raw_data(ser.port, "tx", cmd_bytes)
 
         reply = bytearray()
         for i in range(sentences_to_receive):
@@ -745,6 +748,7 @@ class Daly(Battery):
                 return False
 
         reply += ser.read(12)
+        capture_raw_data(ser.port, "rx", reply)
         try:
             _, id, cmd, length = unpack_from(">BBBB", reply)
         except Exception:

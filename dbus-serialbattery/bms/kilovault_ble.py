@@ -13,7 +13,7 @@ import sys
 import asyncio
 from bleak import BleakClient
 from time import time
-from utils import logger
+from utils import logger, capture_raw_data
 from typing import Optional
 
 
@@ -118,6 +118,7 @@ class Kilovault_Ble(Battery):
     # the frames until we get a full status block.  Status
     # starts and ends with 0xB0
     def notifyCallback(self, sender, data):
+        capture_raw_data(self.address, "rx", data)
         self.lastUpdateTime = time()
         # logger.debug(f"Received notification from {sender}: {data}")
         if data[0] == self.KILOVAULT_START_END_BYTE:

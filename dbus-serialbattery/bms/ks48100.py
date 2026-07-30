@@ -12,7 +12,7 @@
 
 # avoid importing wildcards, remove unused imports
 from battery import Battery, Cell
-from utils import SOC_CALCULATION, open_serial_port, get_connection_error_message, logger
+from utils import SOC_CALCULATION, open_serial_port, get_connection_error_message, logger, capture_raw_data
 from time import sleep
 from struct import unpack
 from re import findall
@@ -150,6 +150,7 @@ class KS48100(Battery):
         ser.flushOutput()
         ser.flushInput()
         ser.write(req.encode())
+        capture_raw_data(ser.port, "tx", req)
         logger.info("probe sent: {}".format(req))
 
         sleep(0.8)  # Allow the BMS some time to send a full response
@@ -185,6 +186,7 @@ class KS48100(Battery):
         ser.flushOutput()
         ser.flushInput()
         ser.write(req.encode())
+        capture_raw_data(ser.port, "tx", req)
         logger.debug("get_mfg_params request sent: {}".format(req))
 
         sleep(1.0)  # Allow the BMS some time to send a full response
@@ -221,6 +223,7 @@ class KS48100(Battery):
         ser.flushOutput()
         ser.flushInput()
         ser.write(req.encode())
+        capture_raw_data(ser.port, "tx", req)
         logger.debug("get_cap_params request sent: {}".format(req))
 
         sleep(0.4)  # Allow the BMS some time to send a full response
@@ -261,6 +264,7 @@ class KS48100(Battery):
         ser.flushOutput()
         ser.flushInput()
         ser.write(req.encode())
+        capture_raw_data(ser.port, "tx", req)
         logger.debug("get_realtime_data request sent: {}".format(req))
 
         sleep(3.0)  # Allow the BMS some time to send a full response
@@ -453,6 +457,7 @@ class KS48100(Battery):
         ser.flushOutput()
         ser.flushInput()
         ser.write(req.encode())
+        capture_raw_data(ser.port, "tx", req)
         logger.debug("get_manufacturer_info request sent: {}".format(req))
 
         sleep(0.4)  # Allow the BMS some time to send a full response
@@ -501,6 +506,7 @@ class KS48100(Battery):
         ser.flushOutput()
         ser.flushInput()
         ser.write(req.encode())
+        capture_raw_data(ser.port, "tx", req)
         logger.debug("get_cells_params request sent: {}".format(req))
 
         sleep(0.4)  # Allow the BMS some time to send a full response
@@ -562,6 +568,8 @@ class KS48100(Battery):
                 # This can happen on this slower board - we assume the next poll will get valid data/complete message
                 logger.debug("Exception during inWaiting(): {}".format(e))
                 pass
+
+        capture_raw_data(ser.port, "rx", buff)
 
         try:
             CID2 = buff[7:9]

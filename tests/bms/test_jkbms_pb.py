@@ -134,6 +134,7 @@ class MockSerial:
     """
 
     def __init__(self, response_bytes):
+        self.port = "/dev/mock0"
         self._response = bytearray(response_bytes)
         self._buf = bytearray()  # empty until write triggers response
         self._written = bytearray()

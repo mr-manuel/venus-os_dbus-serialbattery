@@ -31,6 +31,7 @@ from utils import (
     POLL_INTERVAL,
     save_bms_detection_cache,
     validate_config_values,
+    CAPTURE_RAW_DATA,
 )
 
 # import battery classes
@@ -102,6 +103,17 @@ expected_bms_types = [battery_type for battery_type in supported_bms_types if ba
 
 logger.info("")
 logger.info("Starting dbus-serialbattery")
+
+if CAPTURE_RAW_DATA:
+    logger.warning("")
+    logger.warning("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+    logger.warning("!!! BMS_CAPTURE_RAW_DATA is enabled                   !!!")
+    logger.warning("!!! raw and decoded BMS data is being logged to disk. !!!")
+    logger.warning("!!! This is recommended only while troubleshooting    !!!")
+    logger.warning("!!! disable it again afterwards to avoid unnecessary  !!!")
+    logger.warning("!!! flash wear and disk usage.                        !!!")
+    logger.warning("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+    logger.warning("")
 
 
 # count loops

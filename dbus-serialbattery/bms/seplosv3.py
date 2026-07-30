@@ -11,7 +11,7 @@ from typing import Union
 import ext.minimalmodbus as minimalmodbus
 import serial
 from battery import Battery, Cell, Protection
-from utils import get_connection_error_message, logger, USE_BMS_DVCC_VALUES, SOC_CALCULATION
+from utils import get_connection_error_message, logger, USE_BMS_DVCC_VALUES, SOC_CALCULATION, wrap_modbus_capture
 
 RETRYCNT = 3
 
@@ -64,6 +64,7 @@ class Seplosv3(Battery):
         mbdev.serial.stopbits = serial.STOPBITS_ONE
         mbdev.serial.baudrate = 19200
         mbdev.serial.timeout = 0.4
+        wrap_modbus_capture(mbdev, self.port)
         return mbdev
 
     def test_connection(self):
