@@ -100,6 +100,7 @@
 * Changed: LLT/JBD BLE BMS - Fixed wrong charge/discharge fet assignment @mr-manuel
 * CHanged: LLT/JBD BMS - Fixed issue with checksum missing bytes by @TheRealSbs
 * Changed: LLT/JBD UP16S BMS - Fixed reading 4 fault/alarm values @dmitrych5
+* Changed: LLT/JBD UP16S BMS - Remove "Full charge protect" BMS status from high voltage alarms. Context: https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/461 @dmitrych5
 * Changed: Made some dbus settings silent to not flood the localsettings service log by @mr-manuel
 * Changed: Mechanism to reset SOC via GUI, since it was not possible to set the same SOC twice by @mr-manuel
 * Changed: RV-C CAN BMS - Fixed wrong charge/discharge fet assignment @mr-manuel
