@@ -24,6 +24,9 @@ class Daren485(Battery):
         # to address reflecting the position of the DIP-switches on the unit(s), starting at '01'.
         self.address = address
         self.serial_number = ""
+        self.balanced_mode = None
+        self._last_balance_mask = None
+        self._last_balance_status = None
         self.history.exclude_values_to_calculate = ["charge_cycles", "total_ah_drawn", "charged_energy", "discharged_energy"]
 
     BATTERYTYPE = "Daren485"
@@ -89,6 +92,10 @@ class Daren485(Battery):
                         result = result and self.get_manufacturer_info(ser)
 
                         result = result and self.get_cap_params(ser)
+
+                        # Read balancing configuration once at startup. This is optional
+                        # and must not prevent the driver from starting if Service 0x80 is unsupported.
+                        self.get_balance_params(ser)
                     else:
                         logger.error("Error opening serialport!")
                 else:
@@ -340,8 +347,10 @@ class Daren485(Battery):
             for i in range(self.cell_count):
                 self.cells[i].balance = bool(balance_mask & (1 << i))
 
-            # A useful aggregate state for consumers that support only one flag.
+            # Service 0x42 reports the actual balancing activity. Keep the aggregate
+            # framework flag aligned with the per-cell balance bits.
             self.balance_fet = balance_mask != 0
+            self._log_balance_status(balance_mask)
 
             logger.debug(
                 "Daren realtime: cells={}, temp_sensors={}, ambient={}C, pack={}C, "
@@ -502,6 +511,88 @@ class Daren485(Battery):
 
         return result
 
+    def _log_balance_status(self, balance_mask=None):
+        """Log balancing state on first observation and whenever mode or mask changes."""
+        if balance_mask is not None:
+            self._last_balance_mask = balance_mask
+
+        if self._last_balance_mask is None:
+            return
+
+        status = (self.balanced_mode, self._last_balance_mask)
+        if status == self._last_balance_status:
+            return
+
+        active_cells = [str(i + 1) for i in range(self.cell_count) if self._last_balance_mask & (1 << i)]
+        active_cells_text = ",".join(active_cells) if active_cells else "none"
+        mode_text = str(self.balanced_mode) if self.balanced_mode is not None else "unknown"
+
+        logger.debug(
+            "BALANCE STATUS: mode={} | mask=0x{:08X} | active cells: {}".format(
+                mode_text,
+                self._last_balance_mask,
+                active_cells_text,
+            )
+        )
+        self._last_balance_status = status
+
+    def get_balance_params(self, ser):
+        """
+        Read balancing configuration once at startup using Service 0x80.
+
+        The manufacturer parser stores these four values as 16-bit fields:
+        balance high temperature, balance low temperature (signed),
+        balance starting voltage and balance starting voltage difference.
+        """
+        req = self.create_command_get_balance_params()
+
+        ser.flushOutput()
+        ser.flushInput()
+        ser.write(req.encode())
+        capture_raw_data(ser.port, "tx", req)
+        logger.debug("get_balance_params request sent: {}".format(req))
+
+        # Service 0x80 returns a comparatively long response. At 9600 baud it needs
+        # roughly half a second on the wire, so leave some margin before reading.
+        sleep(0.8)
+
+        response = self.read_response(ser)
+
+        if not response:
+            logger.warning("get_balance_params response error; Service 0x80 may not be supported")
+            return False
+
+        payload = response[13 : len(response) - 5]
+
+        # In the manufacturer Service 0x80 parser these are fields 99..102
+        # (zero-based indices 98..101), each encoded as two bytes / four hex chars.
+        if len(payload) < 408:
+            logger.warning("get_balance_params response too short: {} chars, expected at least 408".format(len(payload)))
+            logger.debug("get_balance_params payload: {}".format(payload))
+            return False
+
+        try:
+            balance_high_temp = int(payload[392:396], base=16)
+            balance_low_temp = unpack(">h", bytes.fromhex(payload[396:400]))[0]
+            balance_start_voltage_raw = int(payload[400:404], base=16)
+            balance_start_diff_raw = int(payload[404:408], base=16)
+        except (ValueError, TypeError) as e:
+            logger.warning("get_balance_params response parsing error: {}".format(e))
+            logger.debug("get_balance_params payload: {}".format(payload))
+            return False
+
+        # Voltage values are reported by these BMS in mV; temperature values are °C.
+        logger.info(
+            "> BALANCE PARAMS: High temp: {} C | Low temp: {} C | "
+            "Start voltage: {:.3f} V | Start difference: {} mV".format(
+                balance_high_temp,
+                balance_low_temp,
+                balance_start_voltage_raw / 1000,
+                balance_start_diff_raw,
+            )
+        )
+        return True
+
     def get_manufacturer_info(self, ser):
         """
         Read manufacturer info from device by calling the get_manufacturer_info command,
@@ -583,13 +674,18 @@ class Daren485(Battery):
                 CHG_C_limit = int(int(payload[34:38], base=16) / 100)
                 # design_capacity_none = int(payload[38:42], base=16) / 100
                 # historical_data_storage_interval = int(payload[42:46], base=16)
-                # balanced_mode = int(payload[46:50], base=16)
+                balanced_mode = int(payload[46:50], base=16)
                 # product_barcode_byte_array = bytearray.fromhex(payload[50:90])
                 # product_barcode = product_barcode_byte_array.decode()
                 # BMS_barcode_byte_array = bytearray.fromhex(payload[90:130])
                 # BMS_barcode = BMS_barcode_byte_array.decode()
 
                 self.cell_count = num_of_cells
+                # Service 0x47 balanced_mode is retained as a raw/configuration mode.
+                # Hardware testing proved that value 0 does not mean balancing disabled:
+                # Service 0x42 can report active cell balancing while balanced_mode is 0.
+                self.balanced_mode = balanced_mode
+                self._log_balance_status()
                 if self.charge_fet is True:
                     self.max_battery_charge_current = CHG_C_limit
                 else:
@@ -667,6 +763,12 @@ class Daren485(Battery):
 
         logger.debug("read_response Data valid!")
         return buff
+
+    def create_command_get_balance_params(self):
+        """
+        Generates the read-only Service 0x80 request used by the manufacturer application.
+        """
+        return self.create_command(self.address, b"\x4a", b"\x80", self.address.hex().upper())
 
     def create_command_get_cells_params(self):
         """
