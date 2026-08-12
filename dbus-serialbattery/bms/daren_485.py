@@ -213,8 +213,12 @@ class Daren485(Battery):
     def get_realtime_data(self, ser):
         """
         Read realtime data from device by calling the get_realtime_data command,
-        using service 42 and extracting the majority of the available data,
-        such as SOC, voltages, current, temperatures and alarms/warnings/statusinformation.
+        using service 42 and extracting runtime data.
+
+        The DATAI structure is variable: the offsets after the cell voltages depend
+        on the reported cell count, and the offsets after the temperatures depend on
+        the reported temperature sensor count. Parse sequentially instead of assuming
+        a fixed 16S / 4-temperature layout.
         """
         result = False
 
@@ -230,178 +234,271 @@ class Daren485(Battery):
 
         response = self.read_response(ser)
 
-        if response:
-            payload = response[13 : len(response) - 5]
-            if len(payload) >= 118:
-                self.soc = int(payload[2:6], base=16) / 100
-                self.soh = int(payload[114:118], base=16) / 1
-                self.voltage = int(payload[6:10], base=16) / 100
-                self.current = unpack(">h", bytes.fromhex(payload[106:110]))[0] / 100
-                temperature_mos = unpack(">h", bytes.fromhex(payload[84:88]))[0] / 10
-                self.to_temperature(0, temperature_mos)
-                temperature_1 = unpack(">h", bytes.fromhex(payload[90:94]))[0] / 10
-                self.to_temperature(1, temperature_1)
-                temperature_2 = unpack(">h", bytes.fromhex(payload[94:98]))[0] / 10
-                self.to_temperature(2, temperature_2)
-                temperature_3 = unpack(">h", bytes.fromhex(payload[98:102]))[0] / 10
-                self.to_temperature(3, temperature_3)
-                temperature_4 = unpack(">h", bytes.fromhex(payload[102:106]))[0] / 10
-                self.to_temperature(4, temperature_4)
-                self.capacity = int(payload[120:124], base=16) / 100
-                self.capacity_remain = int(payload[124:128], base=16) / 100
-                self.history.charge_cycles = int(payload[128:132], base=16)
-                fetstatus = int(payload[148:152], base=16)
-
-                voltagestatus = int(payload[132:136], base=16)
-                currentstatus = int(payload[136:140], base=16)
-                temperaturestatus = int(payload[140:144], base=16)
-                warningstatus = int(payload[144:148], base=16)
-
-                # check bit 2 for TOT_OVV_PROT and bit 0 for cell_OVV_PROT
-                if voltagestatus & (1 << 2) or voltagestatus & (1 << 0):
-                    self.protection.high_voltage = 2
-                # check bit 6 for TOT_OVV_alarm and 4 for cell_OVV_alarm
-                elif voltagestatus & (1 << 6) or voltagestatus & (1 << 4):
-                    self.protection.high_voltage = 1
-                else:
-                    self.protection.high_voltage = 0
-                # NOTE: high_voltage_cell not implemented.
-                # Now incorporated in voltage_high alarm.
-                # Split if high_voltage_cell ever implemented.
-
-                # check bit 3 for TOT_UNDV_PROT
-                if voltagestatus & (1 << 3):
-                    self.protection.low_voltage = 2
-                # check bit 7 for TOT_UNDV_alarm
-                elif voltagestatus & (1 << 7):
-                    self.protection.low_voltage = 1
-                else:
-                    self.protection.low_voltage = 0
-
-                # check bit 1 for cell_UNDV_PROT
-                if voltagestatus & (1 << 1):
-                    self.protection.low_cell_voltage = 2
-                # check bit 5 for cell_UNDV_alarm
-                elif voltagestatus & (1 << 5):
-                    self.protection.low_cell_voltage = 1
-                else:
-                    self.protection.low_cell_voltage = 0
-
-                # check bit 7 for low_BAT_alarm from warningstatus
-                if not SOC_CALCULATION:
-                    if warningstatus & (1 << 7):
-                        self.protection.low_soc = 2
-                    else:
-                        self.protection.low_soc = 0
-
-                # check bit 2 for CHG_OC_PROT
-                if currentstatus & (1 << 2):
-                    self.protection.high_charge_current = 2
-                # check bit 6 for CHG_C_alarm
-                elif currentstatus & (1 << 6):
-                    self.protection.high_charge_current = 1
-                else:
-                    self.protection.high_charge_current = 0
-
-                # check bit 4 for DISCH_OC_1_PROT, bit 5 for DISCH_OC_2_PROT and bit 3 for Short_circuit_PROT
-                if currentstatus & (1 << 4) or currentstatus & (1 << 5) or currentstatus & (1 << 3):
-                    self.protection.high_discharge_current = 2
-                # check bit 7 for DISCH_C_alarm
-                elif currentstatus & (1 << 7):
-                    self.protection.high_discharge_current = 1
-                else:
-                    self.protection.high_discharge_current = 0
-
-                # check bit 14 for V_DIF_PROT
-                if voltagestatus & (1 << 14):
-                    self.protection.cell_imbalance = 2
-                # check bit 8 for V_DIF_ALARM
-                elif voltagestatus & (1 << 8):
-                    self.protection.cell_imbalance = 1
-                else:
-                    self.protection.cell_imbalance = 0
-
-                # if something else is in warning, report internal failure. warningstatus
-                # contains all sorts of internal components, such as CHG_FET, NTC_fail,
-                # cell_fail, chg_mos_fail, disch_mos_fail, etc.
-                # Ignore V_DIF_alarm and low_BAT_alarm flags, since we're allready checking for those.
-                if (warningstatus & 0b01111110) > 0:
-                    self.protection.internal_failure = 2
-                else:
-                    self.protection.internal_failure = 0
-
-                # check bit 0 for CHG_H_TEMP_PROT
-                if temperaturestatus & (1 << 0):
-                    self.protection.high_charge_temperature = 2
-                # check bit 8 for CHG_H_TEMP_alarm
-                elif temperaturestatus & (1 << 8):
-                    self.protection.high_charge_temperature = 1
-                else:
-                    self.protection.high_charge_temperature = 0
-
-                # check bit 1 for CHG_L_TEMP_PROT
-                if temperaturestatus & (1 << 1):
-                    self.protection.low_charge_temperature = 2
-                # check bit 9 for CHG_L_TEMP_alarm
-                elif temperaturestatus & (1 << 9):
-                    self.protection.low_charge_temperature = 1
-                else:
-                    self.protection.low_charge_temperature = 0
-
-                # check bit 0 for CHG_H_TEMP_PROT and bit 2 for DISCH_H_TEMP_PROT
-                if temperaturestatus & (1 << 0) or temperaturestatus & (1 << 2):
-                    self.protection.high_temperature = 2
-                # check bit 8 for CHG_H_TEMP_alarm and bit 10 for DISCH_H_TEMP_alarm
-                elif temperaturestatus & (1 << 8) or temperaturestatus & (1 << 10):
-                    self.protection.high_temperature = 1
-                else:
-                    self.protection.high_temperature = 0
-
-                # check bit 1 for CHG_L_TEMP_PROT and bit 3 for DISCH_L_TEMP_PROT
-                if temperaturestatus & (1 << 1) or temperaturestatus & (1 << 3):
-                    self.protection.low_temperature = 2
-                # check bit 9 for CHG_L_TEMP_alarm and bit 11 for DISCH_L_TEMP_alarm
-                elif temperaturestatus & (1 << 9) or temperaturestatus & (1 << 11):
-                    self.protection.low_temperature = 1
-                else:
-                    self.protection.low_temperature = 0
-
-                # check bit 6 for MOS_H_TEMP_PROT and 4 for ENV_H_TEMP_PROT
-                if temperaturestatus & (1 << 6) or temperaturestatus & (1 << 4):
-                    self.protection.high_internal_temperature = 2
-                # check bit 14 for MOS_H_TEMP_alarm and 12 for ENV_H_TEMP_alarm
-                elif temperaturestatus & (1 << 14) or temperaturestatus & (1 << 12):
-                    self.protection.high_internal_temperature = 1
-                else:
-                    self.protection.high_internal_temperature = 0
-
-                # check bit 13 for blown_fuse from voltagestatus
-                if voltagestatus & (1 << 13):
-                    self.protection.fuse_blown = 2
-                else:
-                    self.protection.fuse_blown = 0
-
-                if fetstatus & (1 << 0):
-                    self.charge_fet = True
-                else:
-                    self.charge_fet = False
-                    self.max_battery_charge_current = 0
-
-                if fetstatus & (1 << 1):
-                    self.discharge_fet = True
-                else:
-                    self.discharge_fet = False
-                    self.max_battery_discharge_current = 0
-
-                for i in range(1, 17):
-                    cell_voltage = int(payload[(i - 1) * 4 + 12 : i * 4 + 12], base=16) / 1000
-                    self.cells[i - 1].voltage = cell_voltage
-
-                result = True
-            else:
-                logger.error("get_realtime_data response length error!")
-        else:
+        if not response:
             logger.error("get_realtime_data response error!")
+            return False
+
+        payload = response[13 : len(response) - 5]
+        pos = 0
+
+        def take(chars, field_name):
+            nonlocal pos
+            if pos + chars > len(payload):
+                raise ValueError(
+                    "get_realtime_data response too short while reading {}: "
+                    "need {} chars at offset {}, payload has {}".format(
+                        field_name, chars, pos, len(payload)
+                    )
+                )
+            value = payload[pos : pos + chars]
+            pos += chars
+            return value
+
+        def read_u8(field_name):
+            return int(take(2, field_name), base=16)
+
+        def read_u16(field_name):
+            return int(take(4, field_name), base=16)
+
+        def read_i16(field_name):
+            return unpack(">h", bytes.fromhex(take(4, field_name)))[0]
+
+        try:
+            # DATAFLAG
+            read_u8("dataflag")
+
+            self.soc = read_u16("soc") / 100
+            self.voltage = read_u16("pack_voltage") / 100
+
+            realtime_cell_count = read_u8("cell_count")
+            if realtime_cell_count <= 0:
+                raise ValueError("Invalid cell count {}".format(realtime_cell_count))
+
+            if self.cell_count is not None and self.cell_count != realtime_cell_count:
+                logger.warning(
+                    "Service 42 cell count ({}) differs from configured cell count ({}). "
+                    "Using Service 42 value.".format(realtime_cell_count, self.cell_count)
+                )
+
+            self.cell_count = realtime_cell_count
+            while len(self.cells) < self.cell_count:
+                self.cells.append(Cell(False))
+
+            for i in range(self.cell_count):
+                self.cells[i].voltage = read_u16("cell_voltage_{}".format(i + 1)) / 1000
+
+            # These two values are part of the frame but dbus-serialbattery does not
+            # currently expose dedicated fields for them.
+            temperature_ambient = read_i16("ambient_temperature") / 10
+            temperature_pack = read_i16("pack_temperature") / 10
+            temperature_mos = read_i16("mos_temperature") / 10
+            self.to_temperature(0, temperature_mos)
+
+            temperature_count = read_u8("temperature_count")
+            for i in range(temperature_count):
+                temperature = read_i16("temperature_{}".format(i + 1)) / 10
+                self.to_temperature(i + 1, temperature)
+
+            self.current = read_i16("pack_current") / 100
+
+            # Pack internal resistance is currently not exposed by Battery, but it
+            # must be consumed to keep all following fields aligned.
+            pack_internal_resistance = read_u16("pack_internal_resistance") / 10
+
+            # SOH is a raw 16-bit percentage value. The manufacturer's application
+            # does NOT divide this field by 10 or 100.
+            self.soh = read_u16("soh")
+
+            # user_custom is currently not used, but is part of DATAI.
+            user_custom = read_u8("user_custom")
+
+            self.capacity = read_u16("full_capacity") / 100
+            self.capacity_remain = read_u16("remaining_capacity") / 100
+            self.history.charge_cycles = read_u16("charge_cycles")
+
+            voltagestatus = read_u16("voltage_status")
+            currentstatus = read_u16("current_status")
+            temperaturestatus = read_u16("temperature_status")
+            warningstatus = read_u16("warning_status")
+            fetstatus = read_u16("fet_status")
+
+            # Per-cell protection/alarm masks (LOW 16 bits). These values are not
+            # currently mapped to dbus-serialbattery properties, but are consumed so
+            # the following balance masks are read at the correct position.
+            read_u16("cell_overvoltage_protection_low")
+            read_u16("cell_undervoltage_protection_low")
+            read_u16("cell_overvoltage_alarm_low")
+            read_u16("cell_undervoltage_alarm_low")
+
+            # Manufacturer Service 42 returns two 16-bit balance masks.
+            # LOW covers cells 1..16, HIGH covers cells 17..32. Bit 0 maps to the
+            # first cell in each group.
+            balance_low = read_u16("cell_balance_low")
+            balance_high = read_u16("cell_balance_high")
+            balance_mask = balance_low | (balance_high << 16)
+
+            for i in range(self.cell_count):
+                self.cells[i].balance = bool(balance_mask & (1 << i))
+
+            # A useful aggregate state for consumers that support only one flag.
+            self.balance_fet = balance_mask != 0
+
+            logger.debug(
+                "Daren realtime: cells={}, temp_sensors={}, ambient={}C, pack={}C, "
+                "MOS={}C, internal_resistance={}, user_custom={}, balance=0x{:08X}".format(
+                    self.cell_count,
+                    temperature_count,
+                    temperature_ambient,
+                    temperature_pack,
+                    temperature_mos,
+                    pack_internal_resistance,
+                    user_custom,
+                    balance_mask,
+                )
+            )
+
+            # check bit 2 for TOT_OVV_PROT and bit 0 for cell_OVV_PROT
+            if voltagestatus & (1 << 2) or voltagestatus & (1 << 0):
+                self.protection.high_voltage = 2
+            # check bit 6 for TOT_OVV_alarm and 4 for cell_OVV_alarm
+            elif voltagestatus & (1 << 6) or voltagestatus & (1 << 4):
+                self.protection.high_voltage = 1
+            else:
+                self.protection.high_voltage = 0
+            # NOTE: high_voltage_cell not implemented.
+            # Now incorporated in voltage_high alarm.
+            # Split if high_voltage_cell ever implemented.
+
+            # check bit 3 for TOT_UNDV_PROT
+            if voltagestatus & (1 << 3):
+                self.protection.low_voltage = 2
+            # check bit 7 for TOT_UNDV_alarm
+            elif voltagestatus & (1 << 7):
+                self.protection.low_voltage = 1
+            else:
+                self.protection.low_voltage = 0
+
+            # check bit 1 for cell_UNDV_PROT
+            if voltagestatus & (1 << 1):
+                self.protection.low_cell_voltage = 2
+            # check bit 5 for cell_UNDV_alarm
+            elif voltagestatus & (1 << 5):
+                self.protection.low_cell_voltage = 1
+            else:
+                self.protection.low_cell_voltage = 0
+
+            # check bit 7 for low_BAT_alarm from warningstatus
+            if not SOC_CALCULATION:
+                if warningstatus & (1 << 7):
+                    self.protection.low_soc = 2
+                else:
+                    self.protection.low_soc = 0
+
+            # check bit 2 for CHG_OC_PROT
+            if currentstatus & (1 << 2):
+                self.protection.high_charge_current = 2
+            # check bit 6 for CHG_C_alarm
+            elif currentstatus & (1 << 6):
+                self.protection.high_charge_current = 1
+            else:
+                self.protection.high_charge_current = 0
+
+            # check bit 4 for DISCH_OC_1_PROT, bit 5 for DISCH_OC_2_PROT and bit 3 for Short_circuit_PROT
+            if currentstatus & (1 << 4) or currentstatus & (1 << 5) or currentstatus & (1 << 3):
+                self.protection.high_discharge_current = 2
+            # check bit 7 for DISCH_C_alarm
+            elif currentstatus & (1 << 7):
+                self.protection.high_discharge_current = 1
+            else:
+                self.protection.high_discharge_current = 0
+
+            # check bit 14 for V_DIF_PROT
+            if voltagestatus & (1 << 14):
+                self.protection.cell_imbalance = 2
+            # check bit 8 for V_DIF_ALARM
+            elif voltagestatus & (1 << 8):
+                self.protection.cell_imbalance = 1
+            else:
+                self.protection.cell_imbalance = 0
+
+            # if something else is in warning, report internal failure. warningstatus
+            # contains all sorts of internal components, such as CHG_FET, NTC_fail,
+            # cell_fail, chg_mos_fail, disch_mos_fail, etc.
+            # Ignore V_DIF_alarm and low_BAT_alarm flags, since we're allready checking for those.
+            if (warningstatus & 0b01111110) > 0:
+                self.protection.internal_failure = 2
+            else:
+                self.protection.internal_failure = 0
+
+            # check bit 0 for CHG_H_TEMP_PROT
+            if temperaturestatus & (1 << 0):
+                self.protection.high_charge_temperature = 2
+            # check bit 8 for CHG_H_TEMP_alarm
+            elif temperaturestatus & (1 << 8):
+                self.protection.high_charge_temperature = 1
+            else:
+                self.protection.high_charge_temperature = 0
+
+            # check bit 1 for CHG_L_TEMP_PROT
+            if temperaturestatus & (1 << 1):
+                self.protection.low_charge_temperature = 2
+            # check bit 9 for CHG_L_TEMP_alarm
+            elif temperaturestatus & (1 << 9):
+                self.protection.low_charge_temperature = 1
+            else:
+                self.protection.low_charge_temperature = 0
+
+            # check bit 0 for CHG_H_TEMP_PROT and bit 2 for DISCH_H_TEMP_PROT
+            if temperaturestatus & (1 << 0) or temperaturestatus & (1 << 2):
+                self.protection.high_temperature = 2
+            # check bit 8 for CHG_H_TEMP_alarm and bit 10 for DISCH_H_TEMP_alarm
+            elif temperaturestatus & (1 << 8) or temperaturestatus & (1 << 10):
+                self.protection.high_temperature = 1
+            else:
+                self.protection.high_temperature = 0
+
+            # check bit 1 for CHG_L_TEMP_PROT and bit 3 for DISCH_L_TEMP_PROT
+            if temperaturestatus & (1 << 1) or temperaturestatus & (1 << 3):
+                self.protection.low_temperature = 2
+            # check bit 9 for CHG_L_TEMP_alarm and bit 11 for DISCH_L_TEMP_alarm
+            elif temperaturestatus & (1 << 9) or temperaturestatus & (1 << 11):
+                self.protection.low_temperature = 1
+            else:
+                self.protection.low_temperature = 0
+
+            # check bit 6 for MOS_H_TEMP_PROT and 4 for ENV_H_TEMP_PROT
+            if temperaturestatus & (1 << 6) or temperaturestatus & (1 << 4):
+                self.protection.high_internal_temperature = 2
+            # check bit 14 for MOS_H_TEMP_alarm and 12 for ENV_H_TEMP_alarm
+            elif temperaturestatus & (1 << 14) or temperaturestatus & (1 << 12):
+                self.protection.high_internal_temperature = 1
+            else:
+                self.protection.high_internal_temperature = 0
+
+            # check bit 13 for blown_fuse from voltagestatus
+            if voltagestatus & (1 << 13):
+                self.protection.fuse_blown = 2
+            else:
+                self.protection.fuse_blown = 0
+
+            if fetstatus & (1 << 0):
+                self.charge_fet = True
+            else:
+                self.charge_fet = False
+                self.max_battery_charge_current = 0
+
+            if fetstatus & (1 << 1):
+                self.discharge_fet = True
+            else:
+                self.discharge_fet = False
+                self.max_battery_discharge_current = 0
+
+            result = True
+
+        except (ValueError, TypeError) as e:
+            logger.error("get_realtime_data response parsing error: {}".format(e))
+            logger.debug("get_realtime_data payload: {}".format(payload))
+            result = False
 
         return result
 
