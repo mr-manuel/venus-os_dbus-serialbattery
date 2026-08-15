@@ -417,7 +417,11 @@ def main():
 
             pin_adapters_by_mac()
 
-            if port == "Jkbms_Ble":
+            if port == "HumsiENK_Ble":
+                # noqa: F401 --> ignore flake "imported but unused" error
+                from bms.humsienk_ble import HumsiENK_Ble  # noqa: F401
+
+            elif port == "Jkbms_Ble":
                 # noqa: F401 --> ignore flake "imported but unused" error
                 from bms.jkbms_ble import Jkbms_Ble  # noqa: F401
 
@@ -439,7 +443,7 @@ def main():
 
             else:
                 logger.error(">>> Unknown Bluetooth BMS type: " + port)
-                logger.error("Supported Bluetooth BMS types (CASE SENSITIVE!): Jkbms_Ble, Kilovault_Ble, LiTime_Ble, LltJbd_Ble, Xdzn_Ble")
+                logger.error("Supported Bluetooth BMS types (CASE SENSITIVE!): HumsiENK_Ble, Jkbms_Ble, Kilovault_Ble, LiTime_Ble, LltJbd_Ble, Xdzn_Ble")
                 sleep(60)
                 exit_driver(None, None, 1)
 

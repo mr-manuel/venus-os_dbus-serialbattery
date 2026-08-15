@@ -37,6 +37,7 @@
 * Added: Disable serial starter if not needed by @mr-manuel
 * Added: Generic MQTT BMS by @mr-manuel
 * Added: Health check for batteries which are using the callback by @mr-manuel
+* Added: HumsiENK BLE BMS by @cgoudie
 * Added: JBD CAN protocol support with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/363 by @dmitrych5
 * Added: JBD UP16S series support, including daisy-chaining, with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/375 by @dmitrych5
 * Added: JK Inverter BMS - Heating informations with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/367 by @BitSeb
