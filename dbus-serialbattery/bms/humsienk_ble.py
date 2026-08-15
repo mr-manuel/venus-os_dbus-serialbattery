@@ -150,6 +150,17 @@ class HumsiENK_Ble(Battery):
     # Shortest interval between handshake re-sends while the stream is starved.
     HANDSHAKE_RETRY_SECONDS = 30.0
 
+    # How long a single request waits for its response.
+    REQUEST_TIMEOUT_SECONDS = 3.0
+
+    # Budget for the whole data phase of test_connection, from the handshake to
+    # the last response. A BMS that is streaming answers a burst of commands in
+    # well under a second, so anything still unanswered when this expires is not
+    # coming, and the only thing more waiting achieves is keeping the D-Bus
+    # service from existing - during which the rest of the bus sees the battery
+    # as absent rather than as merely unresponsive.
+    STARTUP_TIMEOUT_SECONDS = 10.0
+
     def __init__(self, port, baud, address):
         super(HumsiENK_Ble, self).__init__(port, baud, address)
         self.type = self.BATTERYTYPE
@@ -161,6 +172,7 @@ class HumsiENK_Ble(Battery):
         self._last_frame_time = 0.0  # last checksum-verified frame from the radio
         self._last_poll_time = 0.0
         self._last_handshake_time = 0.0
+        self._deadline = None  # caps a run of requests, see _request()
 
         logger.info("Init of HumsiENK_Ble at " + address)
 
@@ -187,12 +199,17 @@ class HumsiENK_Ble(Battery):
                 logger.error("HumsiENK_Ble: could not connect to " + self.address)
                 return False
 
+            # One budget for the whole exchange below, so that four requests
+            # against a link that is up but silent cost STARTUP_TIMEOUT_SECONDS
+            # in total instead of four separate timeouts one after the other.
+            self._deadline = time.time() + self.STARTUP_TIMEOUT_SECONDS
+
             # The BMS stays silent until the handshake is sent
             self._send_command(self.CMD_HANDSHAKE)
             self._last_handshake_time = time.time()
 
             # Cell voltages carry the cell count, so ask for them first
-            result = self._request(self.CMD_CELL_VOLTAGES, timeout=10.0)
+            result = self._request(self.CMD_CELL_VOLTAGES)
             result = result and self._request(self.CMD_BATTERY_INFO)
             result = result and self.get_settings()
 
@@ -206,6 +223,9 @@ class HumsiENK_Ble(Battery):
             line = exception_traceback.tb_lineno
             logger.error(f"Exception occurred: {repr(exception_object)} of type {exception_type} in {file} line #{line}")
             result = False
+
+        finally:
+            self._deadline = None
 
         return result
 
@@ -288,20 +308,32 @@ class HumsiENK_Ble(Battery):
         except Exception as e:
             logger.debug(f"HumsiENK: sending command 0x{command:02X} failed: {repr(e)}")
 
-    def _request(self, command: int, timeout: float = 3.0) -> bool:
+    def _request(self, command: int, timeout: float = REQUEST_TIMEOUT_SECONDS) -> bool:
         """
         Send a command and read frames until its response has been parsed.
+
+        Waits at most `timeout` seconds and never past `self._deadline` when the
+        caller has set one, so a run of requests made while the link is up but
+        the BMS is silent costs the caller's budget rather than the sum of the
+        individual timeouts. Once the budget is gone the command is not even
+        sent: nothing is answering it.
 
         :param command: the command code
         :param timeout: how long to wait for the response
         :return: True if the response was parsed, False on timeout
         """
+        if self._deadline is not None:
+            timeout = min(timeout, self._deadline - time.time())
+            if timeout <= 0:
+                logger.warning(f"HumsiENK: out of time before command 0x{command:02X} could be sent")
+                return False
+
         self._send_command(command)
         deadline = time.time() + timeout
         while time.time() < deadline:
             if command in self._read_frames():
                 return True
-        logger.warning(f"HumsiENK: no response to command 0x{command:02X} within {timeout:.0f} s")
+        logger.warning(f"HumsiENK: no response to command 0x{command:02X} within {timeout:.1f} s")
         return False
 
     def _read_frames(self, timeout: float = 0.3) -> list:
