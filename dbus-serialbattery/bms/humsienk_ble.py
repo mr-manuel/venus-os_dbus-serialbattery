@@ -23,7 +23,7 @@ being worked through separately.
 
 from battery import Battery, Cell
 from collections import deque
-from utils import logger, capture_raw_data
+from utils import logger, capture_raw_data, MAX_CELL_VOLTAGE, MIN_CELL_VOLTAGE
 from utils_ble import BLE_ESTABLISH_TIMEOUT, BLE_RELEASE_TIMEOUT, Syncron_Ble
 import asyncio
 import sys
@@ -194,6 +194,7 @@ class HumsiENK_Ble(Battery):
             # Cell voltages carry the cell count, so ask for them first
             result = self._request(self.CMD_CELL_VOLTAGES, timeout=10.0)
             result = result and self._request(self.CMD_BATTERY_INFO)
+            result = result and self.get_settings()
 
         except Exception:
             (
@@ -582,10 +583,16 @@ class HumsiENK_Ble(Battery):
             self.cell_count = cell_count
         if capacity > 0:
             self.capacity = capacity
+        # The two voltage fields are the BMS protection thresholds, not charge
+        # targets, so they are applied as a ceiling and a floor on the
+        # configured cell voltages rather than replacing them: charging to the
+        # exact overvoltage trip point is what the BMS is there to prevent.
+        # This mirrors how the framework merges the BMS current limits, where
+        # a BMS value only ever tightens the configured one.
         if cell_max_voltage > 0 and cell_count > 0:
-            self.max_battery_voltage = cell_max_voltage * cell_count
+            self.max_battery_voltage = round(min(cell_max_voltage, MAX_CELL_VOLTAGE) * cell_count, 2)
         if cell_min_voltage > 0 and cell_count > 0:
-            self.min_battery_voltage = cell_min_voltage * cell_count
+            self.min_battery_voltage = round(max(cell_min_voltage, MIN_CELL_VOLTAGE) * cell_count, 2)
         if max_charge_current > 0:
             self.max_battery_charge_current = max_charge_current
         if max_discharge_current > 0:
