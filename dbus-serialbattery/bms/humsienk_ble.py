@@ -516,12 +516,18 @@ class HumsiENK_Ble(Battery):
             bit 0: charge overcurrent protection
             bit 1: charge over-temperature protection
             bit 2: charge under-temperature protection
+            bit 3: cell overvoltage protection
             bit 4: pack overvoltage protection
+            bit 5: analogue front end error
+            bit 6: charging stopped
             bit 7: charge FET state (1 = on)
             bit 8: charge overcurrent warning
             bit 9: charge over-temperature warning
             bit 10: charge under-temperature warning
+            bit 11: cell overvoltage warning
             bit 12: pack overvoltage warning
+            bit 13: voltage difference warning
+            bit 14: voltage difference too large
             bit 15: heater state (1 = on)
 
         Discharge section:
@@ -529,16 +535,26 @@ class HumsiENK_Ble(Battery):
             bit 16: discharge overcurrent protection
             bit 17: discharge over-temperature protection
             bit 18: discharge under-temperature protection
+            bit 19: cell undervoltage protection
             bit 20: short circuit protection
             bit 21: pack undervoltage protection
-            bit 22: discharge cutoff reached
+            bit 22: discharging stopped
             bit 23: discharge FET state (1 = on)
             bit 24: discharge overcurrent warning
             bit 25: discharge over-temperature warning
             bit 26: discharge under-temperature warning
+            bit 27: cell undervoltage warning
             bit 28: pack undervoltage warning
             bit 29: MOSFET over-temperature warning
             bit 30: MOSFET over-temperature protection
+            bit 31: pre-discharge FET on
+
+        The word is four bytes of one byte each: charge protection, charge
+        warning, discharge protection, discharge warning. Bit 7 of each byte is
+        a switch state rather than a condition. Bits 3, 5, 6, 13, 14, 19, 27 and
+        31 are documented upstream but the vendor app never reads them, so their
+        labels are taken on the upstream maintainer's authority rather than
+        verified here.
 
         :param data: the frame payload
         :return: None
@@ -567,6 +583,9 @@ class HumsiENK_Ble(Battery):
 
         self.protection.high_voltage = alarm(4, 12)
         self.protection.low_voltage = alarm(21, 28)
+        self.protection.high_cell_voltage = alarm(3, 11)
+        self.protection.low_cell_voltage = alarm(19, 27)
+        self.protection.cell_imbalance = alarm(14, 13)
         self.protection.high_charge_current = alarm(0, 8)
         self.protection.high_charge_temperature = alarm(1, 9)
         self.protection.low_charge_temperature = alarm(2, 10)
@@ -578,12 +597,6 @@ class HumsiENK_Ble(Battery):
         # of its own, so it is reported as a discharge overcurrent.
         self.protection.high_discharge_current = 2 if status & (1 << 20) else alarm(16, 24)
 
-        # Discharge cutoff. Reported as a low cell voltage rather than a low
-        # SoC because the only undervoltage threshold this BMS exposes is the
-        # per-cell one in the config frame; it publishes no SoC threshold at
-        # all. Pack undervoltage is bit 21 and is already reported above.
-        self.protection.low_cell_voltage = 2 if status & (1 << 22) else 0
-
         balancing = int.from_bytes(data[8:11], "little")
         for index in range(min(len(self.cells), 24)):
             self.cells[index].balance = bool(balancing & (1 << index))
@@ -592,7 +605,10 @@ class HumsiENK_Ble(Battery):
         # a wiring fault rather than a battery condition. The vendor app reads
         # this field but never shows it.
         disconnected = int.from_bytes(data[11:14], "little")
-        self.protection.internal_failure = 2 if disconnected else 0
+        # Bit 5 is the analogue front end, the part that measures the cells. A
+        # fault there means the readings themselves are untrustworthy, which is
+        # the same class of problem as a disconnected cell.
+        self.protection.internal_failure = 2 if (disconnected or status & (1 << 5)) else 0
         if disconnected:
             cells = [index + 1 for index in range(min(len(self.cells), 24)) if disconnected & (1 << index)]
             logger.error(f"HumsiENK: cells reported as disconnected: {cells}")
