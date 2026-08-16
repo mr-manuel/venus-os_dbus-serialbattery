@@ -23,7 +23,7 @@ being worked through separately.
 
 from battery import Battery, Cell
 from collections import deque
-from utils import logger, capture_raw_data, MAX_CELL_VOLTAGE, MIN_CELL_VOLTAGE
+from utils import logger, capture_raw_data, USE_BMS_DVCC_VALUES
 from utils_ble import BLE_ESTABLISH_TIMEOUT, BLE_RELEASE_TIMEOUT, Syncron_Ble
 import asyncio
 import sys
@@ -615,20 +615,21 @@ class HumsiENK_Ble(Battery):
             self.cell_count = cell_count
         if capacity > 0:
             self.capacity = capacity
-        # The two voltage fields are the BMS protection thresholds, not charge
-        # targets, so they are applied as a ceiling and a floor on the
-        # configured cell voltages rather than replacing them: charging to the
-        # exact overvoltage trip point is what the BMS is there to prevent.
-        # This mirrors how the framework merges the BMS current limits, where
-        # a BMS value only ever tightens the configured one.
-        if cell_max_voltage > 0 and cell_count > 0:
-            self.max_battery_voltage = round(min(cell_max_voltage, MAX_CELL_VOLTAGE) * cell_count, 2)
-        if cell_min_voltage > 0 and cell_count > 0:
-            self.min_battery_voltage = round(max(cell_min_voltage, MIN_CELL_VOLTAGE) * cell_count, 2)
-        if max_charge_current > 0:
-            self.max_battery_charge_current = max_charge_current
-        if max_discharge_current > 0:
-            self.max_battery_discharge_current = max_discharge_current
+        # get DVCC values from BMS if the user wants to use them and they are
+        # available. Left unset otherwise, so the base class derives them from
+        # the configured cell voltages. Opting in is worth understanding here:
+        # this BMS reports its protection trip points, not charge targets, so
+        # the charge voltage becomes the voltage at which the BMS opens the
+        # charge FET.
+        if USE_BMS_DVCC_VALUES:
+            if cell_max_voltage > 0 and cell_count > 0:
+                self.max_battery_voltage = round(cell_max_voltage * cell_count, 2)
+            if cell_min_voltage > 0 and cell_count > 0:
+                self.min_battery_voltage = round(cell_min_voltage * cell_count, 2)
+            if max_charge_current > 0:
+                self.max_battery_charge_current = max_charge_current
+            if max_discharge_current > 0:
+                self.max_battery_discharge_current = max_discharge_current
 
         logger.info(
             f"HumsiENK: config {cell_count}S {capacity} Ah, "

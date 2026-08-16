@@ -23,7 +23,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "dbus-ser
 _saved_utils_ble = sys.modules.get("utils_ble")
 sys.modules["utils_ble"] = types.SimpleNamespace(Syncron_Ble=object, BLE_ESTABLISH_TIMEOUT=300.0, BLE_RELEASE_TIMEOUT=30.0)
 try:
-    from utils import MAX_CELL_VOLTAGE, MIN_CELL_VOLTAGE  # noqa: E402
+    import utils  # noqa: E402
+    from bms import humsienk_ble  # noqa: E402
     from bms.humsienk_ble import HumsiENK_Ble  # noqa: E402
 finally:
     if _saved_utils_ble is None:
@@ -400,7 +401,9 @@ def test_a_short_status_frame_changes_nothing():
 # ------------------------------------------------------------- 0x58 config
 
 
-def test_config_offsets():
+def test_config_offsets(monkeypatch):
+    # opt in, so the DVCC-gated fields are populated and their offsets checked
+    monkeypatch.setattr(humsienk_ble, "USE_BMS_DVCC_VALUES", True)
     bms = make_bms()
     bms._parse_and_update(
         frame(HumsiENK_Ble.CMD_CONFIG, config_payload(cell_count=4, capacity_centi_ah=10000, charge_ocp_deci_a=1000, discharge_ocp_deci_a=1500))
@@ -412,20 +415,46 @@ def test_config_offsets():
     assert bms.max_battery_discharge_current == 150.0
 
 
-def test_config_voltage_thresholds_only_ever_tighten_the_configured_range():
+def test_bms_dvcc_values_are_ignored_unless_the_user_opts_in(monkeypatch):
+    # Default (USE_BMS_DVCC_VALUES = False): the BMS settings frame must not
+    # touch the DVCC values. These are protection trip points, not charge
+    # targets - charging to the overvoltage protection is charging to the
+    # point the BMS opens the charge FET. The base class derives the limits
+    # from the configured cell voltages instead.
+    monkeypatch.setattr(humsienk_ble, "USE_BMS_DVCC_VALUES", False)
     bms = make_bms()
-    # a BMS that protects wider than the configured cell range must not widen it
-    bms._parse_and_update(frame(HumsiENK_Ble.CMD_CONFIG, config_payload(cell_count=4, cell_ovp_mv=3650, cell_uvp_mv=2500)))
-    assert bms.max_battery_voltage == round(MAX_CELL_VOLTAGE * 4, 2)
-    assert bms.min_battery_voltage == round(MIN_CELL_VOLTAGE * 4, 2)
-
-    # a BMS that protects tighter than the configured cell range must tighten it
-    tight_max, tight_min = MAX_CELL_VOLTAGE - 0.1, MIN_CELL_VOLTAGE + 0.1
     bms._parse_and_update(
-        frame(HumsiENK_Ble.CMD_CONFIG, config_payload(cell_count=4, cell_ovp_mv=round(tight_max * 1000), cell_uvp_mv=round(tight_min * 1000)))
+        frame(
+            HumsiENK_Ble.CMD_CONFIG,
+            config_payload(cell_count=4, cell_ovp_mv=3650, cell_uvp_mv=2500, charge_ocp_deci_a=1000, discharge_ocp_deci_a=1500),
+        )
     )
-    assert bms.max_battery_voltage == round(tight_max * 4, 2)
-    assert bms.min_battery_voltage == round(tight_min * 4, 2)
+
+    assert bms.max_battery_voltage is None
+    assert bms.min_battery_voltage is None
+    assert bms.max_battery_charge_current == utils.MAX_BATTERY_CHARGE_CURRENT
+    assert bms.max_battery_discharge_current == utils.MAX_BATTERY_DISCHARGE_CURRENT
+    # the frame is still parsed for everything that is not a DVCC value
+    assert bms.cell_count == 4
+
+
+def test_bms_dvcc_values_are_used_raw_when_the_user_opts_in(monkeypatch):
+    # Opted in: use what the BMS reports, unmodified. Matches battery_template
+    # and the other drivers honouring this option - the driver does not invent
+    # a clamping policy of its own.
+    monkeypatch.setattr(humsienk_ble, "USE_BMS_DVCC_VALUES", True)
+    bms = make_bms()
+    bms._parse_and_update(
+        frame(
+            HumsiENK_Ble.CMD_CONFIG,
+            config_payload(cell_count=4, cell_ovp_mv=3650, cell_uvp_mv=2500, charge_ocp_deci_a=1000, discharge_ocp_deci_a=1500),
+        )
+    )
+
+    assert bms.max_battery_voltage == round(3.65 * 4, 2)
+    assert bms.min_battery_voltage == round(2.5 * 4, 2)
+    assert bms.max_battery_charge_current == 100.0
+    assert bms.max_battery_discharge_current == 150.0
 
 
 def test_a_short_config_frame_changes_nothing():
@@ -472,9 +501,11 @@ def test_test_connection_reads_the_settings_frame(monkeypatch):
     bms = make_bms(handle)
 
     assert bms.test_connection() is True
-    # only reachable through get_settings(), which test_connection has to call
-    assert bms.max_battery_charge_current == 100.0
-    assert bms.max_battery_discharge_current == 150.0
+    # only reachable through get_settings(), which test_connection has to call.
+    # Capacity and the version string come from the config and version frames;
+    # the DVCC values are deliberately not asserted here because they are gated
+    # on USE_BMS_DVCC_VALUES, which is off by default.
+    assert bms.capacity == 100.0
     assert bms.hardware_version == "HumsiENK vHS30A3-1.07"
     assert [data[1] for data in handle.sent] == [
         HumsiENK_Ble.CMD_HANDSHAKE,
