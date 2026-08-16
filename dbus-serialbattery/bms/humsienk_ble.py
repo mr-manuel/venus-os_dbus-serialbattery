@@ -581,11 +581,32 @@ class HumsiENK_Ble(Battery):
         # per-cell bitmap below says only which cells are balancing right now.
         self.heater_fet = bool(status & (1 << 15))
 
-        self.protection.high_voltage = alarm(4, 12)
+        # The overvoltage WARNINGS (bits 11 and 12) are deliberately not
+        # published. On these packs both assert while charging to the voltage
+        # the manufacturer specifies, and hold for hours: bit 12 was set for
+        # about three hours during a charge to 14.4 V, released only once the
+        # pack had fallen to somewhere between 13.97 and 13.50 V, and bit 11
+        # behaved the same way. A signal that asserts throughout normal, in
+        # spec operation is telemetry, not an alarm, and publishing it puts a
+        # warning in the VRM alarm log on every charge cycle. Aggregators take
+        # the maximum across a bank, so one pack in absorption raises the whole
+        # bank. The protections (bits 3 and 4) are what actually open a FET and
+        # are reported in full.
+        self.protection.high_voltage = 2 if status & (1 << 4) else 0
+        self.protection.high_cell_voltage = 2 if status & (1 << 3) else 0
+
+        # The undervoltage warnings are kept, because their thresholds sit
+        # below the operating floor rather than inside it: nothing reaches them
+        # during ordinary use, so an assertion is worth surfacing.
         self.protection.low_voltage = alarm(21, 28)
-        self.protection.high_cell_voltage = alarm(3, 11)
         self.protection.low_cell_voltage = alarm(19, 27)
-        self.protection.cell_imbalance = alarm(14, 13)
+
+        # Both imbalance bits live in the charge warning byte, so neither is a
+        # protection despite bit 14 reading like one. Reported at warning level
+        # only, and only the upper of the two, because a pack with a lagging
+        # cell crosses the lower one at every charge knee.
+        self.protection.cell_imbalance = 1 if status & (1 << 14) else 0
+
         self.protection.high_charge_current = alarm(0, 8)
         self.protection.high_charge_temperature = alarm(1, 9)
         self.protection.low_charge_temperature = alarm(2, 10)

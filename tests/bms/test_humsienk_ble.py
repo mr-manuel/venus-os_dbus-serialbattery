@@ -373,21 +373,44 @@ def test_cell_voltage_alarms_come_from_the_cell_bits_not_the_stop_bits():
     assert bms.protection.low_cell_voltage == 2
 
 
-def test_cell_overvoltage_and_imbalance_are_published():
-    # bit 11 is the one bit in this group observed on real hardware: it was
-    # asserted through the top of charge on both packs and released well down
-    # the discharge, which is what a warning below its protection does.
+def test_overvoltage_protections_are_published():
     bms = make_bms()
-    bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(status_bits=(1 << 11))))
-    assert bms.protection.high_cell_voltage == 1
-
     bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(status_bits=(1 << 3))))
     assert bms.protection.high_cell_voltage == 2
 
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(status_bits=(1 << 4))))
+    assert bms.protection.high_voltage == 2
+
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(status_bits=0)))
+    assert (bms.protection.high_cell_voltage, bms.protection.high_voltage) == (0, 0)
+
+
+def test_overvoltage_warnings_are_not_published():
+    # Both assert while charging to the voltage the manufacturer specifies and
+    # hold for hours: observed on two packs, bit 12 set for about three hours
+    # during a charge to 14.4 V. Publishing them puts a warning in the VRM
+    # alarm log on every cycle, and an aggregator taking the maximum raises the
+    # whole bank because one pack is in absorption.
+    bms = make_bms()
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(status_bits=(1 << 11) | (1 << 12))))
+
+    assert bms.protection.high_cell_voltage == 0
+    assert bms.protection.high_voltage == 0
+
+
+def test_only_the_upper_imbalance_bit_is_published_and_only_as_a_warning():
+    # Both imbalance bits sit in the charge warning byte, so neither is a
+    # protection despite bit 14 reading like one. A pack with a lagging cell
+    # crosses the lower bit at every charge knee.
+    bms = make_bms()
     bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(status_bits=(1 << 13))))
-    assert bms.protection.cell_imbalance == 1
+    assert bms.protection.cell_imbalance == 0
+
     bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(status_bits=(1 << 14))))
-    assert bms.protection.cell_imbalance == 2
+    assert bms.protection.cell_imbalance == 1
+
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(status_bits=0)))
+    assert bms.protection.cell_imbalance == 0
 
 
 def test_an_analogue_front_end_fault_is_an_internal_failure():
@@ -403,8 +426,11 @@ def test_an_analogue_front_end_fault_is_an_internal_failure():
 
 def test_status_alarm_bits_map_to_alarms_and_warnings():
     protection_bits = {
-        "high_voltage": (4, 12),
+        # high_voltage and high_cell_voltage are absent on purpose: their
+        # warnings assert during normal charging and are not published, so
+        # they are covered by test_overvoltage_warnings_are_not_published.
         "low_voltage": (21, 28),
+        "low_cell_voltage": (19, 27),
         "high_charge_current": (0, 8),
         "high_discharge_current": (16, 24),
         "high_charge_temperature": (1, 9),
