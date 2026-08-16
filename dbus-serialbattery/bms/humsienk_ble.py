@@ -258,7 +258,13 @@ class HumsiENK_Ble(Battery):
                 # after a handshake and a single re-send can be lost while the
                 # BMS is still settling, so keep re-sending while starved.
                 if stale_seconds > self.DATA_FRESHNESS_SECONDS and (now - self._last_handshake_time) > self.HANDSHAKE_RETRY_SECONDS:
-                    logger.info(f"HumsiENK: re-sending handshake after {stale_seconds:.0f} s without data")
+                    # _last_frame_time is 0.0 until the first verified frame,
+                    # so the age is only meaningful once one has arrived -
+                    # otherwise "stale" would be measured from the epoch.
+                    if self._last_frame_time > 0.0:
+                        logger.info(f"HumsiENK: re-sending handshake after {stale_seconds:.0f} s without data")
+                    else:
+                        logger.info("HumsiENK: re-sending handshake, no data since connection")
                     self._send_command(self.CMD_HANDSHAKE)
                     self._last_handshake_time = now
 
