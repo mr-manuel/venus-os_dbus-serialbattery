@@ -577,3 +577,14 @@ def test_refresh_data_fails_again_once_the_data_has_aged_out():
 
     bms._last_frame_time -= HumsiENK_Ble.DATA_FRESHNESS_SECONDS + 1
     assert bms.refresh_data() is False
+
+
+def test_the_driver_carries_no_fallback_machinery():
+    # Structural guard. This driver reports only what the radio delivered:
+    # serving values during an outage belongs to the fallback layer, and an
+    # earlier revision of this driver had grown a stale-data cache, an alarm
+    # escalation ladder and on-disk persistence of its own. Keep it a plain
+    # driver by making a relapse fail here.
+    import inspect
+
+    assert "fallback" not in inspect.getsource(humsienk_ble).lower()
