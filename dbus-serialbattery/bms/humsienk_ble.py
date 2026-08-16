@@ -522,7 +522,7 @@ class HumsiENK_Ble(Battery):
             bit 9: charge over-temperature warning
             bit 10: charge under-temperature warning
             bit 12: pack overvoltage warning
-            bit 15: balancing active
+            bit 15: heater state (1 = on)
 
         Discharge section:
 
@@ -531,6 +531,7 @@ class HumsiENK_Ble(Battery):
             bit 18: discharge under-temperature protection
             bit 20: short circuit protection
             bit 21: pack undervoltage protection
+            bit 22: discharge cutoff reached
             bit 23: discharge FET state (1 = on)
             bit 24: discharge overcurrent warning
             bit 25: discharge over-temperature warning
@@ -558,7 +559,11 @@ class HumsiENK_Ble(Battery):
 
         self.charge_fet = bool(status & (1 << 7))
         self.discharge_fet = bool(status & (1 << 23))
-        self.balance_fet = bool(status & (1 << 15))
+        # The three switch bits are a set: the vendor app labels them charging
+        # switch, discharge switch and heating switch. balance_fet is left
+        # unset, because whether balancing is *allowed* is not reported; the
+        # per-cell bitmap below says only which cells are balancing right now.
+        self.heater_fet = bool(status & (1 << 15))
 
         self.protection.high_voltage = alarm(4, 12)
         self.protection.low_voltage = alarm(21, 28)
@@ -573,6 +578,12 @@ class HumsiENK_Ble(Battery):
         # of its own, so it is reported as a discharge overcurrent.
         self.protection.high_discharge_current = 2 if status & (1 << 20) else alarm(16, 24)
 
+        # Discharge cutoff. Reported as a low cell voltage rather than a low
+        # SoC because the only undervoltage threshold this BMS exposes is the
+        # per-cell one in the config frame; it publishes no SoC threshold at
+        # all. Pack undervoltage is bit 21 and is already reported above.
+        self.protection.low_cell_voltage = 2 if status & (1 << 22) else 0
+
         balancing = int.from_bytes(data[8:11], "little")
         for index in range(min(len(self.cells), 24)):
             self.cells[index].balance = bool(balancing & (1 << index))
@@ -586,7 +597,7 @@ class HumsiENK_Ble(Battery):
             cells = [index + 1 for index in range(min(len(self.cells), 24)) if disconnected & (1 << index)]
             logger.error(f"HumsiENK: cells reported as disconnected: {cells}")
 
-        logger.debug(f"HumsiENK: charge FET {self.charge_fet}, discharge FET {self.discharge_fet}, balancing {self.balance_fet}")
+        logger.debug(f"HumsiENK: charge FET {self.charge_fet}, discharge FET {self.discharge_fet}, heater {self.heater_fet}")
 
     def _parse_config(self, data: bytes) -> None:
         """

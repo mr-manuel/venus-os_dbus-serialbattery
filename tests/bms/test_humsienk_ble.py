@@ -332,14 +332,42 @@ def test_the_pack_voltage_is_not_overwritten_by_the_sum_of_the_cells():
 # ------------------------------------------------------------- 0x20 status
 
 
-def test_status_reports_the_fet_states():
+def test_status_reports_the_switch_states():
+    # Bit 15 is the heater, not balancing. The vendor app labels the three
+    # bits charging switch (7), discharge switch (23) and heating switch (15),
+    # and shows balancing from the per-cell bitmap instead.
     bms = make_bms()
     bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(status_bits=(1 << 7) | (1 << 23) | (1 << 15))))
 
-    assert (bms.charge_fet, bms.discharge_fet, bms.balance_fet) == (True, True, True)
+    assert (bms.charge_fet, bms.discharge_fet, bms.heater_fet) == (True, True, True)
 
     bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(status_bits=0)))
-    assert (bms.charge_fet, bms.discharge_fet, bms.balance_fet) == (False, False, False)
+    assert (bms.charge_fet, bms.discharge_fet, bms.heater_fet) == (False, False, False)
+
+
+def test_whether_balancing_is_allowed_is_never_claimed():
+    # The BMS reports which cells are balancing right now, not whether
+    # balancing is permitted, so balance_fet stays unknown rather than being
+    # inferred from the per-cell bitmap.
+    bms = make_bms()
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_CELL_VOLTAGES, cell_payload([3300] * 4)))
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(status_bits=(1 << 15), balancing=0b0101)))
+
+    assert bms.balance_fet is None
+    assert [cell.balance for cell in bms.cells] == [True, False, True, False]
+
+
+def test_discharge_cutoff_is_reported_as_a_low_cell_voltage():
+    # Bit 22, "end discharge" in the vendor app, sits with the discharge
+    # protections. Pack undervoltage is bit 21 and is reported separately.
+    bms = make_bms()
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(status_bits=(1 << 22))))
+
+    assert bms.protection.low_cell_voltage == 2
+    assert bms.protection.low_voltage == 0
+
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(status_bits=0)))
+    assert bms.protection.low_cell_voltage == 0
 
 
 def test_status_alarm_bits_map_to_alarms_and_warnings():
