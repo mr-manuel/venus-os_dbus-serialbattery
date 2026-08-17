@@ -398,16 +398,13 @@ def test_overvoltage_warnings_are_not_published():
     assert bms.protection.high_voltage == 0
 
 
-def test_only_the_upper_imbalance_bit_is_published_and_only_as_a_warning():
-    # Both imbalance bits sit in the charge warning byte, so neither is a
-    # protection despite bit 14 reading like one. A pack with a lagging cell
-    # crosses the lower bit at every charge knee.
+def test_imbalance_is_reported_as_a_warning_and_protection_pair():
     bms = make_bms()
     bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(status_bits=(1 << 13))))
-    assert bms.protection.cell_imbalance == 0
+    assert bms.protection.cell_imbalance == 1
 
     bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(status_bits=(1 << 14))))
-    assert bms.protection.cell_imbalance == 1
+    assert bms.protection.cell_imbalance == 2
 
     bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(status_bits=0)))
     assert bms.protection.cell_imbalance == 0

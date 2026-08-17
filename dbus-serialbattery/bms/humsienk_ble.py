@@ -601,11 +601,7 @@ class HumsiENK_Ble(Battery):
         self.protection.low_voltage = alarm(21, 28)
         self.protection.low_cell_voltage = alarm(19, 27)
 
-        # Both imbalance bits live in the charge warning byte, so neither is a
-        # protection despite bit 14 reading like one. Reported at warning level
-        # only, and only the upper of the two, because a pack with a lagging
-        # cell crosses the lower one at every charge knee.
-        self.protection.cell_imbalance = 1 if status & (1 << 14) else 0
+        self.protection.cell_imbalance = alarm(14, 13)
 
         self.protection.high_charge_current = alarm(0, 8)
         self.protection.high_charge_temperature = alarm(1, 9)
