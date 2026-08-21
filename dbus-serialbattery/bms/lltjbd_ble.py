@@ -112,7 +112,9 @@ class LltJbd_Ble(LltJbd):
             sleep(5)
 
         if not self.device:
-            self.run = False
+            # not found this pass - the battery may be rebooting or briefly
+            # out of range; background_loop tries again
+            await asyncio.sleep(2)
             return
 
         client = None
@@ -143,8 +145,7 @@ class LltJbd_Ble(LltJbd):
             file = exception_traceback.tb_frame.f_code.co_filename
             line = exception_traceback.tb_lineno
             logger.error(f"BleakClient(): asyncio.exceptions.TimeoutError: {repr(exception_object)} of type {exception_type} " f"in {file} line #{line}")
-            # needed?
-            self.run = False
+            await asyncio.sleep(2)
             return
 
         except TimeoutError:
@@ -152,8 +153,7 @@ class LltJbd_Ble(LltJbd):
             file = exception_traceback.tb_frame.f_code.co_filename
             line = exception_traceback.tb_lineno
             logger.error(f"BleakClient(): TimeoutError: {repr(exception_object)} of type {exception_type} " f"in {file} line #{line}")
-            # needed?
-            self.run = False
+            await asyncio.sleep(2)
             return
 
         except Exception:
@@ -161,8 +161,7 @@ class LltJbd_Ble(LltJbd):
             file = exception_traceback.tb_frame.f_code.co_filename
             line = exception_traceback.tb_lineno
             logger.error(f"BleakClient(): Exception occurred: {repr(exception_object)} of type {exception_type} " f"in {file} line #{line}")
-            # needed?
-            self.run = False
+            await asyncio.sleep(2)
             return
 
         finally:
