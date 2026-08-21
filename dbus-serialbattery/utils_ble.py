@@ -526,6 +526,31 @@ def ble_hold_flag_path(address):
     return os.path.join(BLE_HOLD_FLAG_DIR, BLE_HOLD_FLAG_PREFIX + str(address).replace(":", "").lower())
 
 
+def ble_hold_active(address):
+    """
+    True while the hold flag for the device is in force.
+
+    A flag whose content is "auto" expires by itself after
+    BLE_HOLD_AUTO_EXPIRY and is removed here on its first check past that
+    age; any other content is an operator hold and stays until the file is
+    deleted. A flag that cannot be read counts as held - a hold that fails
+    open would defeat its purpose.
+    """
+    hold_flag = ble_hold_flag_path(address)
+    if not os.path.exists(hold_flag):
+        return False
+    try:
+        with open(hold_flag) as f:
+            automatic = f.read().strip() == "auto"
+        if automatic and time.time() - os.path.getmtime(hold_flag) > BLE_HOLD_AUTO_EXPIRY:
+            os.remove(hold_flag)
+            logger.info(f"BLE hold for {address} auto-expired, resuming connection attempts")
+            return False
+    except Exception as e:
+        logger.debug(f"BLE hold flag {hold_flag} could not be read, treating as held: {repr(e)}")
+    return True
+
+
 # Outer deadlines for the connection backend. Generous on purpose: they are a
 # last resort against a permanently parked await, not a connection timeout.
 # How often the supervision wait re-checks the things that have no callback
@@ -755,6 +780,10 @@ class BleConnectionBackend:
         """
         Connect and start notifications. Returns the connected client
         (may differ from the one passed in). Raises on failure.
+
+        A notify_char of None connects without subscribing, for drivers
+        that do their own notification setup because the characteristic is
+        only known after connecting (auto-detected UUIDs, failover handles).
         """
         raise NotImplementedError
 
@@ -814,7 +843,8 @@ class BleakBackend(BleConnectionBackend):
         logger.debug("initiating BLE connection to: " + address + (f" (adapter {self.current_adapter})" if self.current_adapter else ""))
         await client.connect()
         self._record_landed(client)
-        await start_notify_when_resolved(client, notify_char, notify_callback)
+        if notify_char is not None:
+            await start_notify_when_resolved(client, notify_char, notify_callback)
         return client
 
     async def release(self, client):
@@ -876,7 +906,8 @@ class BleakRetryBackend(BleConnectionBackend):
             BleakClient, device, address, disconnected_callback=self.disconnected_callback, **bluez_adapter_args(self.current_adapter)
         )
         self._record_landed(client)
-        await start_notify_when_resolved(client, notify_char, notify_callback)
+        if notify_char is not None:
+            await start_notify_when_resolved(client, notify_char, notify_callback)
         return client
 
     async def _resolve_device(self, address):
@@ -1107,17 +1138,7 @@ class Syncron_Ble:
         holding = False
         waiting_for_adapter = False
         while self.main_thread.is_alive() and generation == self._ble_thread_generation:
-            if os.path.exists(hold_flag):
-                try:
-                    with open(hold_flag) as f:
-                        automatic = f.read().strip() == "auto"
-                    if automatic and time.time() - os.path.getmtime(hold_flag) > BLE_HOLD_AUTO_EXPIRY:
-                        os.remove(hold_flag)
-                        logger.info(f"BLE hold for {self.address} auto-expired, resuming connection attempts")
-                        continue
-                except Exception as e:
-                    if not holding:
-                        logger.warning(f"BLE hold flag {hold_flag} could not be read: {repr(e)}")
+            if ble_hold_active(self.address):
                 if not holding:
                     holding = True
                     self._end_episode("paused")
