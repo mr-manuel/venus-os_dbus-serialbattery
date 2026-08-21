@@ -27,6 +27,13 @@ if __name__ == "__main__":
 
 else:
     from utils import bytearray_to_string, logger, capture_raw_data
+    from utils_ble import (
+        BLE_ESTABLISH_TIMEOUT,
+        BLE_HOLD_POLL_INTERVAL,
+        BLE_RELEASE_TIMEOUT,
+        ble_hold_active,
+        get_ble_backend,
+    )
 
 # zero means parse all incoming data (every second)
 CELL_INFO_REFRESH_S = 0
@@ -454,12 +461,21 @@ class Jkbms_Brn:
         logger.debug("--> asy_connect_and_scrape(): connect and scrape on address: " + self.address)
         self.run = True
         while self.run and self.main_thread.is_alive():  # autoreconnect
-            self.bt_client = BleakClient(self.address)
+            if ble_hold_active(self.address):
+                await asyncio.sleep(BLE_HOLD_POLL_INTERVAL)
+                continue
+            backend = get_ble_backend()
+            self.bt_client = backend.create_client(self.address, None)
             logger.debug("--> asy_connect_and_scrape(): btloop")
 
             try:
                 logger.info("|- Try to connect to Jkbms_Ble at " + self.address)
-                await self.bt_client.connect()  # default timeout 10s
+                # notify_char=None: the notify characteristic is subscribed
+                # below because it needs the UUID -> raw handle failover
+                self.bt_client = await asyncio.wait_for(
+                    backend.establish(self.bt_client, self.address, None, None),
+                    timeout=BLE_ESTABLISH_TIMEOUT,
+                )
                 logger.info("|- Device connected, check if it's really a JKBMS")
 
                 # TODO: Sometimes settings data are received and sometimes not. Did not found yet found why.
@@ -506,9 +522,9 @@ class Jkbms_Brn:
 
             finally:
                 self.run = False
-                if self.bt_client.is_connected:
+                if self.bt_client is not None and self.bt_client.is_connected:
                     try:
-                        await self.bt_client.disconnect()
+                        await asyncio.wait_for(backend.release(self.bt_client), timeout=BLE_RELEASE_TIMEOUT)
                         logger.info("BLE client disconnected")
                     except Exception:
                         (
