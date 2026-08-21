@@ -12,8 +12,15 @@ import threading
 import sys
 import asyncio
 from bleak import BleakClient
-from time import time
+from time import time, sleep
 from utils import logger, capture_raw_data
+from utils_ble import (
+    BLE_ESTABLISH_TIMEOUT,
+    BLE_HOLD_POLL_INTERVAL,
+    BLE_RELEASE_TIMEOUT,
+    ble_hold_active,
+    get_ble_backend,
+)
 from typing import Optional
 
 
@@ -37,6 +44,9 @@ class Kilovault_Ble(Battery):
         self.bt_thread = threading.Thread(name="Kilovault_Ble_Loop", target=self.background_loop, daemon=True)
         self.client: Optional[BleakClient] = None
         self.run = True
+        # one backend for the life of the driver: its adapter rotation state
+        # is what advances to the next radio after a failed attempt
+        self.backend = get_ble_backend()
 
         # This is the BLE address for the battery
         self.address = address
@@ -72,24 +82,30 @@ class Kilovault_Ble(Battery):
     # This function completes after the first notification has returned.
     async def connection_thread(self):
         logger.info(f"Starting connection to {self.address}")
+        client = None
         try:
-
-            async with BleakClient(self.address) as client:
-                self.client = client
-                # register a callback to stop notifications
-                atexit.register(self.stop_notifications_and_disconnect)
-                # find the BMS service out of the list of services
-                bmsService = self.client.services.get_service(self.KILOVAULT_BMS_SERVICE_UUID)
-                # get the device name
-                deviceName = await self.client.read_gatt_char(self.KILOVAULT_BMS_NAME_CHARACTERISTIC_UUID)
-                self._device_name = deviceName.decode("utf-8").rstrip()
-                # find the notification service that hangs off of the BMS
-                self.notifyService = bmsService.get_characteristic(self.KILOVAULT_BMS_NOTIFY_CHARACTERISTIC_UUID)
-                # turn on notifications.  Data is sent to notifyCallback
-                await self.client.start_notify(self.notifyService, self.notifyCallback)
-                logger.info(f"Connected to {self.address}")
-                while self.run and self.main_thread.is_alive() and time() - self.lastUpdateTime < 10:
-                    await asyncio.sleep(0.1)
+            client = self.backend.create_client(self.address, None)
+            # notify_char=None: the notify characteristic object is resolved
+            # from the service collection below, only known after connecting
+            client = await asyncio.wait_for(
+                self.backend.establish(client, self.address, None, None),
+                timeout=BLE_ESTABLISH_TIMEOUT,
+            )
+            self.client = client
+            # register a callback to stop notifications
+            atexit.register(self.stop_notifications_and_disconnect)
+            # find the BMS service out of the list of services
+            bmsService = self.client.services.get_service(self.KILOVAULT_BMS_SERVICE_UUID)
+            # get the device name
+            deviceName = await self.client.read_gatt_char(self.KILOVAULT_BMS_NAME_CHARACTERISTIC_UUID)
+            self._device_name = deviceName.decode("utf-8").rstrip()
+            # find the notification service that hangs off of the BMS
+            self.notifyService = bmsService.get_characteristic(self.KILOVAULT_BMS_NOTIFY_CHARACTERISTIC_UUID)
+            # turn on notifications.  Data is sent to notifyCallback
+            await self.client.start_notify(self.notifyService, self.notifyCallback)
+            logger.info(f"Connected to {self.address}")
+            while self.run and self.main_thread.is_alive() and time() - self.lastUpdateTime < 10:
+                await asyncio.sleep(0.1)
             logger.info(f"Disconnected from {self.address}")
             logger.info(f"self.run: {self.run}")
             return True
@@ -103,6 +119,14 @@ class Kilovault_Ble(Battery):
             line = exception_traceback.tb_lineno
             logger.error(f"Connection failure occurred: {repr(exception_object)} of type {exception_type} in {file} line #{line}")
             return False
+        finally:
+            if client is not None and client.is_connected:
+                try:
+                    await asyncio.wait_for(self.backend.release(client), timeout=BLE_RELEASE_TIMEOUT)
+                except Exception as e:
+                    # a disconnect that never completes must not prevent the
+                    # next connection attempt
+                    logger.warning(f"BLE [{self.address}] disconnect did not complete: {repr(e)}")
 
     def stop_notifications_and_disconnect(self):
         logger.info("Stopping notifications and disconnecting")
@@ -112,6 +136,9 @@ class Kilovault_Ble(Battery):
     # this is the body of the worker thread loop.  It just tries to stay connected to the battery
     def background_loop(self):
         while self.run and self.main_thread.is_alive():
+            if ble_hold_active(self.address):
+                sleep(BLE_HOLD_POLL_INTERVAL)
+                continue
             asyncio.run(self.connection_thread())
 
     # this is called for each frame from the BMS.  We assemble
