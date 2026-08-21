@@ -37,6 +37,13 @@ else:
 
 # zero means parse all incoming data (every second)
 CELL_INFO_REFRESH_S = 0
+# pause between reconnect attempts inside the scrape loop, indexed by the
+# number of consecutive failures; the last entry repeats
+RECONNECT_BACKOFF_S = [1, 3, 6]
+# after this many consecutive failed attempts the scrape loop hands the
+# session back to monitor_scraping, whose bt_reset callback is the
+# escalation for a radio that is truly stuck
+MAX_CONSECUTIVE_FAILURES = 10
 CHAR_HANDLE = "0000ffe1-0000-1000-8000-00805f9b34fb"
 CHAR_HANDLE_FAILOVER = 4
 MODEL_NBR_UUID = "00002a24-0000-1000-8000-00805f9b34fb"
@@ -460,11 +467,14 @@ class Jkbms_Brn:
     async def asy_connect_and_scrape(self):
         logger.debug("--> asy_connect_and_scrape(): connect and scrape on address: " + self.address)
         self.run = True
+        consecutive_failures = 0
+        # one backend for the whole scrape loop: its adapter rotation state
+        # is what advances to the next radio after a failed attempt
+        backend = get_ble_backend()
         while self.run and self.main_thread.is_alive():  # autoreconnect
             if ble_hold_active(self.address):
                 await asyncio.sleep(BLE_HOLD_POLL_INTERVAL)
                 continue
-            backend = get_ble_backend()
             self.bt_client = backend.create_client(self.address, None)
             logger.debug("--> asy_connect_and_scrape(): btloop")
 
@@ -495,6 +505,10 @@ class Jkbms_Brn:
                     logger.info(f'Error getting UUID "{CHAR_HANDLE}": {repr(exception_object)} -> failover')
                     await self.bt_client.start_notify(CHAR_HANDLE_FAILOVER, self.ncallback)
 
+                # connected and subscribed: the link is good, so the failure
+                # streak ends here even if this session later drops
+                consecutive_failures = 0
+
                 await self.request_bt("device_info", self.bt_client)
 
                 await self.request_bt("cell_info", self.bt_client)
@@ -507,7 +521,7 @@ class Jkbms_Brn:
 
             except exc.BleakDeviceNotFoundError:
                 logger.info(f"BLE client not found: {self.address} - is it turned on and nearby?")
-                self.run = False
+                consecutive_failures += 1
 
             except Exception:
                 (
@@ -518,10 +532,9 @@ class Jkbms_Brn:
                 file = exception_traceback.tb_frame.f_code.co_filename
                 line = exception_traceback.tb_lineno
                 logger.info(f"Error while connecting to BLE client: {repr(exception_object)} " + f"of type {exception_type} in {file} line #{line}")
-                self.run = False
+                consecutive_failures += 1
 
             finally:
-                self.run = False
                 if self.bt_client is not None and self.bt_client.is_connected:
                     try:
                         await asyncio.wait_for(backend.release(self.bt_client), timeout=BLE_RELEASE_TIMEOUT)
@@ -535,6 +548,13 @@ class Jkbms_Brn:
                         file = exception_traceback.tb_frame.f_code.co_filename
                         line = exception_traceback.tb_lineno
                         logger.info(f"Error while disconnecting BLE client {repr(exception_object)} " + f"of type {exception_type} in {file} line #{line}")
+
+            if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
+                logger.info(f"BLE connection to {self.address} failed {consecutive_failures} times in a row" + " -> handing back for escalation")
+                break
+
+            if self.run and self.main_thread.is_alive():
+                await asyncio.sleep(RECONNECT_BACKOFF_S[min(consecutive_failures, len(RECONNECT_BACKOFF_S) - 1)])
 
         logger.debug("--> asy_connect_and_scrape(): Exit")
 
