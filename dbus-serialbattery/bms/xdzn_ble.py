@@ -29,6 +29,7 @@ from typing import Optional
 
 from battery import Battery, Cell
 from utils import logger, MAX_CELL_VOLTAGE, MAX_BATTERY_CHARGE_CURRENT, MAX_BATTERY_DISCHARGE_CURRENT, capture_raw_data
+from utils_ble import BLE_ESTABLISH_TIMEOUT, BLE_RELEASE_TIMEOUT, ble_hold_active, get_ble_backend
 
 # ── BLE UUIDs ──────────────────────────────────────────────────────────────
 
@@ -173,6 +174,10 @@ class Xdzn_Ble(Battery):
         self._expected = None
         self._loop = None
         self._unique_id = ""
+        # one backend for the life of the driver: its adapter rotation state
+        # survives the connect-per-poll cycle and advances to the next radio
+        # only after a failed attempt
+        self.backend = get_ble_backend()
 
     # ── dbus-serialbattery interface ────────────────────────────────────────
 
@@ -216,19 +221,24 @@ class Xdzn_Ble(Battery):
 
     async def _connect(self) -> bool:
         """Establish BLE connection and authenticate."""
-        from bleak import BleakClient
-
         try:
             if self._client and self._client.is_connected:
                 return True
 
-            self._client = BleakClient(self.address, timeout=15.0)
-            await self._client.connect()
+            if ble_hold_active(self.address):
+                # no attempts while the device is held; the next poll retries
+                return False
 
             self._buf.clear()
             self._event.clear()
             self._expected = None
-            await self._client.start_notify(NOTIFY_UUID, self._on_notify)
+
+            client = self.backend.create_client(self.address, None)
+            client = await asyncio.wait_for(
+                self.backend.establish(client, self.address, NOTIFY_UUID, self._on_notify),
+                timeout=BLE_ESTABLISH_TIMEOUT,
+            )
+            self._client = client
 
             await self._client.write_gatt_char(AUTH_UUID, AUTH_KEY, response=False)
             await asyncio.sleep(0.5)
@@ -245,7 +255,7 @@ class Xdzn_Ble(Battery):
             try:
                 if self._client.is_connected:
                     await self._client.stop_notify(NOTIFY_UUID)
-                    await self._client.disconnect()
+                    await asyncio.wait_for(self.backend.release(self._client), timeout=BLE_RELEASE_TIMEOUT)
             except Exception:
                 pass
             self._client = None
