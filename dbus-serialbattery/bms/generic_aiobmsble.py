@@ -26,7 +26,9 @@ sys.path.insert(1, os.path.join(os.path.dirname(__file__), "ext"))
 from bleak import BleakScanner  # noqa: E402
 from bleak.backends.device import BLEDevice  # noqa: E402
 from bleak.exc import BleakError  # noqa: E402
+from bleak_retry_connector import get_device, get_device_by_adapter  # noqa: E402
 from aiobmsble import BMSInfo, BMSSample, TempSensor  # noqa: E402
+from utils_ble import adapters_in_attempt_order, ble_hold_active  # noqa: E402
 
 
 class Generic_AioBmsBle(Battery):
@@ -73,6 +75,8 @@ class Generic_AioBmsBle(Battery):
         # staleness tracking
         self._last_successful_update: float | None = None
         self._max_data_age: int = 5  # seconds before stale cached data causes failure
+        # hold flag state, so enter/exit are each logged once
+        self._ble_hold_logged = False
 
     BATTERYTYPE = "Generic aiobmsble BMS"
 
@@ -117,6 +121,37 @@ class Generic_AioBmsBle(Battery):
             logger.debug("aiobmsble: using __aexit__ to close connection")
             await aexit(None, None, None)
             logger.debug("aiobmsble: disconnected via context manager")
+
+    async def _find_device(self) -> BLEDevice | None:
+        """
+        Resolve the BLEDevice for this battery, honoring BLUETOOTH_ADAPTERS.
+
+        The device's BlueZ object path carries the adapter it was resolved
+        on, and that path is what the vendored establish_connection inside
+        aiobmsble connects through - so resolving on the right adapter is
+        how a pinned battery is kept on its radio. The BlueZ cache is asked
+        first and a scan runs only when the cache misses, matching how the
+        BleakRetryBackend in utils_ble resolves devices.
+        """
+        adapters = adapters_in_attempt_order(self.address)
+        if not adapters:
+            device = await get_device(self.address)
+            if device is None:
+                device = await BleakScanner.find_device_by_address(self.address)
+            return device
+
+        for adapter in adapters:
+            try:
+                device = await get_device_by_adapter(self.address, adapter)
+                if device is None:
+                    # short scan: the whole walk shares one _run_coro budget
+                    device = await BleakScanner.find_device_by_address(self.address, timeout=5.0, adapter=adapter)
+            except Exception as e:
+                logger.debug("aiobmsble: adapter %s could not resolve %s: %s", adapter, self.address, repr(e))
+                device = None
+            if device is not None:
+                return device
+        return None
 
     def _ensure_aiobmsble(self, device: BLEDevice):
         # Instantiate the aiobmsble client once, keep for reuse
@@ -328,7 +363,7 @@ class Generic_AioBmsBle(Battery):
         result = False
 
         async def run_async():
-            device: BLEDevice | None = await BleakScanner.find_device_by_address(self.address)
+            device: BLEDevice | None = await self._find_device()
 
             if device is None:
                 logger.error(f'Battery "{self.BATTERYTYPE}" with MAC "{self.address}" not found. Is it powered on and in range?')
@@ -478,7 +513,7 @@ class Generic_AioBmsBle(Battery):
         async def _update_async():
             # ensure we have a client, try to find device and connect if not
             if self._aiobmsble is None:
-                device: BLEDevice | None = await BleakScanner.find_device_by_address(self.address)
+                device: BLEDevice | None = await self._find_device()
                 if device is None:
                     logger.debug(f"Could not find device {self.address} for refresh")
                     return False
@@ -502,8 +537,27 @@ class Generic_AioBmsBle(Battery):
             return False
 
         try:
-            # perform an async update (keeps connection open on success)
-            ok = self._run_coro(_update_async)
+            if ble_hold_active(self.address):
+                # no connection attempts while the device is held; cached
+                # data below ages out through the normal staleness path
+                if not self._ble_hold_logged:
+                    self._ble_hold_logged = True
+                    logger.warning("aiobmsble: BLE hold flag present, pausing connection attempts (addr=%s)", self.address)
+                    if self._aiobmsble is not None:
+                        # release the kept-alive link once so the radio
+                        # actually goes quiet; the next unheld refresh
+                        # resolves the device again and reconnects
+                        bms = self._aiobmsble
+                        self._aiobmsble = None
+                        self._aiobmsble_device = None
+                        self._run_coro(lambda: self._aiobmsble_disconnect(bms))
+                ok = None
+            else:
+                if self._ble_hold_logged:
+                    self._ble_hold_logged = False
+                    logger.info("aiobmsble: BLE hold released, resuming connection attempts (addr=%s)", self.address)
+                # perform an async update (keeps connection open on success)
+                ok = self._run_coro(_update_async)
             if ok:
                 self._last_successful_update = time.monotonic()
             elif self._last_successful_update is not None:
