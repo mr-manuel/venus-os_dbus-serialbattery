@@ -86,7 +86,63 @@ class HumsiENK_Syncron_Ble(Syncron_Ble):
             self.response_data = data
             self.response_event.set()
 
+    # How often supervision re-checks the conditions that have no callback.
+    # The link drop and the data watchdog are both awaited, so this is a
+    # safety net rather than a poll; it replaced a 0.1s spin that cost ten
+    # timer wakeups a second per battery for the life of every connection.
+    SUPERVISION_RECHECK = 5.0
+
+    # set per connection in connect_to_bms; class defaults so a callback
+    # arriving before or after one cannot fault
+    _link_down = None
+    _link_down_loop = None
+
+    def client_disconnected(self, client):
+        """Wake supervision as well as logging it.
+
+        Defined here rather than relying on the base class so this driver
+        does not depend on which utils_ble revision it is paired with.
+        """
+        super(HumsiENK_Syncron_Ble, self).client_disconnected(client)
+        event, loop = self._link_down, self._link_down_loop
+        if event is None or loop is None:
+            return
+        try:
+            loop.call_soon_threadsafe(event.set)
+        except RuntimeError:
+            # loop already closed; the link is over either way
+            pass
+
+    async def supervise_link(self):
+        """Wait for the link to end, instead of polling for it.
+
+        Ends on a disconnect (awaited on an event), on the data watchdog
+        expiring, on the main thread going away, or on a disconnect whose
+        callback never fired - the last two have no callback, so they are
+        re-checked on a coarse timeout. The watchdog wakes exactly when it
+        is due rather than being sampled ten times a second.
+        """
+        while True:
+            timeout = self.SUPERVISION_RECHECK
+            if self.connected:
+                remaining = self.WATCHDOG_TIMEOUT - (time.time() - self._watchdog_last_fed)
+                if remaining <= 0:
+                    logger.error(f"HumsiENK: no data for {self.WATCHDOG_TIMEOUT:.0f} s on an open link, dropping it to reconnect")
+                    return
+                timeout = min(remaining, self.SUPERVISION_RECHECK)
+            try:
+                await asyncio.wait_for(self._link_down.wait(), timeout=timeout)
+                return
+            except asyncio.TimeoutError:
+                pass
+            if not self.main_thread.is_alive() or not self.client.is_connected:
+                return
+
     async def connect_to_bms(self, address):
+        # one event per connection: a stale set() from the previous link must
+        # not end this one's supervision immediately
+        self._link_down = asyncio.Event()
+        self._link_down_loop = asyncio.get_running_loop()
         self.client = self.backend.create_client(address, self.client_disconnected)
         try:
             # The reconnect loop in async_main only turns while this returns, so
@@ -104,11 +160,7 @@ class HumsiENK_Syncron_Ble(Syncron_Ble):
             self.ble_connection_ready.set()
             try:
                 if self.client:
-                    while self.client.is_connected and self.main_thread.is_alive():
-                        if self.connected and (time.time() - self._watchdog_last_fed) > self.WATCHDOG_TIMEOUT:
-                            logger.error(f"HumsiENK: no data for {self.WATCHDOG_TIMEOUT:.0f} s on an open link, dropping it to reconnect")
-                            break
-                        await asyncio.sleep(0.1)
+                    await self.supervise_link()
             finally:
                 self.connected = False
                 if self.client:
