@@ -12,8 +12,10 @@ imported. The stub is removed again afterwards so no other test module
 inherits it.
 """
 
+import asyncio
 import os
 import sys
+import threading
 import time
 import types
 
@@ -670,3 +672,138 @@ def test_the_driver_carries_no_fallback_machinery():
     import inspect
 
     assert "fallback" not in inspect.getsource(humsienk_ble).lower()
+
+
+# ------------------------------------------------- the backend seam
+#
+# The driver overrides connect_to_bms, so it does not inherit whatever the
+# base class does about subscribing. This pins the one thing the override
+# must keep doing: reach the notification characteristic through
+# backend.establish, which is where the late-GATT recovery lives
+# (tests/test_utils_ble.py covers the recovery itself).
+
+
+class _RecordingBackend:
+    def __init__(self):
+        self.established = []
+        self.released = []
+
+    def create_client(self, address, disconnected_callback):
+        return types.SimpleNamespace(is_connected=True, address=address)
+
+    async def establish(self, client, address, notify_char, notify_callback):
+        self.established.append((address, notify_char))
+        return client
+
+    async def release(self, client):
+        self.released.append(client)
+
+
+def _connect_once(backend, address="AA:BB:CC:DD:EE:FF"):
+    """Drive connect_to_bms on an instance built without __init__."""
+    ble = humsienk_ble.HumsiENK_Syncron_Ble.__new__(humsienk_ble.HumsiENK_Syncron_Ble)
+    ble.backend = backend
+    ble.client = None
+    ble.connected = False
+    ble.read_characteristic = "notify-uuid"
+    ble.notify_read_callback = lambda *a: None
+    ble.ble_connection_ready = threading.Event()
+    ble.feed_watchdog = lambda: None
+    # the link is supervised elsewhere; end it immediately so connect returns
+
+    async def _no_supervision():
+        return
+
+    ble.supervise_link = _no_supervision
+    asyncio.run(ble.connect_to_bms(address))
+    return ble
+
+
+def test_connect_subscribes_through_the_backend_seam():
+    backend = _RecordingBackend()
+
+    _connect_once(backend)
+
+    # one subscribe, on the notification characteristic, via the backend -
+    # not a direct client.start_notify that would bypass GATT recovery
+    assert backend.established == [("AA:BB:CC:DD:EE:FF", "notify-uuid")]
+
+
+def test_a_failed_subscribe_is_reported_rather_than_left_connected():
+    class _FailingBackend(_RecordingBackend):
+        async def establish(self, client, address, notify_char, notify_callback):
+            raise RuntimeError("characteristic missing")
+
+    ble = _connect_once(_FailingBackend())
+
+    assert ble.connected is False
+
+
+# ---------------------------------------------------- handshake re-send volume
+#
+# The pack's radio mutes for 10-15 s several times an hour. A re-send needs
+# 15 s of silence, so one is routine and must not narrate itself at INFO; a
+# second means 45 s on an open link, which is a different condition and is
+# said once. These assert the LEVEL and the count, not that a message exists.
+
+
+def _starve(bms, seconds):
+    """Age the clocks so the next refresh_data() re-sends the handshake."""
+    bms._last_frame_time -= seconds
+    bms._last_handshake_time -= HumsiENK_Ble.HANDSHAKE_RETRY_SECONDS + 1
+
+
+def test_an_ordinary_radio_mute_does_not_log_at_info(caplog):
+    bms = make_bms()
+    bms.ble_handle.push(frame(HumsiENK_Ble.CMD_BATTERY_INFO, battery_info_payload()))
+    bms.refresh_data()
+
+    with caplog.at_level("DEBUG", logger="SerialBattery"):
+        _starve(bms, HumsiENK_Ble.DATA_FRESHNESS_SECONDS + 1)
+        bms.refresh_data()
+
+    resends = [r for r in caplog.records if "re-sending handshake" in r.message]
+    assert len(resends) == 1
+    assert [r.levelname for r in resends] == ["DEBUG"]
+
+
+def test_a_pack_that_is_present_but_not_answering_is_said_once(caplog):
+    bms = make_bms()
+    bms.ble_handle.push(frame(HumsiENK_Ble.CMD_BATTERY_INFO, battery_info_payload()))
+    bms.refresh_data()
+
+    with caplog.at_level("DEBUG", logger="SerialBattery"):
+        for _ in range(4):
+            _starve(bms, HumsiENK_Ble.DATA_FRESHNESS_SECONDS + 1)
+            bms.refresh_data()
+
+    resends = [r for r in caplog.records if "re-sending handshake" in r.message]
+    assert len(resends) == 4
+    # exactly one INFO, on the crossing, and nothing after it
+    assert [r.levelname for r in resends] == ["DEBUG", "INFO", "DEBUG", "DEBUG"]
+    assert "2 consecutive" in resends[1].message
+
+
+def test_data_coming_back_rearms_the_escalation(caplog):
+    """Otherwise the second mute of the day is silent for the rest of it."""
+    bms = make_bms()
+    bms.ble_handle.push(frame(HumsiENK_Ble.CMD_BATTERY_INFO, battery_info_payload()))
+    bms.refresh_data()
+
+    for _ in range(2):
+        _starve(bms, HumsiENK_Ble.DATA_FRESHNESS_SECONDS + 1)
+        bms.refresh_data()
+    assert bms._handshake_resends == 2
+
+    bms.ble_handle.push(frame(HumsiENK_Ble.CMD_BATTERY_INFO, battery_info_payload()))
+    bms.refresh_data()
+    assert bms._handshake_resends == 0
+
+    caplog.clear()  # the first mute's records are not what this asserts on
+    with caplog.at_level("DEBUG", logger="SerialBattery"):
+        for _ in range(2):
+            _starve(bms, HumsiENK_Ble.DATA_FRESHNESS_SECONDS + 1)
+            bms.refresh_data()
+
+    resends = [r for r in caplog.records if "re-sending handshake" in r.message]
+    assert [r.levelname for r in resends] == ["DEBUG", "INFO"]
