@@ -807,3 +807,80 @@ def test_data_coming_back_rearms_the_escalation(caplog):
 
     resends = [r for r in caplog.records if "re-sending handshake" in r.message]
     assert [r.levelname for r in resends] == ["DEBUG", "INFO"]
+
+
+# ------------------------------------------------- connect failure volume
+#
+# The reconnect loop retries for as long as a pack is away, so this line was
+# written on every attempt - 4,400 times in one prod log corpus. One per
+# episode is the readable number. The wording is unchanged on purpose: the
+# fleet's log watch keys on "Failed when trying to connect" as a substring,
+# and prod runs at INFO, so the surviving line has to be INFO and has to
+# still contain that text.
+
+
+def _make_handle():
+    handle = humsienk_ble.HumsiENK_Syncron_Ble.__new__(humsienk_ble.HumsiENK_Syncron_Ble)
+    handle.backend = _RecordingBackend()
+    handle.client = None
+    handle.connected = False
+    handle.read_characteristic = "notify-uuid"
+    handle.notify_read_callback = lambda *a: None
+    handle.ble_connection_ready = threading.Event()
+    handle.feed_watchdog = lambda: None
+
+    async def _no_supervision():
+        return
+
+    handle.supervise_link = _no_supervision
+    return handle
+
+
+class _RefusingBackend(_RecordingBackend):
+    async def establish(self, client, address, notify_char, notify_callback):
+        raise RuntimeError("[org.bluez.Error.InProgress] Operation already in progress")
+
+
+def _attempt(handle, backend=None):
+    if backend is not None:
+        handle.backend = backend
+    asyncio.run(handle.connect_to_bms("AA:BB:CC:DD:EE:FF"))
+
+
+def test_a_pack_that_is_away_reports_its_absence_once(caplog):
+    handle = _make_handle()
+
+    with caplog.at_level("DEBUG", logger="SerialBattery"):
+        for _ in range(5):
+            _attempt(handle, _RefusingBackend())
+
+    failures = [r for r in caplog.records if "Failed when trying to connect" in r.message]
+    assert len(failures) == 5
+    assert [r.levelname for r in failures] == ["INFO", "DEBUG", "DEBUG", "DEBUG", "DEBUG"]
+
+
+def test_the_surviving_line_is_still_the_string_the_watch_greps_for(caplog):
+    handle = _make_handle()
+
+    with caplog.at_level("INFO", logger="SerialBattery"):
+        _attempt(handle, _RefusingBackend())
+
+    emitted = [r for r in caplog.records if r.levelno >= 20]
+    assert any(r.message.startswith("Failed when trying to connect: ") for r in emitted)
+
+
+def test_coming_back_rearms_the_absence_report(caplog):
+    handle = _make_handle()
+    _attempt(handle, _RefusingBackend())
+    _attempt(handle, _RefusingBackend())
+    assert handle._connect_failures == 2
+
+    _attempt(handle, _RecordingBackend())
+    assert handle._connect_failures == 0
+
+    caplog.clear()
+    with caplog.at_level("DEBUG", logger="SerialBattery"):
+        _attempt(handle, _RefusingBackend())
+
+    failures = [r for r in caplog.records if "Failed when trying to connect" in r.message]
+    assert [r.levelname for r in failures] == ["INFO"]

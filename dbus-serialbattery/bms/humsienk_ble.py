@@ -97,6 +97,13 @@ class HumsiENK_Syncron_Ble(Syncron_Ble):
     _link_down = None
     _link_down_loop = None
 
+    # Consecutive failed connect attempts, reset by the next success. The
+    # reconnect loop retries indefinitely, so a pack that is simply out of
+    # range writes this line on every attempt for as long as it is away -
+    # 4,400 times across one prod log corpus. The first failure of an episode
+    # is the one worth reading; the rest are the same fact again.
+    _connect_failures = 0
+
     def client_disconnected(self, client):
         """Wake supervision as well as logging it.
 
@@ -153,8 +160,15 @@ class HumsiENK_Syncron_Ble(Syncron_Ble):
             )
             self.feed_watchdog()
             self.connected = True
+            self._connect_failures = 0
         except Exception as e:
-            logger.error(f"Failed when trying to connect: {e}")
+            self._connect_failures += 1
+            # Said once per episode, at a level prod emits, and worded exactly
+            # as before so anything keyed on this string keeps working.
+            if self._connect_failures == 1:
+                logger.info(f"Failed when trying to connect: {e}")
+            else:
+                logger.debug(f"Failed when trying to connect: {e} (attempt {self._connect_failures})")
             return False
         finally:
             self.ble_connection_ready.set()
