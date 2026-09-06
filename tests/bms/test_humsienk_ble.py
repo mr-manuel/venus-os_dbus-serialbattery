@@ -884,3 +884,49 @@ def test_coming_back_rearms_the_absence_report(caplog):
 
     failures = [r for r in caplog.records if "Failed when trying to connect" in r.message]
     assert [r.levelname for r in failures] == ["INFO"]
+
+
+# ------------------------------------------- reporting the link up to utils_ble
+#
+# utils_ble delivers both ends of an episode through the backend's connected
+# callback, wired when the base class builds the backend - not from inside
+# connect_to_bms. So this override gets the link-up line for free and must
+# not report it as well. A call here would not actually double the log -
+# _report_link_up latches and a second call emits nothing - which is the
+# reason to pin this with a test rather than trust it to be noticed: the
+# damage is dead code leaning on someone else's internal detail, and dead
+# code that stays quiet is exactly what survives review. An earlier utils_ble
+# reported from inside the base connect_to_bms and did need a call here.
+
+
+def test_the_override_does_not_report_the_link_up_itself():
+    handle = _make_handle()
+    reported = []
+    handle._report_link_up = lambda: reported.append("up")
+
+    _attempt(handle, _RecordingBackend())
+
+    assert reported == []
+
+
+def test_an_older_utils_ble_without_the_hook_still_connects():
+    handle = _make_handle()
+    assert not hasattr(handle, "_report_link_up")
+
+    _attempt(handle, _RecordingBackend())
+
+    # establish() alone is not enough: an unguarded call raises AFTER it and
+    # the except swallows it, so the counter is what proves the connect path
+    # ran to the end rather than failing on the way out.
+    assert handle.backend.established == [("AA:BB:CC:DD:EE:FF", "notify-uuid")]
+    assert handle._connect_failures == 0
+
+
+def test_a_failed_connect_does_not_report_a_link_that_never_came_up():
+    handle = _make_handle()
+    reported = []
+    handle._report_link_up = lambda: reported.append("up")
+
+    _attempt(handle, _RefusingBackend())
+
+    assert reported == []

@@ -161,6 +161,18 @@ class HumsiENK_Syncron_Ble(Syncron_Ble):
             self.feed_watchdog()
             self.connected = True
             self._connect_failures = 0
+            # Deliberately NO link-up report here. utils_ble delivers the
+            # once-per-life "connected to bluetooth device ... on adapter" line
+            # and the "BLE link recovered for" episode terminator through the
+            # backend's connected callback, wired by the base class when it
+            # builds the backend (utils_ble.py: _new_backend / _record_landed),
+            # so an override of connect_to_bms gets both ends of an episode
+            # without doing anything. Field 2026-09-06: against the earlier
+            # utils_ble that reported from inside the base connect_to_bms this
+            # override needed an explicit call; against the seam the seam owns
+            # the report and a call here is dead code that stays quiet only
+            # because _report_link_up latches (a second call emits nothing) -
+            # someone else's internal detail, not a contract to lean on.
         except Exception as e:
             self._connect_failures += 1
             # Said once per episode, at a level prod emits, and worded exactly
