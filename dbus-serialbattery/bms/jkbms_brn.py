@@ -34,7 +34,7 @@ CHAR_HANDLE = "0000ffe1-0000-1000-8000-00805f9b34fb"
 CHAR_HANDLE_FAILOVER = 4
 MODEL_NBR_UUID = "00002a24-0000-1000-8000-00805f9b34fb"
 
-COMMAND_CELL_INFO = 0x96
+COMMAND_SETTINGS = 0x96
 COMMAND_DEVICE_INFO = 0x97
 
 FRAME_VERSION_JK04 = 0x01
@@ -293,6 +293,8 @@ class Jkbms_Brn:
                     if t[0][-2] == "voltages" or t[0][-2] == "voltages":
                         self.translate_cell_info[i][0][-1] = ccount
                 self.bms_status["last_update"] = time()
+            if self.waiting_for_response == "settings"
+                self.waiting_for_response = ""
 
         elif info_type == 0x02:
             if CELL_INFO_REFRESH_S == 0 or time() - self.last_cell_info > CELL_INFO_REFRESH_S:
@@ -304,8 +306,6 @@ class Jkbms_Brn:
                 # power is calculated from voltage x current as
                 # register 122 contains unsigned power-value
                 self.bms_status["cell_info"]["power"] = self.bms_status["cell_info"]["current"] * self.bms_status["cell_info"]["total_voltage"]
-                if self.waiting_for_response == "cell_info":
-                    self.waiting_for_response = ""
 
         elif info_type == 0x03:
             logger.debug("processing frame with device info")
@@ -417,9 +417,9 @@ class Jkbms_Brn:
             await asyncio.sleep(1)
             logger.debug(self.waiting_for_response)
 
-        if rtype == "cell_info":
-            cmd = COMMAND_CELL_INFO
-            self.waiting_for_response = "cell_info"
+        if rtype == "settings":
+            cmd = COMMAND_SETTINGS
+            self.waiting_for_response = "settings"
         elif rtype == "device_info":
             cmd = COMMAND_DEVICE_INFO
             self.waiting_for_response = "device_info"
@@ -479,9 +479,9 @@ class Jkbms_Brn:
                     logger.info(f'Error getting UUID "{CHAR_HANDLE}": {repr(exception_object)} -> failover')
                     await self.bt_client.start_notify(CHAR_HANDLE_FAILOVER, self.ncallback)
 
-                await self.request_bt("device_info", self.bt_client)
+                await self.request_bt("settings", self.bt_client)
 
-                await self.request_bt("cell_info", self.bt_client)
+                await self.request_bt("device_info", self.bt_client)
 
                 while self.bt_client.is_connected and self.run and self.main_thread.is_alive():
                     if self.trigger_soc_reset:
