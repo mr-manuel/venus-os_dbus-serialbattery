@@ -293,7 +293,7 @@ class Jkbms_Brn:
                     if t[0][-2] == "voltages" or t[0][-2] == "voltages":
                         self.translate_cell_info[i][0][-1] = ccount
                 self.bms_status["last_update"] = time()
-            if self.waiting_for_response == "settings"
+            if self.waiting_for_response == "settings":
                 self.waiting_for_response = ""
 
         elif info_type == 0x02:
