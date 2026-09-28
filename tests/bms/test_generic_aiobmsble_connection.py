@@ -216,37 +216,83 @@ def _borrow(mod, *names):
     return type("BorrowedStandIn", (), {name: getattr(driver, name) for name in names})()
 
 
-@_needs_pep604
-def test_refresh_does_not_reconnect_while_paced(monkeypatch):
+class _Log:
+    """Records the driver's warnings and errors; drops the rest."""
+
+    def __init__(self):
+        self.warnings = []
+        self.errors = []
+
+    def warning(self, msg, *args):
+        self.warnings.append(msg % args if args else msg)
+
+    def error(self, msg, *args, **kwargs):
+        self.errors.append(msg % args if args else msg)
+
+    exception = error
+
+    def debug(self, *args, **kwargs):
+        pass
+
+    info = debug
+
+
+class _Clock:
+    """Stands in for the driver's time module, so a test can move time on."""
+
+    def __init__(self):
+        self.now = 10_000.0
+
+    def monotonic(self):
+        return self.now
+
+
+def _refresh_with_device_gone(mod, monkeypatch):
+    """The real refresh_data on a stand-in whose BLE device has gone away.
+
+    refresh_data turns any exception into an ERROR line and a False return,
+    which is indistinguishable from a stale device - so a stand-in missing an
+    attribute would pass silently. Every caller asserts log.errors is empty.
+    """
     import asyncio
-    import time
     import types
 
-    mod = _load_driver()
     scans = []
 
     class _Scanner:
         @staticmethod
         async def find_device_by_address(address):
             scans.append(address)
-            return None  # the device is gone
+            return None
 
+    log, clock = _Log(), _Clock()
     monkeypatch.setattr(mod, "BleakScanner", _Scanner)
     # no BlueZ cache either, so every resolve that runs is a scan
     monkeypatch.setitem(sys.modules, "bleak_retry_connector", types.ModuleType("bleak_retry_connector"))
+    monkeypatch.setattr(mod, "logger", log)
+    monkeypatch.setattr(mod, "time", clock)
 
     bms = _borrow(mod, "refresh_data", "_resolve_device", "_reconnect_on_hold", "_note_connect_failure", "_note_connect_success")
     bms.address = "A4:C1:38:33:41:24"
     bms._aiobmsble = None
     bms.aiobmsble_data = {"voltage": 13.2, "current": 0.0, "battery_level": 80}
-    bms._last_successful_update = time.monotonic() - 60
+    bms._last_successful_update = clock.now - 60
     bms._max_data_age = 5
+    bms._stale_warning_interval = 60
+    bms._stale_warned_at = 0.0
     bms._connect_failures = 0
     bms._reconnect_hold_until = 0.0
     bms._reconnect_warned = False
     # run each poll's coroutine to completion inline: scheduling is
-    # _poll_update's job and is tested separately, this is about the gate
+    # _poll_update's job and is tested separately
     bms._poll_update = lambda coro: bool(asyncio.run(coro()))
+    return bms, scans, log, clock
+
+
+@_needs_pep604
+def test_refresh_does_not_reconnect_while_paced(monkeypatch):
+    mod = _load_driver()
+    bms, scans, log, clock = _refresh_with_device_gone(mod, monkeypatch)
 
     for _ in range(120):
         bms.refresh_data()
@@ -254,9 +300,34 @@ def test_refresh_does_not_reconnect_while_paced(monkeypatch):
 
     # ...and it is tried again, not abandoned, once the wait elapses
     before = len(scans)
-    bms._reconnect_hold_until = time.monotonic() - 0.01
+    clock.now = bms._reconnect_hold_until + 0.01
     bms.refresh_data()
     assert len(scans) == before + 1, "the device must be retried once the pacing expires"
+    assert log.errors == [], f"refresh_data swallowed an exception: {log.errors[:1]}"
+
+
+@_needs_pep604
+def test_stale_data_warning_is_rate_limited(monkeypatch):
+    mod = _load_driver()
+    bms, _, log, clock = _refresh_with_device_gone(mod, monkeypatch)
+
+    def stale_warnings():
+        return [w for w in log.warnings if "treating as failure" in w]
+
+    # 90 s of polling once a second: a warning when the spell starts and one
+    # a minute later, not one per poll
+    for _ in range(90):
+        bms.refresh_data()
+        clock.now += 1
+    assert len(stale_warnings()) == 2, f"expected a warning at the start and one a minute on, got {len(stale_warnings())} in 90 polls"
+
+    # good data ends the spell; the next one is reported when it starts, not
+    # up to a minute late, because its onset is the line worth having
+    bms._last_successful_update = clock.now
+    clock.now += 10
+    bms.refresh_data()
+    assert len(stale_warnings()) == 3, "a new stale spell must be reported when it starts"
+    assert log.errors == [], f"refresh_data swallowed an exception: {log.errors[:1]}"
 
 
 @_needs_pep604

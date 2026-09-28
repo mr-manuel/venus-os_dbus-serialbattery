@@ -96,6 +96,10 @@ class Generic_AioBmsBle(Battery):
         # staleness tracking
         self._last_successful_update: float | None = None
         self._max_data_age: int = 5  # seconds before stale cached data causes failure
+        # the stale-data warning would fire on every poll while the BMS is away;
+        # log it when a stale spell starts, then at most this often
+        self._stale_warning_interval: int = 60
+        self._stale_warned_at: float = 0.0
         # reconnect pacing: consecutive failed connects, when the next attempt
         # is allowed, and whether the sustained-failure warning has been logged
         self._connect_failures: int = 0
@@ -674,11 +678,17 @@ class Generic_AioBmsBle(Battery):
             elif self._last_successful_update is not None:
                 data_age = time.monotonic() - self._last_successful_update
                 if data_age > self._max_data_age:
-                    logger.warning(
-                        "aiobmsble: cached data is %ds old, treating as failure (addr=%s)",
-                        int(data_age),
-                        self.address,
-                    )
+                    # Warn when a stale spell starts - no warning since the last
+                    # good data - and then once a minute; the growing age in the
+                    # message shows the spell continuing.
+                    now = time.monotonic()
+                    if self._stale_warned_at < self._last_successful_update or now - self._stale_warned_at >= self._stale_warning_interval:
+                        self._stale_warned_at = now
+                        logger.warning(
+                            "aiobmsble: cached data is %ds old, treating as failure (addr=%s)",
+                            int(data_age),
+                            self.address,
+                        )
                     return False
                 logger.debug("aiobmsble: using cached data (%.1fs old) (addr=%s)", data_age, self.address)
             elif not isinstance(self.aiobmsble_data, dict):
