@@ -930,3 +930,105 @@ def test_a_failed_connect_does_not_report_a_link_that_never_came_up():
     _attempt(handle, _RefusingBackend())
 
     assert reported == []
+
+
+# ------------------------------------------------------- link supervision
+#
+# supervise_link replaced a 0.1 s spin with a wait that sleeps until something
+# ends the link. Four things may end it, and each is pinned here: a disconnect
+# callback, which wakes the wait through an event from another thread; the
+# data watchdog, which wakes it when due rather than at the next recheck; the
+# main thread going away; and a disconnect whose callback never fired. The
+# recheck is set long wherever an early finish is what proves the mechanism.
+
+
+class _SyncronBleBase:
+    """Stands in for utils_ble.Syncron_Ble, which this module stubs to object.
+
+    Placed after the driver's class in the MRO, it is what the override's
+    super().client_disconnected() reaches, and it records that it was reached.
+    """
+
+    def client_disconnected(self, client):
+        self.base_disconnects.append(client)
+
+
+class _Supervisable(humsienk_ble.HumsiENK_Syncron_Ble, _SyncronBleBase):
+    pass
+
+
+def _supervised(fed_ago=0.0, main_alive=True, client_connected=True, recheck=30.0):
+    ble = _Supervisable.__new__(_Supervisable)
+    ble.connected = True
+    ble._watchdog_last_fed = time.time() - fed_ago
+    ble.main_thread = types.SimpleNamespace(is_alive=lambda: main_alive)
+    ble.client = types.SimpleNamespace(is_connected=client_connected)
+    ble.SUPERVISION_RECHECK = recheck
+    ble.base_disconnects = []
+    return ble
+
+
+def _supervise(ble, within, while_waiting=None):
+    """Run supervise_link, failing unless it ends within `within` seconds.
+
+    With `while_waiting`, supervision must first be seen still waiting, and
+    the callable then runs - so ending afterwards is caused by it.
+    """
+
+    async def run():
+        ble._link_down = asyncio.Event()
+        ble._link_down_loop = asyncio.get_running_loop()
+        task = asyncio.ensure_future(ble.supervise_link())
+        if while_waiting is not None:
+            await asyncio.sleep(0.2)
+            assert not task.done(), "supervision ended before anything ended the link"
+            while_waiting()
+        await asyncio.wait_for(task, timeout=within)
+
+    started = time.monotonic()
+    asyncio.run(run())
+    return time.monotonic() - started
+
+
+def test_a_disconnect_wakes_supervision_from_another_thread():
+    ble = _supervised(recheck=30.0)
+
+    def disconnect():
+        threading.Thread(target=ble.client_disconnected, args=(ble.client,)).start()
+
+    # a 30 s recheck cannot be what ends this inside 2 s: the event did
+    _supervise(ble, within=2.0, while_waiting=disconnect)
+
+    # and the override still let the base class handle the disconnect
+    assert ble.base_disconnects == [ble.client]
+
+
+def test_an_expired_data_watchdog_drops_the_link(caplog):
+    ble = _supervised(fed_ago=humsienk_ble.HumsiENK_Syncron_Ble.WATCHDOG_TIMEOUT + 1)
+
+    with caplog.at_level("ERROR", logger="SerialBattery"):
+        _supervise(ble, within=1.0)
+
+    assert [r.message for r in caplog.records] == ["HumsiENK: no data for 180 s on an open link, dropping it to reconnect"]
+
+
+def test_the_data_watchdog_wakes_when_it_is_due_not_at_the_next_recheck(caplog):
+    watchdog = humsienk_ble.HumsiENK_Syncron_Ble.WATCHDOG_TIMEOUT
+    ble = _supervised(fed_ago=watchdog - 0.3, recheck=30.0)
+
+    with caplog.at_level("ERROR", logger="SerialBattery"):
+        _supervise(ble, within=2.0)
+
+    assert [r.message for r in caplog.records] == ["HumsiENK: no data for 180 s on an open link, dropping it to reconnect"]
+
+
+def test_supervision_ends_when_the_main_thread_has_gone():
+    ble = _supervised(main_alive=False, recheck=0.05)
+
+    _supervise(ble, within=1.0)
+
+
+def test_a_disconnect_whose_callback_never_fired_still_ends_supervision():
+    ble = _supervised(client_connected=False, recheck=0.05)
+
+    _supervise(ble, within=1.0)
