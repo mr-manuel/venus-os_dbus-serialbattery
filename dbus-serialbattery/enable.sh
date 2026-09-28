@@ -310,10 +310,15 @@ if [ "$bluetooth_length" -gt 0 ]; then
             # SIGSEGV on an Allwinner A20 Cerbo), silently skipping the
             # disconnect and leaving a stale LE link that blocks the next
             # connection attempt. Try the device object on every adapter.
+            # hci0-hci15 rather than the adapters actually present: the list
+            # is fixed so it needs nothing from the platform to be right, and
+            # a disconnect sent to an adapter that does not exist fails
+            # quietly. It was hci0-hci4, which missed a stale link on hci5 and
+            # above - and GX devices run with ten adapters.
             echo "MACPATH=\$(echo $3 | tr ':' '_')"
-            echo "for A in /org/bluez/hci0 /org/bluez/hci1 /org/bluez/hci2 /org/bluez/hci3 /org/bluez/hci4; do"
+            echo "for N in 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do"
             echo "    dbus-send --system --print-reply --dest=org.bluez \\"
-            echo "        \"\$A/dev_\$MACPATH\" org.bluez.Device1.Disconnect > /dev/null 2>&1"
+            echo "        \"/org/bluez/hci\$N/dev_\$MACPATH\" org.bluez.Device1.Disconnect > /dev/null 2>&1"
             echo "done"
             echo
             echo "# Start the main process"
