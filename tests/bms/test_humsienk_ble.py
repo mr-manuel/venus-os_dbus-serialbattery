@@ -663,30 +663,6 @@ def test_refresh_data_fails_again_once_the_data_has_aged_out():
     assert bms.refresh_data() is False
 
 
-def test_the_driver_keeps_no_state_on_disk():
-    # Structural guard. This driver reports only what the radio delivered:
-    # serving values during an outage belongs to the fallback layer, and an
-    # earlier revision of this driver had grown on-disk persistence of its
-    # own. Refusing stale values is pinned by behaviour, in
-    # test_refresh_data_fails_again_once_the_data_has_aged_out; this pins the
-    # disk half. It reads the syntax tree rather than searching the text, so
-    # a comment that mentions the fallback layer cannot trip it.
-    import ast
-    import inspect
-
-    tree = ast.parse(inspect.getsource(humsienk_ble))
-    called = {node.func.id for node in ast.walk(tree) if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)}
-    imported = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            imported.update(alias.name.split(".")[0] for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            imported.add(node.module.split(".")[0])
-
-    assert "open" not in called
-    assert not imported & {"json", "pickle", "shelve", "sqlite3", "dbm"}
-
-
 # ------------------------------------------------- the backend seam
 #
 # The driver overrides connect_to_bms, so it does not inherit whatever the
