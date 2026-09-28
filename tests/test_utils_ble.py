@@ -467,6 +467,29 @@ def test_a_bleak_that_moves_the_rebuild_call_fails_loudly():
         assert "_get_services" in str(e)
 
 
+def test_a_rebuild_that_cannot_happen_is_said_at_warning_once(monkeypatch, caplog):
+    """
+    The raise alone is not seen at the default log level: connection failures
+    are logged at DEBUG, so an operator would see only "rebuilding it" repeat
+    every attempt with the reason hidden. Said once, at WARNING, because it
+    means the installed bleak does not fit this driver and no attempt will
+    change that.
+    """
+    import asyncio
+
+    monkeypatch.setattr(utils_ble, "_rediscovery_unavailable_reported", False)
+    client = _GattClient(appears_after=99, backend=types.SimpleNamespace())
+    with caplog.at_level("WARNING", logger="SerialBattery"):
+        for _ in range(3):
+            try:
+                asyncio.run(utils_ble.rediscover_services(client, "char"))
+                raise AssertionError("a missing backend call must still fail the connection")
+            except utils_ble.BleakError:
+                pass
+    warned = [m for m in caplog.messages if "_get_services" in m]
+    assert len(warned) == 1
+
+
 def test_neither_backend_subscribes_without_the_rebuild_guard():
     """
     Both backends reach start_notify by the same route, so a fix applied to

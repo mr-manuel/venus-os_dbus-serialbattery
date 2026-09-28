@@ -599,6 +599,11 @@ GATT_REDISCOVERY_ATTEMPTS = 3
 GATT_REDISCOVERY_SETTLE = 0.5
 
 
+# Whether the rebuild has been found impossible in this process; see
+# rediscover_services.
+_rediscovery_unavailable_reported = False
+
+
 async def rediscover_services(client, notify_char):
     """
     Rebuild a connected client's GATT tree from what BlueZ holds now.
@@ -614,10 +619,20 @@ async def rediscover_services(client, notify_char):
     backend = getattr(client, "_backend", None)
     get_services = getattr(backend, "_get_services", None)
     if get_services is None or not hasattr(backend, "services"):
-        raise BleakError(
+        message = (
             f"characteristic {notify_char} is missing from the resolved GATT tree, and this bleak "
             "offers no way to rebuild it (expected _backend._get_services); connection unusable"
         )
+        # The raise alone is not enough to be seen: connection failures are
+        # logged at DEBUG, so at the default level only the "rebuilding it"
+        # warning would show, repeating every attempt with the reason hidden.
+        # Said once per process at WARNING: it means the installed bleak is not
+        # one this driver can work with, which no later attempt will change.
+        global _rediscovery_unavailable_reported
+        if not _rediscovery_unavailable_reported:
+            _rediscovery_unavailable_reported = True
+            logger.warning(message)
+        raise BleakError(message)
     # _get_services returns the tree it already has, so it has to be dropped
     # first for the rebuild to read BlueZ again. The rebuild goes to live
     # BlueZ state rather than any cached collection, so a client that was
