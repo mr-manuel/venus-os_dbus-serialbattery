@@ -590,3 +590,131 @@ class TestHighWriteVolume:
             proxy[path] = val
 
         assert mock_svc.__setitem__.call_count == initial + 1
+
+
+class TestCgwacsSettingsCache:
+    """Time-to-Go reads the ESS settings at most every CGWACS_SETTINGS_CACHE_S.
+
+    The cache is inline in DbusHelper._publish_dbus_values(), so these tests
+    drive the real method with a stub battery. That method wraps the
+    Time-to-Go block in a broad ``except Exception`` which would swallow a
+    stub mistake and let a test pass without ever reaching the cache, so
+    every publish first asserts that the block actually ran.
+    """
+
+    # get_settings_with_values() builds absolute-path nesting and stringifies
+    # every leaf; the stubs return that exact shape.
+    BATTERY_LIFE = {"Settings": {"CGwacs": {"BatteryLife": {"State": "1", "MinimumSocLimit": "10.0", "SocLimit": "20.0"}}}}
+    HUB4MODE = {"Settings": {"CGwacs": {"Hub4Mode": "1"}}}
+
+    @pytest.fixture
+    def clock(self, monkeypatch):
+        state = {"now": 1_000_000.0}
+        monkeypatch.setattr(dbushelper, "time", lambda: state["now"])
+        return state
+
+    @pytest.fixture
+    def helper(self, monkeypatch, clock):
+        monkeypatch.setattr(dbushelper.utils, "TIME_TO_GO_ENABLE", True)
+        monkeypatch.setattr(dbushelper.utils, "TIME_TO_SOC_RECALCULATE_EVERY", 60)
+        monkeypatch.setattr(dbushelper.utils, "TIME_TO_SOC_POINTS", [])
+        monkeypatch.setattr(dbushelper.utils, "HISTORY_ENABLE", False)
+        monkeypatch.setattr(dbushelper.utils, "PUBLISH_BATTERY_DATA_AS_JSON", False)
+
+        helper = DbusHelper.__new__(DbusHelper)
+        helper.battery = _stub_battery()
+        helper._dbusservice = _CachedDbusProxy(FakeService())
+        helper._dbusservice._svc._store["/Mode"] = 3
+        helper.bms_cable_alarm = 0
+        helper.path_battery = "/Settings/Devices/serialbattery_stub"
+        helper.cgwacs_settings_cache = None
+        helper.cgwacs_settings_cache_time = 0
+        # keep the unrelated periodic housekeeping branches quiet
+        helper.history_calculated_last_time = clock["now"]
+        helper.settings_saved_last_time = clock["now"]
+        helper.last_seen_saved_last_time = clock["now"]
+        helper.save_current_battery_state = MagicMock()
+        helper.set_settings = MagicMock()
+
+        reads = []
+
+        def get_settings_with_values(bus, service, object_path, recursive=True):
+            reads.append(object_path)
+            return self.BATTERY_LIFE if object_path.endswith("/BatteryLife") else self.HUB4MODE
+
+        helper.get_settings_with_values = get_settings_with_values
+        helper.reads = reads
+        return helper
+
+    @staticmethod
+    def _publish(helper, clock, advance):
+        """One publish cycle, advancing past the Time-to-Go recalculation gate."""
+        clock["now"] += advance
+        calls_before = helper.battery.get_time_to_soc.call_count
+        helper._publish_dbus_values()
+        # the Time-to-Go block really ran, and did not fail silently
+        assert helper.battery.get_time_to_soc.call_count == calls_before + 1
+        assert 8 not in [c.args[0] for c in helper.battery.manage_error_code.call_args_list]
+
+    def test_first_recalculation_reads_the_settings(self, helper, clock):
+        self._publish(helper, clock, 60)
+        assert helper.reads == ["/Settings/CGwacs/BatteryLife", "/Settings/CGwacs/Hub4Mode"]
+
+    def test_recalculations_within_the_cache_window_do_not_reread(self, helper, clock):
+        self._publish(helper, clock, 60)
+        for _ in range(4):  # four more 60 s recalculations: 240 s < 300 s
+            self._publish(helper, clock, 60)
+        assert len(helper.reads) == 2
+
+    def test_settings_are_reread_once_the_cache_expires(self, helper, clock):
+        self._publish(helper, clock, 60)
+        clock["now"] += dbushelper.CGWACS_SETTINGS_CACHE_S - 60
+        self._publish(helper, clock, 60)  # exactly CGWACS_SETTINGS_CACHE_S after the first read
+        assert helper.reads == ["/Settings/CGwacs/BatteryLife", "/Settings/CGwacs/Hub4Mode"] * 2
+
+    def test_cached_settings_still_drive_time_to_go(self, helper, clock):
+        """A cached read must feed the calculation exactly like a fresh one."""
+        self._publish(helper, clock, 60)
+        self._publish(helper, clock, 60)  # served from the cache
+        soc_targets = [c.args[0] for c in helper.battery.get_time_to_soc.call_args_list]
+        # Hub4Mode 1 with BatteryLife State 1 (optimised with BatteryLife) -> SocLimit
+        assert soc_targets == [20, 20]
+        assert len(helper.reads) == 2
+
+
+def _stub_battery():
+    """A battery with numeric values wherever _publish_dbus_values() does arithmetic."""
+    b = MagicMock()
+    numbers = {
+        "cell_count": 4,
+        "soc": 80.0,
+        "soc_calc": 80.0,
+        "soh": 100.0,
+        "voltage": 13.3,
+        "current_calc": -5.0,
+        "power_calc": -66.5,
+        "current_avg": -5.0,
+        "capacity": 100.0,
+        "time_to_soc_update": 0,
+        "temperature_mos": 20.0,
+        "control_voltage": 14.2,
+        "control_charge_current": 50.0,
+        "control_discharge_current": 50.0,
+        "max_battery_voltage": 14.6,
+        "min_battery_voltage": 12.0,
+        "state": 9,
+        "online": True,
+    }
+    for name, value in numbers.items():
+        setattr(b, name, value)
+    b.cells = []
+    b.current_avg_lst = []
+    b.get_midvoltage.return_value = (None, None)
+    b.get_time_to_soc.return_value = 3600
+    for method in ("get_temperature", "get_min_temperature", "get_max_temperature"):
+        getattr(b, method).return_value = 20.0
+    for method in ("get_capacity_remain", "get_capacity_consumed", "get_capacity_remain_bms", "get_capacity_consumed_bms"):
+        getattr(b, method).return_value = 50.0
+    for method in ("get_max_cell_voltage", "get_min_cell_voltage"):
+        getattr(b, method).return_value = 3.3
+    return b
