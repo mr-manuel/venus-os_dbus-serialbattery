@@ -901,6 +901,200 @@ def test_without_strict_an_absent_pin_still_attempts(monkeypatch):
         _configure(original_pins, original_pool)
 
 
+# --------- the reconnect loop's guards ---------
+#
+# These ran in production for weeks with nothing asserting them: a review
+# deleted each one in turn and every test still passed. Each test below is
+# the one that fails if its guard is removed.
+
+
+def _connecting_battery(backend):
+    """A Syncron_Ble with the threads left out, so connect_to_bms can be run directly."""
+    import threading
+
+    battery = utils_ble.Syncron_Ble.__new__(utils_ble.Syncron_Ble)
+    battery.address = PINNED
+    battery.backend = backend
+    battery.main_thread = types.SimpleNamespace(is_alive=lambda: True)
+    battery.ble_connection_ready = threading.Event()
+    battery._reset_counters()
+    return battery
+
+
+def test_an_establish_that_never_answers_is_abandoned(monkeypatch):
+    """
+    One unanswered D-Bus await once silenced reconnection for four hours
+    without a log line. The deadline is the backstop; a backstop that
+    quietly stopped working would bring that silence straight back.
+    """
+    import asyncio as aio
+
+    monkeypatch.setattr(utils_ble, "BLE_ESTABLISH_TIMEOUT", 0.05)
+
+    async def never(*args, **kwargs):
+        await aio.Event().wait()
+
+    backend = types.SimpleNamespace(create_client=lambda address, callback: None, establish=never)
+    battery = _connecting_battery(backend)
+    assert aio.run(aio.wait_for(battery.connect_to_bms(PINNED), timeout=2.0)) is False
+
+
+def test_a_release_that_never_answers_is_abandoned(monkeypatch, caplog):
+    """A disconnect that never completes must not prevent the next attempt."""
+    import asyncio as aio
+
+    monkeypatch.setattr(utils_ble, "BLE_RELEASE_TIMEOUT", 0.05)
+    monkeypatch.setattr(utils_ble, "BLE_SUPERVISION_RECHECK", 0.01)
+
+    async def connected(*args, **kwargs):
+        return _FakeClient(False)
+
+    async def never(*args, **kwargs):
+        await aio.Event().wait()
+
+    backend = types.SimpleNamespace(create_client=lambda address, callback: None, establish=connected, release=never)
+    battery = _connecting_battery(backend)
+    with caplog.at_level("WARNING", logger="SerialBattery"):
+        aio.run(aio.wait_for(battery.connect_to_bms(PINNED), timeout=2.0))
+    assert any("disconnect did not complete" in m for m in caplog.messages)
+
+
+def test_an_abandoned_generation_stops_attempting(monkeypatch):
+    """
+    A thread rebuild starts a new generation and leaves the old thread to
+    retire itself at its next loop pass. Without the guard both generations
+    would reconnect the same battery, each fighting the other for the link.
+    """
+    battery, attempts, asyncio_mod = _loop_battery(monkeypatch, {}, iterations=6)
+
+    async def rebuild_after_first(address):
+        attempts.append(address)
+        battery._ble_thread_generation += 1
+
+    battery.connect_to_bms = rebuild_after_first
+    asyncio_mod.run(battery.async_main(PINNED, 0))
+    assert attempts == [PINNED]
+
+
+def test_a_hold_flag_stops_every_attempt(monkeypatch, tmp_path, caplog):
+    battery, attempts, asyncio_mod = _loop_battery(monkeypatch, {}, iterations=4)
+    flag = tmp_path / "ble-hold"
+    flag.write_text("operator")
+    monkeypatch.setattr(utils_ble, "ble_hold_flag_path", lambda address: str(flag))
+    with caplog.at_level("WARNING", logger="SerialBattery"):
+        asyncio_mod.run(battery.async_main(PINNED, 0))
+    assert attempts == []
+    # an operator's flag is theirs to remove
+    assert flag.exists()
+    assert len([m for m in caplog.messages if "pausing connection attempts" in m]) == 1
+
+
+def test_an_automatic_hold_expires_by_itself(monkeypatch, tmp_path):
+    battery, attempts, asyncio_mod = _loop_battery(monkeypatch, {}, iterations=3)
+    flag = tmp_path / "ble-hold"
+    flag.write_text("auto")
+    expired = time.time() - utils_ble.BLE_HOLD_AUTO_EXPIRY - 60
+    os.utime(flag, (expired, expired))
+    monkeypatch.setattr(utils_ble, "ble_hold_flag_path", lambda address: str(flag))
+    asyncio_mod.run(battery.async_main(PINNED, 0))
+    assert not flag.exists()
+    assert attempts
+
+
+def test_the_reconnect_backoff_climbs_and_resets_after_a_long_session(monkeypatch):
+    """
+    The sequence is not obvious from the code: the first entry is only used
+    after a session that held for over a minute, so a fresh failure waits the
+    second entry, then the third, and stays there.
+    """
+    battery, attempts, asyncio_mod = _loop_battery(monkeypatch, {}, iterations=5)
+    monkeypatch.setattr(utils_ble, "BLE_RECONNECT_BACKOFF", [10, 20, 30])
+    real_sleep = asyncio_mod.sleep
+    slept = []
+
+    async def recording_sleep(delay, *args, **kwargs):
+        slept.append(delay)
+        await real_sleep(0)
+
+    monkeypatch.setattr(utils_ble.asyncio, "sleep", recording_sleep)
+    clock = [1000.0]
+    monkeypatch.setattr(utils_ble.time, "time", lambda: clock[0])
+
+    async def connect(address):
+        attempts.append(address)
+        # the first session holds for over a minute; the rest fail at once
+        if len(attempts) == 1:
+            clock[0] += 61
+
+    battery.connect_to_bms = connect
+    asyncio_mod.run(battery.async_main(PINNED, 0))
+    assert slept == [10, 20, 30, 30]
+
+
+def test_the_retry_backend_closes_stale_links_and_asks_for_its_adapter(monkeypatch):
+    """
+    Two things the retry backend exists to do beyond plain bleak: close a link
+    left over from a previous session before connecting, and connect over the
+    adapter this battery was assigned rather than whichever BlueZ picks.
+    """
+    import asyncio as aio
+
+    device = object()
+    closed = []
+    passed = {}
+
+    async def fake_resolve(address):
+        return device
+
+    async def fake_close(dev):
+        closed.append(dev)
+
+    async def fake_establish(client_class, dev, address, **kwargs):
+        passed.update(kwargs)
+        return _GattClient()
+
+    backend = utils_ble.get_ble_backend("BleakRetryBackend")
+    backend.current_adapter = "hci3"
+    backend._resolve_device = fake_resolve
+    monkeypatch.setattr(utils_ble, "close_stale_connections", fake_close)
+    monkeypatch.setattr(utils_ble, "retry_establish_connection", fake_establish)
+    aio.run(backend._establish(None, PINNED, "char", "callback"))
+    assert closed == [device]
+    assert passed.get("adapter") == "hci3"
+
+
+def test_send_data_runs_the_command_on_the_ble_thread_s_own_loop():
+    """
+    It used to wrap every command in asyncio.run(), building and tearing down
+    a whole event loop on the calling thread per command. It now schedules
+    onto the loop the BLE thread already runs, and waits for the answer.
+    """
+    import asyncio as aio
+    import threading
+
+    loop = aio.new_event_loop()
+    worker = threading.Thread(target=loop.run_forever, daemon=True)
+    worker.start()
+    try:
+        battery = utils_ble.Syncron_Ble.__new__(utils_ble.Syncron_Ble)
+        battery.ble_async_thread_event_loop = loop
+        seen = {}
+
+        async def fake_send(data):
+            seen["thread"] = threading.current_thread()
+            seen["data"] = data
+            return b"reply"
+
+        battery.ble_thread_send_com = fake_send
+        assert battery.send_data(b"cmd") == b"reply"
+        assert seen["data"] == b"cmd"
+        assert seen["thread"] is worker
+    finally:
+        loop.call_soon_threadsafe(loop.stop)
+        worker.join(1)
+        loop.close()
+
+
 # --------- one line per episode, not three per attempt ---------
 #
 # A characterised BMS radio mute lasts 10-20 s, happens a few times an hour
@@ -1419,6 +1613,31 @@ def test_supervision_returns_when_the_main_thread_is_gone():
         aio.run(run())
     finally:
         utils_ble.BLE_SUPERVISION_RECHECK = original
+
+
+def test_supervision_keeps_waiting_while_the_link_is_healthy(monkeypatch):
+    """
+    The three tests above check that supervision RETURNS when it should. None
+    checked that it WAITS when it should, so a supervision that returned at
+    once passed all of them - and would have turned every healthy connection
+    into an immediate release and reconnect.
+    """
+    import asyncio as aio
+
+    monkeypatch.setattr(utils_ble, "BLE_SUPERVISION_RECHECK", 0.01)
+
+    async def run():
+        s = _supervisor(connected=True, main_alive=True)
+        s._disconnected = aio.Event()
+        s._disconnected_loop = aio.get_running_loop()
+        # many recheck intervals pass with the link up and nothing signalled
+        try:
+            await aio.wait_for(s.supervise_connection(), timeout=0.2)
+        except aio.TimeoutError:
+            return
+        raise AssertionError("supervision returned while the link was healthy")
+
+    aio.run(run())
 
 
 def test_signalling_without_a_connection_is_harmless():
