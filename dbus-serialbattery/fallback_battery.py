@@ -127,10 +127,9 @@ class FallbackBattery:
 
     #: How long the fallback may serve before the log says so at WARNING.
     #: Log-only and deliberately separate from FALLBACK_BMS_CABLE_WARN_MINUTES,
-    #: which governs the D-Bus alarm: a characterised BMS mute is 10-15 s and
-    #: happens 2-8 times an hour per pack, so an ordinary mute must not print a
-    #: WARNING. Past this, the outage is no longer an ordinary mute and the log
-    #: should say so exactly once.
+    #: which governs the D-Bus alarm. A short BMS mute is routine and absorbed
+    #: by the fallback, so it must not print a WARNING; past this, the outage
+    #: is no longer a short mute and the log should say so exactly once.
     LONG_OUTAGE_LOG_SECONDS = 60
 
     #: The fallback sensor paths this wrapper can read, in probe order.
@@ -434,11 +433,8 @@ class FallbackBattery:
                 self.setup_fallback_sensor()
                 return
             # NameHasOwner, not ListNames: this runs every poll cycle, and
-            # ListNames returns every name on the bus (~110 on a Cerbo) to
-            # answer a question about ONE of them. Measured at 1/s per pack
-            # driver on prod - with two packs configured, ~6% of all method
-            # calls on the box and effectively the whole recurring
-            # first-party share. Same semantics, one small reply.
+            # ListNames returns every name on the bus to answer a question
+            # about one of them. Same semantics, one small reply.
             present = bool(self._dbus_connection.name_has_owner(self._device))
             if self.dbus_fallback_objects is not None and not present:
                 logger.error("Fallback sensor was disconnected, fallback not available")
@@ -648,11 +644,11 @@ class FallbackBattery:
         if fresh and not self._serving:
             if self._fallback_mode:
                 covered = time() - self._fallback_since if self._fallback_since is not None else 0.0
-                # The original line is preserved COMPLETE, terminator included, and
-                # the duration appended after it. The fleet watch pairs this with
+                # The original line is preserved complete, terminator included,
+                # and the duration appended after it. Log watchers pair this with
                 # the entering line to measure the outage window; inserting the
-                # duration before "<<<" would have broken any matcher anchored on
-                # the full line rather than the bare substring.
+                # duration before "<<<" would break any matcher anchored on the
+                # full line rather than the bare substring.
                 logger.info(f">>> Battery responds again, leaving fallback mode <<< (fallback covered {covered:.1f}s, BMS mute)")
                 self._long_outage_logged = False
                 # Data provably resumed: clear the stale-data escalation
@@ -694,13 +690,12 @@ class FallbackBattery:
             self._take_soc_anchor()
             self._take_cell_snapshot()
             self._long_outage_logged = False
-            # INFO, not warning: entering fallback is the expected response to a
-            # routine mute, and a WARNING would fire 2-8 times an hour per pack
-            # for the event this feature exists to absorb. Not DEBUG either:
-            # "Entering fallback mode" is a load-bearing substring for the fleet
-            # watch, which pairs it with the leaving line to measure the outage
-            # window. Prod runs at INFO, so demoting this to DEBUG does not make
-            # it quieter - it deletes the window's start from the log entirely.
+            # INFO, not WARNING: entering fallback is the expected response to a
+            # routine mute, and a WARNING would fire for the very event this
+            # feature exists to absorb. Not DEBUG either: log watchers pair
+            # "Entering fallback mode" with the leaving line to measure the
+            # outage window, and at an INFO log level a DEBUG line is not
+            # quieter, it is absent.
             logger.info("Entering fallback mode (BMS mute)")
         elif self._serving and self._fallback_mode and not self._long_outage_logged and self._fallback_since is not None:
             if time() - self._fallback_since >= self.LONG_OUTAGE_LOG_SECONDS:
@@ -880,14 +875,17 @@ class FallbackBattery:
         Normally the moment this process engaged the fallback. But a process
         started mid-outage has never heard the BMS, and its own engagement
         time says nothing about how long the pack has been uncovered:
-        measured from it, a reboot silently re-arms the BmsCable grace, and
-        an outage that has already run for an hour is warning-silent for
-        another ten minutes. Field-observed on dev-cerbo 2026-08-28: a
-        47-minute outage, rebooted at 03:26Z, raised the alarm at ~03:37Z.
+        measured from it, a restart silently re-arms the BmsCable grace, and
+        an outage that has already run for an hour stays warning-silent for
+        another full grace period.
 
-        The stash is written only while the BMS is fresh, so its timestamp
-        IS the last BMS contact and survives the reboot - the same number
-        the "stash loaded (Ns old)" line already prints. It is used only
+        The stash is refreshed only while the BMS is fresh and survives the
+        restart, so its timestamp is the best surviving record of the last
+        BMS contact - the same number the "stash loaded (Ns old)" line
+        prints. It is not exact: the stash reaches disk at most every
+        STASH_INTERVAL_SECONDS, so the recorded time can precede the last
+        contact by up to that interval. The error is always early, so the
+        alarm can fire sooner than the grace, never later. It is used only
         while this process has no BMS contact of its own; the moment the
         BMS answers, the process clock takes over and a later outage is
         measured from that, never from a stale stash.
@@ -1416,21 +1414,18 @@ class FallbackBattery:
                     ceiling = utils.MAX_CELL_VOLTAGE * self.battery.cell_count
                 if ceiling is not None:
                     self.battery.control_voltage = round(ceiling, 2)
-            # Same reason the sibling limiter sets its allow flags: skipping a
-            # state machine must not also skip the state it was going to
-            # establish. charge_mode starts as None and is only ever assigned
-            # inside the machine being skipped here, so a wrapper that serves
-            # for hours hands the base class a None it never sees in stock
-            # operation - where the machine runs every cycle. The base guards
-            # one branch for that (battery.py:917) and not the next
-            # (battery.py:941, ``charge_mode.startswith("Float Transition")``),
-            # so the crash lands on the way BACK, the instant the BMS returns
-            # and delegation resumes. Field-observed on dev-cerbo 2026-08-28
-            # 05:30:25Z. Seed a string that matches no branch test: the base
-            # machine then evaluates its conditions normally and overwrites
-            # this on the same cycle. The wrapper's own charge_mode property
-            # shows the fallback text meanwhile, so this is not user-visible
-            # while serving.
+            # charge_mode starts as None and is only ever assigned inside the
+            # state machine skipped here, while control_voltage was just given
+            # a value - a pair stock operation never produces. The base machine
+            # guards charge_mode against None in one branch but not the next,
+            # so without a value the first delegation after the BMS returns
+            # raises AttributeError. Known limitation of this seed: it reads as
+            # a non-float mode, so if that first delegation lands in the float
+            # branch the machine takes its bulk-to-float transition - it calls
+            # trigger_soc_reset(), records a full charge in the history, and
+            # with SOC_CALCULATION resets the calculated SoC to 100 %. The
+            # wrapper's own charge_mode property shows the fallback text while
+            # serving, so the seed itself is not user-visible.
             if self.battery.charge_mode is None:
                 self.battery.charge_mode = "Waiting for BMS data"
             return
@@ -1467,8 +1462,7 @@ class FallbackBattery:
             # conclusion: control_allow_* start life as None, and an unread
             # FET falls back to them, so leaving them unset publishes full
             # configured limits alongside "discharge not allowed" - the very
-            # contradiction _fet_never_read exists to prevent. Field-observed
-            # on a mid-outage restart before this was set.
+            # contradiction _fet_never_read exists to prevent.
             self.battery.control_allow_charge = self.battery.control_charge_current != 0
             self.battery.control_allow_discharge = self.battery.control_discharge_current != 0
             return
