@@ -533,6 +533,32 @@ class TestUnreadFetStates:
         assert wrapper.get_allow_to_charge() is True
         assert wrapper.get_allow_to_discharge() is True
 
+    def test_unread_temperatures_alone_still_derive_the_allow_flags(self, monkeypatch):
+        # The limiters are also skipped when temperature limiting is enabled
+        # and no temperature has been read, even with the cells present. The
+        # flags must follow the limits on that trigger as well.
+        monkeypatch.setattr(utils, "FALLBACK_SAFE_CELL_VOLTAGE_MIN", 2.70)
+        monkeypatch.setattr(utils, "FALLBACK_SAFE_CELL_VOLTAGE_MAX", 3.55)
+        monkeypatch.setattr(utils, "CCCM_T_ENABLE", True)
+        shunt = {key: value for key, value in _LIVE_SHUNT.items() if key != "Temperature"}
+        wrapper = _make_wrapper(monkeypatch, shunt=shunt, connected=False)
+        wrapper.battery.charge_fet = None
+        wrapper.battery.discharge_fet = None
+        wrapper.battery.temperature_1 = None
+        wrapper.battery.temperature_2 = None
+        assert wrapper.battery.control_allow_charge is None
+        assert wrapper.battery.control_allow_discharge is None
+        _serve(wrapper)
+
+        # the trigger under test, and only that one
+        assert not wrapper._cells_unread()
+        assert wrapper._temperatures_unread()
+
+        wrapper.manage_charge_and_discharge_current()
+
+        assert wrapper.get_allow_to_charge() is True
+        assert wrapper.get_allow_to_discharge() is True
+
     def test_a_zero_configured_limit_still_reports_the_direction_blocked(self, monkeypatch):
         # the flags follow the limits rather than being pinned true: a limit
         # the installation genuinely sets to zero must still read as blocked
