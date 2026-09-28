@@ -36,6 +36,15 @@ class RecordingService:
     def __getitem__(self, path):
         return self.values.get(path)
 
+    def __enter__(self):
+        # #510's write-gating proxy stages writes on whatever __enter__ returns
+        # (velib returns a writable ServiceContext). Without this, __getattr__
+        # below hands back a no-op lambda and the proxy assigns into None.
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
     def __getattr__(self, name):
         return lambda *a, **kw: None
 
