@@ -1405,6 +1405,15 @@ class FallbackBattery:
         configured ceiling instead and let the state machine start when real
         cell voltages do.
 
+        Known limitation while serving: once the cells carry a projection the
+        state machine runs on it, so an absorption period that began before
+        the outage can end during it and switch to float as usual. With
+        AUTO_RESET_SOC, the drivers that act on that switch write SoC 100 %
+        to a BMS that is away. Jkbms_Ble and LltJbd_Up16s hold that write
+        until the link returns, with no expiry, by which time the pack may
+        no longer be full. Documented for users next to
+        FALLBACK_SENSOR_DBUS_DEVICE in config.default.ini.
+
         :return: None
         """
         if self._cells_unread():
@@ -1423,7 +1432,11 @@ class FallbackBattery:
             # a non-float mode, so if that first delegation lands in the float
             # branch the machine takes its bulk-to-float transition - it calls
             # trigger_soc_reset(), records a full charge in the history, and
-            # with SOC_CALCULATION resets the calculated SoC to 100 %. The
+            # with SOC_CALCULATION resets the calculated SoC to 100 %. With
+            # AUTO_RESET_SOC the drivers that act on that switch (Daly serial
+            # and CAN, Jkbms_Ble, LltJbd_Up16s) then write SoC 100 % to the
+            # BMS although the pack was not just charged. Documented for users
+            # next to FALLBACK_SENSOR_DBUS_DEVICE in config.default.ini. The
             # wrapper's own charge_mode property shows the fallback text while
             # serving, so the seed itself is not user-visible.
             if self.battery.charge_mode is None:
