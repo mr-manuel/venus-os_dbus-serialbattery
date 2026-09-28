@@ -621,18 +621,16 @@ class TestCgwacsSettingsCache:
         monkeypatch.setattr(dbushelper.utils, "HISTORY_ENABLE", False)
         monkeypatch.setattr(dbushelper.utils, "PUBLISH_BATTERY_DATA_AS_JSON", False)
 
-        helper = DbusHelper.__new__(DbusHelper)
-        helper.battery = _stub_battery()
+        # The real constructor, so the cache's starting state is whatever
+        # production initialises it to, not a value supplied by this test.
+        helper = DbusHelper(_stub_battery())
+        # conftest stubs VeDbusService as the MagicMock class itself, so the
+        # constructor's service is specced on its first argument (a str) and
+        # rejects item assignment. Swap in the faithful double as the sink.
         helper._dbusservice = _CachedDbusProxy(FakeService())
         helper._dbusservice._svc._store["/Mode"] = 3
-        helper.bms_cable_alarm = 0
-        helper.path_battery = "/Settings/Devices/serialbattery_stub"
-        helper.cgwacs_settings_cache = None
-        helper.cgwacs_settings_cache_time = 0
-        # keep the unrelated periodic housekeeping branches quiet
-        helper.history_calculated_last_time = clock["now"]
-        helper.settings_saved_last_time = clock["now"]
-        helper.last_seen_saved_last_time = clock["now"]
+        # Periodic housekeeping in the same method writes to the settings
+        # service; it is not under test here, so absorb it.
         helper.save_current_battery_state = MagicMock()
         helper.set_settings = MagicMock()
 
@@ -685,6 +683,8 @@ class TestCgwacsSettingsCache:
 def _stub_battery():
     """A battery with numeric values wherever _publish_dbus_values() does arithmetic."""
     b = MagicMock()
+    b.port = "/dev/ttyUSB0"
+    b.unique_identifier.return_value = "STUB0001"
     numbers = {
         "cell_count": 4,
         "soc": 80.0,
