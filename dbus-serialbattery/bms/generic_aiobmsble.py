@@ -627,14 +627,15 @@ class Generic_AioBmsBle(Battery):
 
         # Try to (re)fetch data from the stored aiobmsble client if available
         async def _update_async():
+            # Pace an unreachable device rather than hammering it, on both
+            # paths below: finding and connecting it here, and the client's own
+            # reconnect inside async_update once a client exists. Every attempt
+            # costs a full establish_connection of four BlueZ attempts, and for
+            # a device that is not there none of them can win.
+            if self._reconnect_on_hold():
+                return False
             # ensure we have a client, try to find device and connect if not
             if self._aiobmsble is None:
-                # Pace an unreachable device rather than hammering it: every
-                # attempt below costs a full establish_connection, which makes
-                # four BlueZ attempts of its own, and for a device that is not
-                # there none of them can win.
-                if self._reconnect_on_hold():
-                    return False
                 # Cache-first, like test_connection: a bare
                 # find_device_by_address here starts a fresh BlueZ discovery on
                 # EVERY poll of a battery whose client was lost, which on a GX
@@ -642,7 +643,14 @@ class Generic_AioBmsBle(Battery):
                 # with org.bluez.Error.InProgress - and then blocks the caller
                 # for the whole coroutine timeout while it does. Resolving from
                 # the BlueZ cache costs no scan at all in the common case.
-                device: BLEDevice | None = await self._resolve_device()
+                try:
+                    device: BLEDevice | None = await self._resolve_device()
+                except asyncio.CancelledError:
+                    # _poll_update cancels an attempt that outlives its timeout,
+                    # e.g. a scan waiting on an adapter another service holds.
+                    # Count the hang, or the pacing never engages.
+                    self._note_connect_failure("timed out")
+                    raise
                 if device is None:
                     self._note_connect_failure("device not found")
                     logger.debug(f"Could not find device {self.address} for refresh")
@@ -653,6 +661,9 @@ class Generic_AioBmsBle(Battery):
                     return False
                 try:
                     await self._aiobmsble_connect(self._aiobmsble)
+                except asyncio.CancelledError:
+                    self._note_connect_failure("timed out")
+                    raise
                 except Exception as ex:
                     self._note_connect_failure(repr(ex))
                     raise
@@ -662,8 +673,15 @@ class Generic_AioBmsBle(Battery):
             if callable(update):
                 try:
                     self.aiobmsble_data = await update()
+                    self._note_connect_success()
                     return True
+                except asyncio.CancelledError:
+                    self._note_connect_failure("timed out")
+                    raise
                 except Exception as ex:
+                    # the client reconnects inside async_update, so this is the
+                    # failure path of a lost connection: count it for the pacing
+                    self._note_connect_failure(repr(ex))
                     logger.error("Failed to refresh BMS data: %s", ex)
                     try:
                         await self._aiobmsble_disconnect(self._aiobmsble)

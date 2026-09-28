@@ -272,7 +272,8 @@ def _refresh_with_device_gone(mod, monkeypatch):
     monkeypatch.setattr(mod, "logger", log)
     monkeypatch.setattr(mod, "time", clock)
 
-    bms = _borrow(mod, "refresh_data", "_resolve_device", "_reconnect_on_hold", "_note_connect_failure", "_note_connect_success")
+    names = ("refresh_data", "_resolve_device", "_aiobmsble_disconnect")
+    bms = _borrow(mod, *names, "_reconnect_on_hold", "_note_connect_failure", "_note_connect_success")
     bms.address = "A4:C1:38:33:41:24"
     bms._aiobmsble = None
     bms.aiobmsble_data = {"voltage": 13.2, "current": 0.0, "battery_level": 80}
@@ -304,6 +305,56 @@ def test_refresh_does_not_reconnect_while_paced(monkeypatch):
     bms.refresh_data()
     assert len(scans) == before + 1, "the device must be retried once the pacing expires"
     assert log.errors == [], f"refresh_data swallowed an exception: {log.errors[:1]}"
+
+
+@_needs_pep604
+def test_lost_connection_is_paced(monkeypatch):
+    """A battery that was connected and then went away is paced too.
+
+    Once a client exists, the driver never finds or connects the device
+    itself again: the aiobmsble client reconnects inside async_update. That
+    is the usual way an outage happens, so it is the path that most needs
+    the pacing.
+    """
+    mod = _load_driver()
+    bms, scans, log, clock = _refresh_with_device_gone(mod, monkeypatch)
+    updates = []
+
+    class _Client:
+        """An aiobmsble client whose battery has gone away."""
+
+        back = False
+
+        async def async_update(self):
+            updates.append(clock.now)
+            if not self.back:
+                raise RuntimeError("Failed to connect after 4 attempt(s)")
+            return {"voltage": 13.3}
+
+        async def disconnect(self):
+            pass
+
+    client = _Client()
+    bms._aiobmsble = client  # it was connected, then the battery went away
+
+    # three minutes at one poll a second
+    for _ in range(180):
+        bms.refresh_data()
+        clock.now += 1
+    assert scans == [], "with a client in place the driver must not scan for the device"
+    assert len(updates) < 12, f"a lost connection must not be retried on every poll ({len(updates)} tries in 180 polls)"
+    assert sum("unreachable after" in w for w in log.warnings) == 1, "a long outage must be reported once"
+    unexpected = [e for e in log.errors if "Failed to refresh BMS data" not in e]
+    assert unexpected == [], f"refresh_data swallowed an exception: {unexpected[:1]}"
+
+    # the battery comes back: the next try succeeds and clears the pacing.
+    # (Parsing the data needs the real Battery class, so this one poll logs an
+    # error on the stand-in after the pacing has been reset; that is expected.)
+    client.back = True
+    clock.now = bms._reconnect_hold_until + 0.01
+    bms.refresh_data()
+    assert bms._connect_failures == 0, "a successful update must clear the pacing"
+    assert any("reachable again after" in w for w in log.warnings), "the recovery must be reported"
 
 
 @_needs_pep604
@@ -402,3 +453,100 @@ def test_resolve_device_prefers_the_bluez_cache(monkeypatch):
     cache.clear()
     assert asyncio.run(bms._resolve_device()) is found_by_scan
     assert len(scans) == 1, "a cache miss must fall back to one scan"
+
+
+@_needs_pep604
+@pytest.mark.parametrize("stuck_in", ["scan", "connect", "update"])
+def test_hung_reconnect_is_paced(monkeypatch, stuck_in):
+    """An attempt that hangs until the poller cancels it counts as a failure.
+
+    A scan waiting on an adapter another service holds never returns, and
+    neither does a connect or a client reconnect stuck the same way; the
+    poller cancels each at its timeout. If the cancellation is not counted,
+    the pacing never engages and a fresh attempt starts after every timeout.
+    """
+    import asyncio
+    import threading
+    import time
+    import types
+
+    mod = _load_driver()
+    attempts = []
+
+    async def _hang(stage):
+        attempts.append(stage)
+        await asyncio.sleep(3600)  # never returns: cancelled by the poller
+
+    class _Scanner:
+        @staticmethod
+        async def find_device_by_address(address):
+            if stuck_in == "scan":
+                await _hang("scan")
+            return object()  # found
+
+    class _Client:
+        async def connect(self):
+            if stuck_in != "update":
+                await _hang("connect")
+
+        async def async_update(self):
+            await _hang("update")
+
+        async def disconnect(self):
+            pass
+
+    log = _Log()
+    monkeypatch.setattr(mod, "BleakScanner", _Scanner)
+    monkeypatch.setitem(sys.modules, "bleak_retry_connector", types.ModuleType("bleak_retry_connector"))
+    monkeypatch.setattr(mod, "logger", log)
+
+    names = ("refresh_data", "_poll_update", "_ensure_event_loop", "_release_update_lock", "_resolve_device")
+    names += ("_ensure_aiobmsble", "_aiobmsble_connect", "_aiobmsble_disconnect")
+    bms = _borrow(mod, *names, "_reconnect_on_hold", "_note_connect_failure", "_note_connect_success")
+    bms.address = "A4:C1:38:33:41:24"
+    bms.AIOBMSBLE_CLASS = lambda ble_device: _Client()
+    bms._aiobmsble_device = None
+    # "update": the battery was connected, so a client already exists
+    bms._aiobmsble = _Client() if stuck_in == "update" else None
+    bms.aiobmsble_data = {"voltage": 13.2, "current": 0.0, "battery_level": 80}
+    bms._last_successful_update = time.monotonic() - 60
+    bms._max_data_age = 5
+    bms._stale_warning_interval = 60
+    bms._stale_warned_at = 0.0
+    bms._connect_failures = 0
+    bms._reconnect_hold_until = 0.0
+    bms._reconnect_warned = False
+    bms._loop = None
+    bms._loop_thread = None
+    bms._loop_ready = None
+    bms._coro_lock = threading.Lock()
+    bms._current_future = None
+    bms._update_lock_held = False
+    bms._update_started_at = None
+    bms._run_timeout = 0.2  # the real timeout is 10 s; the mechanism is the same
+
+    try:
+        # poll until two hung attempts have been counted; the second imposes a wait
+        deadline = time.monotonic() + 5
+        while bms._connect_failures < 2 and time.monotonic() < deadline:
+            bms.refresh_data()
+            time.sleep(0.02)
+        assert bms._connect_failures >= 2, f"a hung {stuck_in} must count as a connect failure ({len(attempts)} attempts, {bms._connect_failures} counted)"
+
+        # ...so no new attempt may start while that wait runs
+        tried = len(attempts)
+        end = time.monotonic() + 1.0
+        while time.monotonic() < end:
+            bms.refresh_data()
+            time.sleep(0.02)
+        assert len(attempts) == tried, f"a new attempt started while paced ({len(attempts) - tried} extra)"
+        # and every hung attempt was counted, not just some of them
+        assert bms._connect_failures == len(attempts), f"{len(attempts)} hung attempts ({attempts}) but {bms._connect_failures} counted"
+    finally:
+        if bms._loop is not None:
+            bms._loop.call_soon_threadsafe(bms._loop.stop)
+            bms._loop_thread.join(timeout=2)
+
+    # the only errors expected are the poller's own timeouts
+    unexpected = [e for e in log.errors if "coroutine timed out" not in e]
+    assert unexpected == [], f"refresh_data swallowed an exception: {unexpected[:1]}"
