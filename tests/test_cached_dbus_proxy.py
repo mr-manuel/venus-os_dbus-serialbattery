@@ -33,29 +33,33 @@ def proxy(mock_svc):
     return _CachedDbusProxy(mock_svc)
 
 
+_UNSET = object()
+
+
 class FakeServiceContext:
     """Stand-in for velib_python's ServiceContext.
 
-    Mirrors ext/velib_python/vedbus.py: writes are staged locally and only
-    handed to the parent as one batch when the context is flushed.
+    Mirrors ext/velib_python/vedbus.py: a write updates the stored value at
+    once, but is only recorded for the batch when the value actually changed
+    (``VeDbusItemExport._local_set_value`` returns None for an equal value),
+    and flushing a context with no changes emits no ItemsChanged at all.
     """
 
     def __init__(self, parent):
         self.parent = parent
         self.changes = {}
-        self.flushed = None
 
     def __setitem__(self, path, value):
-        self.changes[path] = value
+        if self.parent._set_local(path, value):
+            self.changes[path] = value
 
     def __getitem__(self, path):
         return self.parent[path]
 
     def flush(self):
-        self.flushed = dict(self.changes)
-        self.parent.batches.append(self.flushed)
-        self.parent._store.update(self.changes)
-        self.changes.clear()
+        if self.changes:
+            self.parent.batches.append(dict(self.changes))
+            self.changes.clear()
 
 
 class FakeService:
@@ -67,11 +71,18 @@ class FakeService:
         self.direct_writes = []
         self.batches = []
 
+    def _set_local(self, path, value):
+        """velib's _local_set_value: store the value, report whether it changed."""
+        if self._store.get(path, _UNSET) == value:
+            return False
+        self._store[path] = value
+        return True
+
     def __setitem__(self, path, value):
         # velib's VeDbusService.__setitem__ bypasses the rate limiters and
-        # emits PropertiesChanged straight away.
-        self.direct_writes.append((path, value))
-        self._store[path] = value
+        # emits PropertiesChanged straight away, but only for a changed value.
+        if self._set_local(path, value):
+            self.direct_writes.append((path, value))
 
     def __getitem__(self, path):
         return self._store[path]
@@ -314,7 +325,16 @@ class TestSignificanceGate:
 
 
 class TestHeartbeat:
-    """Entering the batch context periodically forces a full re-publish."""
+    """Entering the batch context periodically drops the proxy's cache.
+
+    What that buys on the bus is narrower than "re-publish every path":
+    velib itself suppresses a write whose value equals the one it already
+    holds, so an unchanged value is NOT re-sent. The heartbeat's observable
+    effect is to refresh a value that has been sitting under its gate
+    threshold, bounding how long the published value can lag the measured
+    one. These tests pin that contract; a value held under its gate is used
+    wherever a test needs the heartbeat to be visible.
+    """
 
     @pytest.fixture
     def clock(self, monkeypatch):
@@ -322,58 +342,57 @@ class TestHeartbeat:
         monkeypatch.setattr(dbushelper, "time", lambda: state["now"])
         return state
 
-    def test_no_republish_before_the_interval(self, clock, fake_svc):
+    def test_no_refresh_before_the_interval(self, clock, fake_svc):
         proxy = _CachedDbusProxy(fake_svc)
         with proxy:
             proxy["/Dc/0/Current"] = 10.0
-        assert fake_svc.batches[-1] == {"/Dc/0/Current": 10.0}
-
         clock["now"] += PUBLISH_HEARTBEAT_S - 1
         with proxy:
-            proxy["/Dc/0/Current"] = 10.0
-        assert fake_svc.batches[-1] == {}
+            proxy["/Dc/0/Current"] = 10.05  # below the gate
+        assert fake_svc.batches == [{"/Dc/0/Current": 10.0}]
 
-    def test_republish_after_the_interval(self, clock, fake_svc):
-        proxy = _CachedDbusProxy(fake_svc)
-        with proxy:
-            proxy["/Dc/0/Current"] = 10.0
-            proxy["/Soc"] = 50.0
-
-        clock["now"] += PUBLISH_HEARTBEAT_S
-        with proxy:
-            proxy["/Dc/0/Current"] = 10.0  # unchanged, but the cache was dropped
-            proxy["/Soc"] = 50.0
-        assert fake_svc.batches[-1] == {"/Dc/0/Current": 10.0, "/Soc": 50.0}
-
-    def test_heartbeat_also_defeats_a_suppressed_sub_threshold_value(self, clock, fake_svc):
+    def test_heartbeat_refreshes_a_value_held_under_its_gate(self, clock, fake_svc):
         proxy = _CachedDbusProxy(fake_svc)
         with proxy:
             proxy["/Dc/0/Current"] = 10.0
         with proxy:
             proxy["/Dc/0/Current"] = 10.05  # suppressed by the gate
-        assert fake_svc.batches[-1] == {}
+        assert fake_svc.batches == [{"/Dc/0/Current": 10.0}]
 
         clock["now"] += PUBLISH_HEARTBEAT_S
         with proxy:
             proxy["/Dc/0/Current"] = 10.05
-        assert fake_svc.batches[-1] == {"/Dc/0/Current": 10.05}
+        assert fake_svc.batches == [{"/Dc/0/Current": 10.0}, {"/Dc/0/Current": 10.05}]
+
+    def test_heartbeat_does_not_resend_unchanged_values(self, clock, fake_svc):
+        """On a quiescent bank the heartbeat emits nothing: velib drops equal values."""
+        proxy = _CachedDbusProxy(fake_svc)
+        with proxy:
+            proxy["/Dc/0/Current"] = 10.0
+            proxy["/Soc"] = 50.0
+
+        clock["now"] += PUBLISH_HEARTBEAT_S
+        with proxy:
+            proxy["/Dc/0/Current"] = 10.0
+            proxy["/Soc"] = 50.0
+        assert fake_svc.batches == [{"/Dc/0/Current": 10.0, "/Soc": 50.0}]
 
     def test_heartbeat_is_only_evaluated_on_the_outermost_enter(self, clock, fake_svc):
         proxy = _CachedDbusProxy(fake_svc)
         with proxy:
-            proxy["/Soc"] = 50.0
+            proxy["/Dc/0/Current"] = 10.0
             clock["now"] += PUBLISH_HEARTBEAT_S
             with proxy:
-                proxy["/Soc"] = 50.0  # must stay deduplicated mid-cycle
+                proxy["/Dc/0/Current"] = 10.05  # must stay gated mid-cycle
                 assert fake_svc._ratelimiters[-1].changes == {}
 
     def test_heartbeat_does_not_fire_without_a_batch_context(self, clock, fake_svc):
-        """Ungated, unbatched writes keep their plain deduplication."""
+        """Unbatched writes keep their gate however much time passes."""
         proxy = _CachedDbusProxy(fake_svc)
-        proxy["/Soc"] = 50.0
+        proxy["/Dc/0/Current"] = 10.0
         clock["now"] += PUBLISH_HEARTBEAT_S * 10
-        proxy["/Soc"] = 50.0
-        assert fake_svc.direct_writes == [("/Soc", 50.0)]
+        proxy["/Dc/0/Current"] = 10.05  # below the gate
+        assert fake_svc.direct_writes == [("/Dc/0/Current", 10.0)]
 
 
 class TestBatching:
@@ -397,12 +416,13 @@ class TestBatching:
             batched_proxy["/Soh"] = 99.0
         assert fake_svc.batches[1] == {"/Soh": 99.0}
 
-    def test_empty_cycle_emits_an_empty_batch(self, batched_proxy, fake_svc):
+    def test_empty_cycle_emits_nothing(self, batched_proxy, fake_svc):
+        """velib's ServiceContext.flush() only signals when something changed."""
         with batched_proxy:
             batched_proxy["/Soc"] = 50.0
         with batched_proxy:
             batched_proxy["/Soc"] = 50.0
-        assert fake_svc.batches[1] == {}
+        assert fake_svc.batches == [{"/Soc": 50.0}]
 
     def test_writes_outside_the_block_go_out_immediately(self, batched_proxy, fake_svc):
         """publish_battery() sets /Alarms/BmsCable after publish_dbus() returns."""
