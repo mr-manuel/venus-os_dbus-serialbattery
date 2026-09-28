@@ -201,3 +201,135 @@ def test_sustained_outage_warns_once_and_resets_on_recovery():
         assert len(warnings) == 3, "a second outage must warn again"
     finally:
         mod.logger = real_logger
+
+
+# --------- the same properties, driven through the real code paths ---------
+#
+# The tests above pin the helpers. These run the methods that call them, so
+# deleting the wiring - not just breaking a helper - fails a test: removing
+# the pacing gate from refresh_data, leaking the update lock after a harvest
+# (which stops every later update without logging anything), or skipping the
+# BlueZ cache all passed the helper-level tests.
+
+
+def _borrow(mod, *names):
+    """A stand-in carrying the named REAL driver methods and nothing else."""
+    driver = mod.Generic_AioBmsBle
+    return type("BorrowedStandIn", (), {name: getattr(driver, name) for name in names})()
+
+
+@_needs_pep604
+def test_refresh_does_not_reconnect_while_paced(monkeypatch):
+    import asyncio
+    import time
+    import types
+
+    mod = _load_driver()
+    scans = []
+
+    class _Scanner:
+        @staticmethod
+        async def find_device_by_address(address):
+            scans.append(address)
+            return None  # the device is gone
+
+    monkeypatch.setattr(mod, "BleakScanner", _Scanner)
+    # no BlueZ cache either, so every resolve that runs is a scan
+    monkeypatch.setitem(sys.modules, "bleak_retry_connector", types.ModuleType("bleak_retry_connector"))
+
+    bms = _borrow(mod, "refresh_data", "_resolve_device", "_reconnect_on_hold", "_note_connect_failure", "_note_connect_success")
+    bms.address = "A4:C1:38:33:41:24"
+    bms._aiobmsble = None
+    bms.aiobmsble_data = {"voltage": 13.2, "current": 0.0, "battery_level": 80}
+    bms._last_successful_update = time.monotonic() - 60
+    bms._max_data_age = 5
+    bms._connect_failures = 0
+    bms._reconnect_hold_until = 0.0
+    bms._reconnect_warned = False
+    # run each poll's coroutine to completion inline: scheduling is
+    # _poll_update's job and is tested separately, this is about the gate
+    bms._poll_update = lambda coro: bool(asyncio.run(coro()))
+
+    for _ in range(120):
+        bms.refresh_data()
+    assert len(scans) < 12, f"a paced device must not be scanned on every poll ({len(scans)} scans in 120 polls)"
+
+    # ...and it is tried again, not abandoned, once the wait elapses
+    before = len(scans)
+    bms._reconnect_hold_until = time.monotonic() - 0.01
+    bms.refresh_data()
+    assert len(scans) == before + 1, "the device must be retried once the pacing expires"
+
+
+@_needs_pep604
+def test_poller_keeps_scheduling_updates():
+    import threading
+    import time
+
+    mod = _load_driver()
+    bms = _borrow(mod, "_poll_update", "_release_update_lock", "_ensure_event_loop")
+    bms.address = "A4:C1:38:33:41:24"
+    bms._loop = None
+    bms._loop_thread = None
+    bms._loop_ready = None
+    bms._coro_lock = threading.Lock()
+    bms._current_future = None
+    bms._update_lock_held = False
+    bms._update_started_at = None
+    bms._run_timeout = 10
+
+    async def update():
+        return True
+
+    completed = 0
+    deadline = time.monotonic() + 5
+    try:
+        while completed < 5 and time.monotonic() < deadline:
+            if bms._poll_update(update):
+                completed += 1
+            time.sleep(0.01)
+    finally:
+        if bms._loop is not None:
+            bms._loop.call_soon_threadsafe(bms._loop.stop)
+            bms._loop_thread.join(timeout=2)
+    # a lock left held after a harvest stops every later update and logs
+    # nothing, so the only way to see it is to count completed updates
+    assert completed >= 5, f"the poller must keep harvesting and rescheduling updates; {completed} completed in 5 s"
+
+
+@_needs_pep604
+def test_resolve_device_prefers_the_bluez_cache(monkeypatch):
+    import asyncio
+    import types
+
+    mod = _load_driver()
+    scans = []
+    cached = object()
+    found_by_scan = object()
+    cache = {"A4:C1:38:33:41:24": cached}
+
+    class _Scanner:
+        @staticmethod
+        async def find_device_by_address(address):
+            scans.append(address)
+            return found_by_scan
+
+    async def get_device(address):
+        return cache.get(address)
+
+    brc = types.ModuleType("bleak_retry_connector")
+    brc.get_device = get_device
+    monkeypatch.setitem(sys.modules, "bleak_retry_connector", brc)
+    monkeypatch.setattr(mod, "BleakScanner", _Scanner)
+
+    bms = _borrow(mod, "_resolve_device")
+    bms.address = "A4:C1:38:33:41:24"
+
+    # a device BlueZ already knows is returned without starting a discovery
+    assert asyncio.run(bms._resolve_device()) is cached
+    assert scans == [], "a cache hit must not start a discovery"
+
+    # a device BlueZ has never seen still falls back to exactly one scan
+    cache.clear()
+    assert asyncio.run(bms._resolve_device()) is found_by_scan
+    assert len(scans) == 1, "a cache miss must fall back to one scan"
