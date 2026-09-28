@@ -1032,3 +1032,20 @@ def test_a_disconnect_whose_callback_never_fired_still_ends_supervision():
     ble = _supervised(client_connected=False, recheck=0.05)
 
     _supervise(ble, within=1.0)
+
+
+# ---------------------------------------------- a pack that never answered
+
+
+def test_a_pack_that_never_answered_is_not_given_an_age_from_the_epoch(caplog):
+    # _last_frame_time stays 0.0 until the first verified frame, so an age
+    # computed from it is the time since 1970 - once logged as "re-sending
+    # handshake after 1786848637 s without data".
+    bms = make_bms()
+    assert bms._last_frame_time == 0.0
+
+    with caplog.at_level("DEBUG", logger="SerialBattery"):
+        bms.refresh_data()
+
+    resends = [r.message for r in caplog.records if "re-sending handshake" in r.message]
+    assert resends == ["HumsiENK: re-sending handshake, no data since connection"]
