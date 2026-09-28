@@ -36,9 +36,11 @@ from aiobmsble import BMSInfo, BMSSample, TempSensor  # noqa: E402
 # raises. For a device that is powered off, removed or out of range, retrying
 # on every poll cannot succeed and only costs load.
 #
-# The ladder is deliberately flat at the start: a genuinely transient miss -
-# a pack that slept through one advertising window - must still recover in
-# seconds, so only a sustained run of failures earns a long wait.
+# Indexed by the number of consecutive failures, which is at least 1, so the
+# first entry is never used: after the first failure the next attempt is
+# immediate, then the waits are 5, 15, 30 and 60 seconds. A pack that slept
+# through one advertising window still recovers straight away; only a
+# sustained run of failures earns a long wait.
 RECONNECT_BACKOFF_SECONDS = (0, 0, 5, 15, 30, 60)
 
 
