@@ -36,6 +36,13 @@ LOG_SERVICES = {
 # the log/run of the serial service, shipped as a file instead of generated
 STATIC_LOG_RUN = os.path.join(os.path.dirname(__file__), "..", "dbus-serialbattery", "service", "log", "run")
 
+# the run script of the serial service, shipped as a file instead of generated
+STATIC_RUN = os.path.join(os.path.dirname(__file__), "..", "dbus-serialbattery", "service", "run")
+
+# every run script this repository installs, generated or shipped. A check that only
+# enumerates the generated ones cannot see a defect in the shipped one.
+ALL_RUN_SCRIPTS = sorted(SERVICES) + ["service/run"]
+
 # multilog keeps n files of s bytes. Sized against the rate during an incident, not
 # when idle, because the flood that accompanies an incident evicts the record of it.
 EXPECTED_RETENTION = "s1500000 n20"
@@ -70,6 +77,14 @@ def _render(target):
     return result.stdout
 
 
+def _run_script(target):
+    """Return a run script, rendering it if generated and reading it if shipped."""
+    if target == "service/run":
+        with open(STATIC_RUN, encoding="utf-8") as static_file:
+            return static_file.read()
+    return _render(target)
+
+
 @pytest.mark.parametrize("target", sorted(SERVICES))
 def test_run_script_execs_python(target):
     """python must replace the shell, so it becomes the process supervise watches."""
@@ -89,11 +104,11 @@ def test_run_script_does_not_background_python(target):
         assert not line.rstrip().endswith("&")
 
 
-@pytest.mark.parametrize("target", sorted(SERVICES))
+@pytest.mark.parametrize("target", ALL_RUN_SCRIPTS)
 @pytest.mark.parametrize("shim", ["trap ", "PID=$!", "wait $PID", "EXIT_STATUS"])
 def test_run_script_has_no_signal_forwarding_shim(target, shim):
     """No part of the fork-and-wait shim may survive; each piece is a failure mode."""
-    assert shim not in _render(target)
+    assert shim not in _run_script(target)
 
 
 @pytest.mark.parametrize("target", sorted(SERVICES))
@@ -115,11 +130,28 @@ def test_ble_run_script_keeps_the_disconnect_preamble():
 
 
 def test_run_script_is_a_valid_shell_script():
-    """A generated script that does not parse would fail only at service start."""
-    for target in SERVICES:
-        rendered = _render(target)
+    """A run script that does not parse would fail only at service start."""
+    for target in ALL_RUN_SCRIPTS:
+        rendered = _run_script(target)
         assert rendered.startswith("#!/bin/sh")
         subprocess.run(["sh", "-n"], input=rendered, text=True, check=True)
+
+
+def test_static_run_script_execs_the_start_script():
+    """The serial service starts through start-serialbattery.sh, which must replace the shell."""
+    lines = _run_script("service/run").splitlines()
+
+    launch = [line for line in lines if "start-serialbattery.sh" in line]
+    assert launch == ['exec bash /data/apps/dbus-serialbattery/start-serialbattery.sh "$PORT_NAME"']
+
+
+def test_static_run_script_keeps_the_port_derivation():
+    """PORT_NAME is derived before the exec and passed to it, so it must survive the change."""
+    lines = _run_script("service/run").splitlines()
+
+    derive = next(i for i, line in enumerate(lines) if line.startswith("PORT_NAME="))
+    launch = next(i for i, line in enumerate(lines) if "start-serialbattery.sh" in line)
+    assert derive < launch
 
 
 @pytest.mark.parametrize("target", sorted(LOG_SERVICES))
