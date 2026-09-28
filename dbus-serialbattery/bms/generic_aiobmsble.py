@@ -33,15 +33,8 @@ from aiobmsble import BMSInfo, BMSSample, TempSensor  # noqa: E402
 #
 # refresh_data polls once a second, and every poll that finds no client runs a
 # full establish_connection, which makes its own four BlueZ attempts before it
-# raises. When the cause is structural - the adapter the battery is pinned to
-# left the box, the configured MAC names hardware that is no longer present,
-# the device was removed - retrying at 1 Hz cannot fix it, because the
-# condition does not clear until a card or the config changes.
-#
-# Field case, dev-cerbo 2026-09-18: a USB dongle was swapped, the pin still
-# named the old card's MAC, and this path retried at roughly 1 Hz for about
-# 18 hours. It bought nothing, cost load, and at two log lines per second it
-# evicted its own onset from the retained log inside the first hour.
+# raises. For a device that is powered off, removed or out of range, retrying
+# on every poll cannot succeed and only costs load.
 #
 # The ladder is deliberately flat at the start: a genuinely transient miss -
 # a pack that slept through one advertising window - must still recover in
@@ -161,9 +154,7 @@ class Generic_AioBmsBle(Battery):
         """Record a failed connect and pace the next attempt.
 
         Emits exactly ONE warning per outage, when the ladder reaches its
-        longest step. Logging every failure is what made the original incident
-        unreadable: the flood evicted the onset from the log, so the record of
-        why it started was gone by the time anyone looked.
+        longest step, so a long outage cannot flood the log.
         """
         self._connect_failures += 1
         delay = RECONNECT_BACKOFF_SECONDS[min(self._connect_failures, len(RECONNECT_BACKOFF_SECONDS) - 1)]
@@ -194,8 +185,7 @@ class Generic_AioBmsBle(Battery):
         A sleeping BMS can advertise too sparsely for an active scan window
         to catch, while a connect to its cached device object still works -
         BlueZ's create-connection waits for the next connectable
-        advertisement instead of needing a scan report. Same cache-first
-        contract as utils_ble's BleakRetryBackend; the scan remains the
+        advertisement instead of needing a scan report. The scan remains the
         fallback for a device BlueZ has never seen.
         """
         try:
@@ -258,10 +248,8 @@ class Generic_AioBmsBle(Battery):
         which is also the thread that answers D-Bus, so blocking here for a
         coroutine timeout stops the driver serving anything at all - the
         battery's own service stops answering /Soc, /Connected and
-        /Mgmt/Connection while remaining registered, and the fallback it is
-        supposed to hand over to never gets a turn. Field failure on
-        dev-cerbo 2026-08-23, where an unreachable pack blocked the main
-        thread for 10 s out of every 10 s.
+        /Mgmt/Connection while remaining registered. An unreachable pack
+        blocked the main thread for the whole coroutine timeout on every poll.
 
         Returns True only when an update completed successfully since the
         last poll; the caller's staleness logic decides what to serve.
@@ -637,8 +625,8 @@ class Generic_AioBmsBle(Battery):
             if self._aiobmsble is None:
                 # Pace an unreachable device rather than hammering it: every
                 # attempt below costs a full establish_connection, which makes
-                # four BlueZ attempts of its own, and when the adapter this
-                # battery is pinned to has left the box none of them can win.
+                # four BlueZ attempts of its own, and for a device that is not
+                # there none of them can win.
                 if self._reconnect_on_hold():
                     return False
                 # Cache-first, like test_connection: a bare

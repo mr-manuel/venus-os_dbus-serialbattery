@@ -15,7 +15,7 @@ _needs_pep604 = pytest.mark.skipif(
 
 # --------- the refresh path must not start a discovery ---------
 #
-# Field failure, dev-cerbo 2026-08-23: with the client lost and another
+# Field failure on a GX device: with the client lost and another
 # service already scanning the adapter, a bare find_device_by_address on
 # every poll failed with org.bluez.Error.InProgress, blocked the caller for
 # the whole coroutine timeout, and starved the GLib main thread so the
@@ -50,10 +50,10 @@ def test_refresh_never_blocks_the_main_thread_on_the_bms():
     """refresh_data runs on the GLib main thread, which also answers D-Bus.
 
     Waiting there for a BMS coroutine stops the driver serving anything:
-    on dev-cerbo an unreachable pack blocked it for 10 s out of every 10 s,
-    the battery service stopped answering /Soc and /Mgmt/Connection while
-    still registered, and the fallback never got a turn. The poll must
-    schedule and harvest, never wait.
+    an unreachable pack blocked it for the whole coroutine timeout on every
+    poll, and the battery service stopped answering /Soc and
+    /Mgmt/Connection while still registered. The poll must schedule and
+    harvest, never wait.
     """
     import ast
     import os
@@ -76,12 +76,10 @@ def test_refresh_never_blocks_the_main_thread_on_the_bms():
 
 # --------- an unreachable device must be paced, not hammered ---------
 #
-# Field failure, dev-cerbo 2026-09-18: a USB dongle was swapped while a
-# battery was pinned to the old card's MAC. refresh_data polls at 1 Hz and
-# every poll ran a full establish_connection (four BlueZ attempts of its
-# own), for about 18 hours. The condition could not clear until a card or
-# the config changed, so the retries bought nothing, cost load, and at two
-# log lines per second evicted their own onset from the retained log.
+# refresh_data polls at 1 Hz, and every poll without a client ran a full
+# establish_connection (four BlueZ attempts of its own). For a device that
+# is off, removed or out of range those retries cannot succeed and only
+# cost load.
 
 
 def _load_driver():
