@@ -30,6 +30,25 @@ if "bleak" not in sys.modules:
         BleakCharacteristicNotFoundError=type("BleakCharacteristicNotFoundError", (_bleak_error,), {}),
     )
     sys.modules["bleak.exc"] = sys.modules["bleak"].exc
+# A tests/bms/* stub collected earlier may already own "bleak"/"bleak.exc" with fewer
+# names than utils_ble imports (the setdefault race). Add what is missing onto the
+# existing stub instead of losing; never overwrite a name another test defined.
+_bleak_stub = sys.modules.get("bleak")
+_exc_stub = sys.modules.get("bleak.exc") or getattr(_bleak_stub, "exc", None)
+if _exc_stub is not None:
+    _base = getattr(_exc_stub, "BleakError", None) or type("BleakError", (Exception,), {})
+    if not hasattr(_exc_stub, "BleakError"):
+        _exc_stub.BleakError = _base
+    if not hasattr(_exc_stub, "BleakCharacteristicNotFoundError"):
+        _exc_stub.BleakCharacteristicNotFoundError = type("BleakCharacteristicNotFoundError", (_base,), {})
+    sys.modules.setdefault("bleak.exc", _exc_stub)
+if _bleak_stub is not None:
+    if not hasattr(_bleak_stub, "BleakClient"):
+        _bleak_stub.BleakClient = type("BleakClient", (), {"__init__": lambda self, *a, **kw: None})
+    if not hasattr(_bleak_stub, "BleakScanner"):
+        _bleak_stub.BleakScanner = object
+    if not hasattr(_bleak_stub, "exc"):
+        _bleak_stub.exc = _exc_stub
 if "bleak_retry_connector" not in sys.modules:
     # utils_ble only needs these four names; stubbing keeps BleakRetryBackend
     # in supported_ble_backends so the generic backend tests cover it too.
