@@ -73,8 +73,10 @@ PUBLISH_GATE_THRESHOLDS = {
 # otherwise be swallowed by a 0.01 gate.
 _GATE_TOLERANCE = 1e-9
 
-# Force a full re-publish at least this often even when nothing crosses a
-# threshold, so freshness watchers (VRM, GUI) can tell the service is alive.
+# Drop the publish cache at least this often, so a value that has been held
+# just below its gate threshold is re-published even if it never crosses it.
+# Unchanged values are still not re-sent: velib suppresses a write equal to
+# the value it already holds, so this is not a liveness signal.
 PUBLISH_HEARTBEAT_S = 900
 
 # The Victron ESS settings below /Settings/CGwacs change rarely, but reading
@@ -127,8 +129,10 @@ class _CachedDbusProxy:
     def __enter__(self):
         if not self._contexts:
             # Heartbeat, evaluated only when the outermost block opens: drop
-            # the cache periodically so every path re-publishes once during
-            # the next cycle even if it never crossed its gate threshold.
+            # the cache periodically so a value held just below its gate
+            # threshold is forwarded again during the next cycle. velib still
+            # drops any value that has not changed, so only such held-back
+            # values produce a signal.
             now = time()
             if now - self._last_heartbeat >= PUBLISH_HEARTBEAT_S:
                 self._last_heartbeat = now
