@@ -11,11 +11,33 @@ from utils import logger, AUTO_RESET_SOC, BLUETOOTH_FORCE_RESET_BLE_STACK, BLUET
 from utils_ble import restart_ble_hardware_and_bluez_driver
 from time import sleep, time
 from bms.jkbms_brn import Jkbms_Brn
-import os
+import subprocess
 import sys
 
 # from bleak import BleakScanner, BleakError
 # import asyncio
+
+
+# Fields of "bluetoothctl info" that are worth logging when the connection stalls
+BLUETOOTHCTL_INFO_FIELDS = ("device", "name", "alias", "pair", "trusted", "blocked", "connected", "rssi", "power")
+
+
+def get_bluetoothctl_info(address: str) -> str:
+    """
+    Get the interesting lines of "bluetoothctl info <address>".
+
+    Runs bluetoothctl via subprocess.run() with an argument list, so that no shell is forked
+    from this multithreaded process.
+
+    :param address: MAC address of the BMS
+    :return: the matching output lines or a short message, if the command could not be run
+    """
+    try:
+        result = subprocess.run(["bluetoothctl", "info", address], capture_output=True, text=True, timeout=10)
+    except Exception as e:
+        return f"bluetoothctl info {address} could not be run: {e}"
+
+    return "\n".join(line for line in result.stdout.splitlines() if any(field in line.lower() for field in BLUETOOTHCTL_INFO_FIELDS))
 
 
 class Jkbms_Ble(Battery):
@@ -169,11 +191,7 @@ class Jkbms_Ble(Battery):
                 logger.info(f"Jkbms_Ble: Bluetooth connection interrupted. Got no fresh data since {last_update} s.")
 
                 # show Bluetooth signal strength (RSSI)
-                bluetoothctl_info = os.popen(
-                    "bluetoothctl info " + self.address + ' | grep -i -E "device|name|alias|pair|trusted|blocked|connected|rssi|power"'
-                )
-                logger.info(bluetoothctl_info.read())
-                bluetoothctl_info.close()
+                logger.info(get_bluetoothctl_info(self.address))
 
                 # if the thread is still alive but data too old there is something
                 # wrong with the bt-connection; restart whole stack
