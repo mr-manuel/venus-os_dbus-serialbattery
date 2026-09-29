@@ -114,7 +114,7 @@ def _adapters_from_hciconfig():
     """{hciN: MAC} by parsing one bare hciconfig call.
 
     One call returns the whole table, so this spawns a single subprocess
-    however many adapters the box has - the production GX device has seven.
+    however many adapters the box has.
     """
     try:
         result = subprocess.run(["hciconfig"], capture_output=True, text=True, timeout=5)
