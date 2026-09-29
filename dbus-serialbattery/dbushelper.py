@@ -36,6 +36,64 @@ def _adjust_temperature(value, adjustment):
     return (value * adjustment[1]) + adjustment[0]
 
 
+# ── Publish gate ─────────────────────────────────────────────────────────
+#
+# Per-path significance thresholds: a numeric value is only re-published
+# when it has moved at least this far from the LAST PUBLISHED value, so
+# sensor flicker stops generating D-Bus traffic while cumulative drift
+# still gets through (the comparison base is not updated on suppression,
+# so the published value is never more than one threshold away from the
+# measured one, no matter how long the drift takes).
+#
+# Deliberately UNGATED (not listed here, so they only get the plain
+# unchanged-value deduplication): everything under /Info (CVL/CCL/DCL feed
+# the charge control loop — a stale limit is a control error), everything
+# under /Alarms (discrete state that must be exact and immediate), /Soc
+# (ESS reads it against MinimumSocLimit), cell voltages and cell-voltage
+# extremes (balance displays read them), FET/balance flags, counters and
+# all string paths.
+PUBLISH_GATE_THRESHOLDS = {
+    "/Dc/0/Voltage": 0.01,  # V — one step of the published 2-decimal value, so effectively dedup only
+    "/Dc/0/Current": 0.1,  # A — far below BMS shunt noise; bounded 0.1 A display error
+    "/Dc/0/Power": 5.0,  # W — derived from V*I, wobbles the most; ~0.1 A at 48 V
+    "/Dc/0/Temperature": 0.2,  # °C — telemetry/display only, alarms are computed from the raw value
+    "/System/Temperature1": 0.2,  # °C
+    "/System/Temperature2": 0.2,  # °C
+    "/System/Temperature3": 0.2,  # °C
+    "/System/Temperature4": 0.2,  # °C
+    "/System/MOSTemperature": 0.5,  # °C — pure telemetry
+    "/TimeToGo": 60,  # s — an estimate whose own noise is far larger than a minute
+    "/ConsumedAmphours": 0.1,  # Ah — monotonically drifting, so it always publishes eventually
+    "/Capacity": 0.1,  # Ah
+}
+
+# Absorbs binary float representation error when comparing against a
+# threshold: values are published pre-rounded, so an exact one-step change
+# such as 4.34 -> 4.35 can compute as 0.00999999999999978 and would
+# otherwise be swallowed by a 0.01 gate.
+_GATE_TOLERANCE = 1e-9
+
+# Drop the publish cache at least this often, so a value that has been held
+# just below its gate threshold is re-published even if it never crosses it.
+# Unchanged values are still not re-sent: velib suppresses a write equal to
+# the value it already holds, so this is not a liveness signal.
+PUBLISH_HEARTBEAT_S = 900
+
+# The Victron ESS settings below /Settings/CGwacs change rarely, but reading
+# them is a recursive D-Bus introspection walk (an Introspect plus a GetValue
+# per child, dozens of calls). Re-read them at most this often.
+CGWACS_SETTINGS_CACHE_S = 300
+
+
+def _is_gateable_number(value) -> bool:
+    """True for real numbers only.
+
+    ``bool`` is a subclass of ``int`` in Python but is never a measurement,
+    so it must never be compared against a significance threshold.
+    """
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
 class _CachedDbusProxy:
     """Thin proxy around VeDbusService that suppresses redundant D-Bus writes.
 
@@ -47,21 +105,73 @@ class _CachedDbusProxy:
 
     This proxy keeps a lightweight in-process cache and only forwards
     the write to the real service when the new value differs from the
-    last written one, eliminating the majority of D-Bus traffic while
-    remaining fully transparent for reads and method calls.
+    last written one — and, for paths listed in PUBLISH_GATE_THRESHOLDS,
+    differs *significantly* — eliminating the majority of D-Bus traffic
+    while remaining fully transparent for reads and method calls.
+
+    Used as a context manager it additionally batches: writes made inside
+    a ``with`` block are collected in a velib ``ServiceContext`` and emitted
+    as one ``ItemsChanged`` signal on exit, instead of one
+    ``PropertiesChanged`` per path. Writes made outside a block are
+    forwarded to the service immediately, exactly as before.
     """
 
-    __slots__ = ("_svc", "_cache")
+    __slots__ = ("_svc", "_cache", "_contexts", "_last_heartbeat")
 
     def __init__(self, svc):
         self._svc = svc
         self._cache: dict = {}
+        # Stack of open velib ServiceContexts, mirroring the service's own
+        # rate-limiter stack so nested ``with`` blocks behave identically.
+        self._contexts: list = []
+        self._last_heartbeat: float = time()
+
+    def __enter__(self):
+        if not self._contexts:
+            # Heartbeat, evaluated only when the outermost block opens: drop
+            # the cache periodically so a value held just below its gate
+            # threshold is forwarded again during the next cycle. velib still
+            # drops any value that has not changed, so only such held-back
+            # values produce a signal.
+            now = time()
+            if now - self._last_heartbeat >= PUBLISH_HEARTBEAT_S:
+                self._last_heartbeat = now
+                self._cache.clear()
+        self._contexts.append(self._svc.__enter__())
+        return self
+
+    def __exit__(self, *exc):
+        # Mirrors velib's nesting behaviour: each ``__exit__`` flushes the
+        # context its matching ``__enter__`` opened, after which writes fall
+        # back to the enclosing context, or straight to the service when the
+        # outermost block closes.
+        if self._contexts:
+            self._contexts.pop()
+        return self._svc.__exit__(*exc)
 
     def __setitem__(self, path, value):
         prev = self._cache.get(path, _SENTINEL)
-        if prev is not value and prev != value:
-            self._cache[path] = value
-            self._svc[path] = value
+        if prev is value or prev == value:
+            return
+        # NaN is not equal to itself, so an unchanged NaN passes the equality
+        # check above, and the threshold comparison below is False for NaN as
+        # well - without this guard it would be republished every cycle,
+        # forever. Treat NaN following NaN as unchanged.
+        if prev != prev and value != value:
+            return
+        if prev is not _SENTINEL and _is_gateable_number(value) and _is_gateable_number(prev):
+            threshold = PUBLISH_GATE_THRESHOLDS.get(path)
+            if threshold is not None and abs(value - prev) < threshold - _GATE_TOLERANCE:
+                # Sub-threshold flicker: suppress the write and deliberately
+                # keep the old cache entry as the comparison base, so slow
+                # cumulative drift still crosses the gate eventually instead
+                # of being reset on every cycle.
+                return
+        self._cache[path] = value
+        # Inside a ``with`` block the write is staged on the innermost
+        # ServiceContext and flushed as part of its ItemsChanged signal.
+        target = self._contexts[-1] if self._contexts else self._svc
+        target[path] = value
 
     def __getitem__(self, path):
         return self._svc[path]
@@ -161,6 +271,14 @@ class DbusHelper:
         self.last_seen_saved_last_time: int = 0
         """
         Last time the LastSeen dbus setting was refreshed.
+        """
+        self.cgwacs_settings_cache: tuple = None
+        """
+        Cached (BatteryLife, Hub4Mode) settings read from com.victronenergy.settings.
+        """
+        self.cgwacs_settings_cache_time: int = 0
+        """
+        Timestamp of the last /Settings/CGwacs read, see CGWACS_SETTINGS_CACHE_S.
         """
         self.telemetry_upload_error_count: int = 0
         self.telemetry_upload_interval: int = 60 * 60 * 3  # 3 hours
@@ -1129,6 +1247,18 @@ class DbusHelper:
         """
         Publishes the battery data to dbus and refresh it.
         """
+        # Emit all of this cycle's changes as a single batched ItemsChanged
+        # signal instead of one PropertiesChanged per changed path.
+        with self._dbusservice:
+            self._publish_dbus_values()
+
+    def _publish_dbus_values(self) -> None:
+        """
+        Write the battery data to the dbus service.
+
+        Split out of :meth:`publish_dbus` so that the batching context stays
+        a thin wrapper around the value writes.
+        """
         self._dbusservice["/System/NrOfCellsPerBattery"] = self.battery.cell_count
         if utils.SOC_CALCULATION or utils.EXTERNAL_SENSOR_DBUS_PATH_SOC is not None:
             self._dbusservice["/Soc"] = round(self.battery.soc_calc, 2) if self.battery.soc_calc is not None else None
@@ -1365,17 +1495,22 @@ class DbusHelper:
                 # Update TimeToGo item
                 if utils.TIME_TO_GO_ENABLE and percent_per_seconds is not None:
 
-                    # Get settings from dbus
-                    settings_battery_life = self.get_settings_with_values(
-                        get_bus(VICTRON_SETTINGS_DBUS_NAME),
-                        VICTRON_SETTINGS_DBUS_NAME,
-                        "/Settings/CGwacs/BatteryLife",
-                    )
-                    settings_hub4mode = self.get_settings_with_values(
-                        get_bus(VICTRON_SETTINGS_DBUS_NAME),
-                        VICTRON_SETTINGS_DBUS_NAME,
-                        "/Settings/CGwacs/Hub4Mode",
-                    )
+                    # Get settings from dbus, cached for CGWACS_SETTINGS_CACHE_S
+                    if self.cgwacs_settings_cache is None or int(time()) - self.cgwacs_settings_cache_time >= CGWACS_SETTINGS_CACHE_S:
+                        self.cgwacs_settings_cache = (
+                            self.get_settings_with_values(
+                                get_bus(VICTRON_SETTINGS_DBUS_NAME),
+                                VICTRON_SETTINGS_DBUS_NAME,
+                                "/Settings/CGwacs/BatteryLife",
+                            ),
+                            self.get_settings_with_values(
+                                get_bus(VICTRON_SETTINGS_DBUS_NAME),
+                                VICTRON_SETTINGS_DBUS_NAME,
+                                "/Settings/CGwacs/Hub4Mode",
+                            ),
+                        )
+                        self.cgwacs_settings_cache_time = int(time())
+                    settings_battery_life, settings_hub4mode = self.cgwacs_settings_cache
 
                     hub4mode = int(settings_hub4mode["Settings"]["CGwacs"]["Hub4Mode"]) if "Settings" in settings_hub4mode else None
                     state = (
