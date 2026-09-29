@@ -409,7 +409,19 @@ def main():
         else:
             ble_address = sys.argv[2]
 
-            if port == "Jkbms_Ble":
+            # Make the configured adapters durable before anything connects:
+            # a name that resolves to a readable MAC is written back to the
+            # config, because the number can be handed to a different radio
+            # by the next reboot while the name stays put.
+            from utils_ble import pin_adapters_by_mac
+
+            pin_adapters_by_mac()
+
+            if port == "HumsiENK_Ble":
+                # noqa: F401 --> ignore flake "imported but unused" error
+                from bms.humsienk_ble import HumsiENK_Ble  # noqa: F401
+
+            elif port == "Jkbms_Ble":
                 # noqa: F401 --> ignore flake "imported but unused" error
                 from bms.jkbms_ble import Jkbms_Ble  # noqa: F401
 
@@ -431,7 +443,7 @@ def main():
 
             else:
                 logger.error(">>> Unknown Bluetooth BMS type: " + port)
-                logger.error("Supported Bluetooth BMS types (CASE SENSITIVE!): Jkbms_Ble, Kilovault_Ble, LiTime_Ble, LltJbd_Ble, Xdzn_Ble")
+                logger.error("Supported Bluetooth BMS types (CASE SENSITIVE!): HumsiENK_Ble, Jkbms_Ble, Kilovault_Ble, LiTime_Ble, LltJbd_Ble, Xdzn_Ble")
                 sleep(60)
                 exit_driver(None, None, 1)
 
@@ -456,9 +468,17 @@ def main():
             logger.error(">>> Bluetooth address is missing in the command line arguments")
             exit_driver(None, None, 1)
         else:
-            from bms.generic_aiobmsble import Generic_AioBmsBle  # noqa: F401
-
             ble_address = sys.argv[2]
+
+            # Make the configured adapters durable before anything connects:
+            # a name that resolves to a readable MAC is written back to the
+            # config, because the number can be handed to a different radio
+            # by the next reboot while the name stays put.
+            from utils_ble import pin_adapters_by_mac
+
+            pin_adapters_by_mac()
+
+            from bms.generic_aiobmsble import Generic_AioBmsBle  # noqa: F401
 
             # do not remove ble_ prefix, since the dbus service cannot be only numbers
             testbms = Generic_AioBmsBle(port.replace("aiobmsble_", ""), None, ble_address)

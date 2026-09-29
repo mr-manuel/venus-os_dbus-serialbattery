@@ -1,0 +1,1128 @@
+# -*- coding: utf-8 -*-
+"""Tests for the HumsiENK BLE protocol logic.
+
+Everything here runs against the frame codec and the response parsers, which
+is all of the driver that does not need a radio: framing and reassembly,
+resynchronisation after corrupt input, the register offsets of each response,
+the alarm bit map, and the request budget that bounds startup.
+
+utils_ble imports bleak, which is not installed on the machines this suite
+runs on, so a minimal stub stands in for it while bms.humsienk_ble is
+imported. The stub is removed again afterwards so no other test module
+inherits it.
+"""
+
+import asyncio
+import os
+import sys
+import threading
+import time
+import types
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "dbus-serialbattery"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "dbus-serialbattery", "ext", "velib_python"))
+
+_saved_utils_ble = sys.modules.get("utils_ble")
+sys.modules["utils_ble"] = types.SimpleNamespace(Syncron_Ble=object, BLE_ESTABLISH_TIMEOUT=300.0, BLE_RELEASE_TIMEOUT=30.0)
+try:
+    import utils  # noqa: E402
+    from bms import humsienk_ble  # noqa: E402
+    from bms.humsienk_ble import HumsiENK_Ble  # noqa: E402
+finally:
+    if _saved_utils_ble is None:
+        del sys.modules["utils_ble"]
+    else:
+        sys.modules["utils_ble"] = _saved_utils_ble
+
+
+# ---------------------------------------------------------------- test doubles
+
+
+class FakeBleHandle:
+    """Stands in for HumsiENK_Syncron_Ble: a notification queue and a writer."""
+
+    def __init__(self, responses=None, chunk_size=None):
+        """
+        :param responses: command code -> response frame, answered on send_data
+        :param chunk_size: split every queued frame into chunks of this size
+        """
+        self.connected = True
+        self.responses = responses or {}
+        self.chunk_size = chunk_size
+        self.queue = []
+        self.sent = []
+        self.watchdog_feeds = 0
+
+    def push(self, data):
+        """Queue raw bytes as they would arrive from the notification callback."""
+        if self.chunk_size:
+            for offset in range(0, len(data), self.chunk_size):
+                self.queue.append(data[offset : offset + self.chunk_size])
+        else:
+            self.queue.append(data)
+
+    def get_notification(self, timeout=0.0):
+        return self.queue.pop(0) if self.queue else None
+
+    def feed_watchdog(self):
+        self.watchdog_feeds += 1
+
+    def send_data(self, data):
+        self.sent.append(data)
+        if data[1] in self.responses:
+            self.push(self.responses[data[1]])
+
+
+def make_bms(handle=None):
+    bms = HumsiENK_Ble("ble_aabbccddeeff", 9600, "AA:BB:CC:DD:EE:FF")
+    bms.ble_handle = handle if handle is not None else FakeBleHandle()
+    return bms
+
+
+def frame(command, data=b""):
+    """Build a wire frame the way the BMS does, independently of the driver."""
+    body = bytes([command, len(data)]) + bytes(data)
+    checksum = sum(body) & 0xFFFF
+    return bytes([0xAA]) + body + bytes([checksum & 0xFF, checksum >> 8])
+
+
+def battery_info_payload(
+    voltage_mv=13260,
+    current_ma=-4500,
+    soc=87,
+    soh=99,
+    remaining_mah=91000,
+    total_mah=100000,
+    cycles=42,
+    temperatures=(21, 22, 23, 24, 31, 19),
+):
+    payload = bytearray()
+    payload += voltage_mv.to_bytes(4, "little")
+    payload += current_ma.to_bytes(4, "little", signed=True)
+    payload += bytes([soc, soh])
+    payload += remaining_mah.to_bytes(4, "little")
+    payload += total_mah.to_bytes(4, "little")
+    payload += cycles.to_bytes(2, "little")
+    payload += bytes((value + 256) if value < 0 else value for value in temperatures)
+    return bytes(payload)
+
+
+def cell_payload(millivolts):
+    payload = bytearray()
+    for millivolt in millivolts:
+        payload += millivolt.to_bytes(2, "little")
+    return bytes(payload)
+
+
+def status_payload(status_bits=0, balancing=0, disconnected=0):
+    payload = bytearray()
+    payload += (3).to_bytes(2, "little")  # runtime days
+    payload += bytes([4, 5])  # runtime hours, minutes
+    payload += status_bits.to_bytes(4, "little")
+    payload += balancing.to_bytes(3, "little")
+    payload += disconnected.to_bytes(3, "little")
+    return bytes(payload)
+
+
+def config_payload(
+    cell_count=4,
+    capacity_centi_ah=10000,
+    cell_ovp_mv=3650,
+    cell_uvp_mv=2500,
+    charge_ocp_deci_a=1000,
+    discharge_ocp_deci_a=1500,
+):
+    values = [0] * 22
+    values[0] = cell_count
+    values[1] = capacity_centi_ah
+    values[2] = cell_ovp_mv
+    values[3] = cell_ovp_mv - 100  # recovery
+    values[5] = cell_uvp_mv
+    values[6] = cell_uvp_mv + 100  # recovery
+    values[8] = charge_ocp_deci_a
+    values[10] = discharge_ocp_deci_a
+    values[14] = 2731 + 550  # charge high temperature, deciKelvin
+    values[16] = 2731 + 0  # charge low temperature
+    values[18] = 2731 + 600  # discharge high temperature
+    values[20] = 2731 - 200  # discharge low temperature
+    payload = bytearray()
+    for value in values:
+        payload += value.to_bytes(2, "little")
+    return bytes(payload)
+
+
+# ----------------------------------------------------------------- frame codec
+
+
+def test_build_command_encodes_the_documented_frame_layout():
+    bms = make_bms()
+    assert bms._build_command(HumsiENK_Ble.CMD_HANDSHAKE) == b"\xaa\x00\x00\x00\x00"
+    # checksum is the 16 bit little endian sum of CMD, LEN and the data bytes
+    assert bms._build_command(0x50, [0x01]) == b"\xaa\x50\x01\x01\x52\x00"
+
+
+def test_built_command_frames_round_trip_through_the_reader():
+    bms = make_bms()
+    bms.ble_handle.push(bms._build_command(HumsiENK_Ble.CMD_CELL_VOLTAGES, cell_payload([3301, 3302, 3303, 3304])))
+
+    assert bms._read_frames() == [HumsiENK_Ble.CMD_CELL_VOLTAGES]
+    assert [cell.voltage for cell in bms.cells] == [3.301, 3.302, 3.303, 3.304]
+
+
+def test_frames_are_reassembled_across_notification_boundaries():
+    bms = make_bms(FakeBleHandle(chunk_size=7))
+    bms.ble_handle.push(frame(HumsiENK_Ble.CMD_BATTERY_INFO, battery_info_payload()))
+    assert len(bms.ble_handle.queue) > 1, "the frame must actually be split for this test to mean anything"
+
+    assert bms._read_frames() == [HumsiENK_Ble.CMD_BATTERY_INFO]
+    assert bms.soc == 87
+
+
+def test_several_frames_in_one_notification_are_all_parsed():
+    bms = make_bms()
+    bms.ble_handle.push(frame(HumsiENK_Ble.CMD_BATTERY_INFO, battery_info_payload()) + frame(HumsiENK_Ble.CMD_CELL_VOLTAGES, cell_payload([3300] * 4)))
+
+    assert bms._read_frames() == [HumsiENK_Ble.CMD_BATTERY_INFO, HumsiENK_Ble.CMD_CELL_VOLTAGES]
+
+
+def test_a_truncated_frame_is_held_until_the_rest_arrives():
+    bms = make_bms()
+    complete = frame(HumsiENK_Ble.CMD_BATTERY_INFO, battery_info_payload())
+    bms.ble_handle.push(complete[:-3])
+
+    assert bms._read_frames() == []
+    assert bms.soc is None
+
+    bms.ble_handle.push(complete[-3:])
+    assert bms._read_frames() == [HumsiENK_Ble.CMD_BATTERY_INFO]
+    assert bms.soc == 87
+
+
+def test_a_bad_checksum_is_dropped_and_the_reader_resynchronises():
+    bms = make_bms()
+    corrupt = bytearray(frame(HumsiENK_Ble.CMD_BATTERY_INFO, battery_info_payload(soc=11)))
+    corrupt[-1] ^= 0xFF
+    bms.ble_handle.push(bytes(corrupt) + frame(HumsiENK_Ble.CMD_BATTERY_INFO, battery_info_payload(soc=87)))
+
+    assert bms._read_frames() == [HumsiENK_Ble.CMD_BATTERY_INFO]
+    assert bms.soc == 87, "the corrupt frame must not be applied"
+
+
+def test_a_bad_checksum_does_not_count_as_data_from_the_radio():
+    bms = make_bms()
+    corrupt = bytearray(frame(HumsiENK_Ble.CMD_BATTERY_INFO, battery_info_payload()))
+    corrupt[-1] ^= 0xFF
+    bms.ble_handle.push(bytes(corrupt))
+
+    assert bms._read_frames() == []
+    assert bms._last_frame_time == 0.0
+    assert bms.ble_handle.watchdog_feeds == 0
+
+
+def test_an_implausible_length_byte_is_resynchronised_past():
+    bms = make_bms()
+    bms.ble_handle.push(bytes([0xAA, 0x21, 0xFF, 0x01, 0x02]) + frame(HumsiENK_Ble.CMD_BATTERY_INFO, battery_info_payload()))
+
+    assert bms._read_frames() == [HumsiENK_Ble.CMD_BATTERY_INFO]
+    assert bms.soc == 87
+
+
+def test_reading_a_frame_marks_the_data_fresh_and_feeds_the_watchdog():
+    bms = make_bms()
+    bms.ble_handle.push(frame(HumsiENK_Ble.CMD_BATTERY_INFO, battery_info_payload()))
+
+    bms._read_frames()
+
+    assert bms.ble_handle.watchdog_feeds == 1
+    assert time.time() - bms._last_frame_time < 5
+
+
+def test_junk_without_a_start_byte_is_discarded():
+    bms = make_bms()
+    bms.ble_handle.push(b"\x01\x02\x03\x04\x05\x06")
+
+    assert bms._read_frames() == []
+    assert bms._rx_buffer == bytearray()
+
+
+# -------------------------------------------------------- 0x21 battery info
+
+
+def test_battery_info_offsets():
+    bms = make_bms()
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_BATTERY_INFO, battery_info_payload()))
+
+    assert bms.voltage == 13.26
+    assert bms.current == -4.5
+    assert bms.soc == 87
+    assert bms.soh == 99
+    assert bms.capacity_remain == 91.0
+    assert bms.capacity == 100.0
+    assert bms.history.charge_cycles == 42
+    assert (bms.temperature_1, bms.temperature_2, bms.temperature_3, bms.temperature_4) == (21, 22, 23, 24)
+    assert bms.temperature_mos == 31
+
+
+def test_battery_info_temperatures_below_zero_are_signed():
+    bms = make_bms()
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_BATTERY_INFO, battery_info_payload(temperatures=(-1, -5, -13, 0, -8, -20))))
+
+    assert (bms.temperature_1, bms.temperature_2, bms.temperature_3, bms.temperature_4) == (-1, -5, -13, 0)
+    assert bms.temperature_mos == -8
+
+
+def test_battery_info_reports_a_bogus_soh_as_unknown():
+    bms = make_bms()
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_BATTERY_INFO, battery_info_payload(soh=255)))
+
+    assert bms.soh is None
+
+
+def test_a_short_battery_info_frame_changes_nothing():
+    bms = make_bms()
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_BATTERY_INFO, battery_info_payload()[:20]))
+
+    assert bms.voltage is None
+
+
+# ------------------------------------------------------- 0x22 cell voltages
+
+
+def test_cell_voltages_stop_at_the_first_implausible_slot():
+    bms = make_bms()
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_CELL_VOLTAGES, cell_payload([3300, 3310, 3320, 3330] + [0] * 20)))
+
+    assert bms.cell_count == 4
+    assert [cell.voltage for cell in bms.cells] == [3.3, 3.31, 3.32, 3.33]
+
+
+def test_repeated_cell_frames_do_not_grow_the_cell_list():
+    bms = make_bms()
+    payload = cell_payload([3300] * 4 + [0] * 20)
+    for _ in range(5):
+        bms._parse_and_update(frame(HumsiENK_Ble.CMD_CELL_VOLTAGES, payload))
+
+    assert len(bms.cells) == 4
+
+
+def test_an_all_zero_cell_frame_does_not_wipe_the_cell_list():
+    bms = make_bms()
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_CELL_VOLTAGES, cell_payload([3300, 3310, 3320, 3330])))
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_CELL_VOLTAGES, cell_payload([0] * 24)))
+
+    assert bms.cell_count == 4
+    assert [cell.voltage for cell in bms.cells] == [3.3, 3.31, 3.32, 3.33]
+
+
+def test_a_shrinking_string_drops_the_cells_that_went_away():
+    bms = make_bms()
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_CELL_VOLTAGES, cell_payload([3300] * 8)))
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_CELL_VOLTAGES, cell_payload([3300] * 4 + [0] * 4)))
+
+    assert bms.cell_count == 4
+    assert len(bms.cells) == 4
+
+
+def test_the_pack_voltage_is_not_overwritten_by_the_sum_of_the_cells():
+    bms = make_bms()
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_BATTERY_INFO, battery_info_payload(voltage_mv=13260)))
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_CELL_VOLTAGES, cell_payload([3300] * 4)))
+
+    assert bms.voltage == 13.26
+
+
+# ------------------------------------------------------------- 0x20 status
+
+
+def test_status_reports_the_switch_states():
+    # Bit 15 is the heater, not balancing. The vendor app labels the three
+    # bits charging switch (7), discharge switch (23) and heating switch (15),
+    # and shows balancing from the per-cell bitmap instead.
+    bms = make_bms()
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(status_bits=(1 << 7) | (1 << 23) | (1 << 15))))
+
+    assert (bms.charge_fet, bms.discharge_fet, bms.heater_fet) == (True, True, True)
+
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(status_bits=0)))
+    assert (bms.charge_fet, bms.discharge_fet, bms.heater_fet) == (False, False, False)
+
+
+def test_whether_balancing_is_allowed_is_never_claimed():
+    # The BMS reports which cells are balancing right now, not whether
+    # balancing is permitted, so balance_fet stays unknown rather than being
+    # inferred from the per-cell bitmap.
+    bms = make_bms()
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_CELL_VOLTAGES, cell_payload([3300] * 4)))
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(status_bits=(1 << 15), balancing=0b0101)))
+
+    assert bms.balance_fet is None
+    assert [cell.balance for cell in bms.cells] == [True, False, True, False]
+
+
+def test_cell_voltage_alarms_come_from_the_cell_bits_not_the_stop_bits():
+    # Cell undervoltage is the 19/27 pair. Bit 22 is "discharging stopped",
+    # a state the BMS reaches on a normal cutoff, so routing it to a cell
+    # undervoltage alarm would raise a fault every time a pack ran down.
+    bms = make_bms()
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(status_bits=(1 << 22))))
+
+    assert bms.protection.low_cell_voltage == 0
+    assert bms.protection.low_voltage == 0
+
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(status_bits=(1 << 27))))
+    assert bms.protection.low_cell_voltage == 1
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(status_bits=(1 << 19))))
+    assert bms.protection.low_cell_voltage == 2
+
+
+def test_overvoltage_protections_are_published():
+    bms = make_bms()
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(status_bits=(1 << 3))))
+    assert bms.protection.high_cell_voltage == 2
+
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(status_bits=(1 << 4))))
+    assert bms.protection.high_voltage == 2
+
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(status_bits=0)))
+    assert (bms.protection.high_cell_voltage, bms.protection.high_voltage) == (0, 0)
+
+
+def test_overvoltage_warnings_are_not_published():
+    # Both assert while charging to the voltage the manufacturer specifies and
+    # hold for hours: observed on two packs, bit 12 set for about three hours
+    # during a charge to 14.4 V. Publishing them puts a warning in the VRM
+    # alarm log on every cycle, and an aggregator taking the maximum raises the
+    # whole bank because one pack is in absorption.
+    bms = make_bms()
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(status_bits=(1 << 11) | (1 << 12))))
+
+    assert bms.protection.high_cell_voltage == 0
+    assert bms.protection.high_voltage == 0
+
+
+def test_imbalance_is_reported_as_a_warning_and_protection_pair():
+    bms = make_bms()
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(status_bits=(1 << 13))))
+    assert bms.protection.cell_imbalance == 1
+
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(status_bits=(1 << 14))))
+    assert bms.protection.cell_imbalance == 2
+
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(status_bits=0)))
+    assert bms.protection.cell_imbalance == 0
+
+
+def test_an_analogue_front_end_fault_is_an_internal_failure():
+    # The AFE is what measures the cells, so a fault there makes every reading
+    # untrustworthy: the same class of problem as a disconnected cell.
+    bms = make_bms()
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(status_bits=(1 << 5))))
+    assert bms.protection.internal_failure == 2
+
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(status_bits=0)))
+    assert bms.protection.internal_failure == 0
+
+
+def test_status_alarm_bits_map_to_alarms_and_warnings():
+    protection_bits = {
+        # high_voltage and high_cell_voltage are absent on purpose: their
+        # warnings assert during normal charging and are not published, so
+        # they are covered by test_overvoltage_warnings_are_not_published.
+        "low_voltage": (21, 28),
+        "low_cell_voltage": (19, 27),
+        "high_charge_current": (0, 8),
+        "high_discharge_current": (16, 24),
+        "high_charge_temperature": (1, 9),
+        "low_charge_temperature": (2, 10),
+        "high_temperature": (17, 25),
+        "low_temperature": (18, 26),
+        "high_internal_temperature": (30, 29),
+    }
+    for name, (alarm_bit, warning_bit) in protection_bits.items():
+        bms = make_bms()
+        bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(status_bits=1 << warning_bit)))
+        assert getattr(bms.protection, name) == 1, f"{name} should warn on bit {warning_bit}"
+
+        bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(status_bits=1 << alarm_bit)))
+        assert getattr(bms.protection, name) == 2, f"{name} should alarm on bit {alarm_bit}"
+
+        bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(status_bits=0)))
+        assert getattr(bms.protection, name) == 0, f"{name} should clear"
+
+
+def test_a_short_circuit_is_reported_as_a_discharge_overcurrent_alarm():
+    bms = make_bms()
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(status_bits=1 << 20)))
+
+    assert bms.protection.high_discharge_current == 2
+
+
+def test_status_applies_the_balancing_bitmap_to_the_known_cells():
+    bms = make_bms()
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_CELL_VOLTAGES, cell_payload([3300] * 4)))
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(balancing=0b0101)))
+
+    assert [cell.balance for cell in bms.cells] == [True, False, True, False]
+
+
+def test_a_disconnected_cell_raises_an_internal_failure():
+    bms = make_bms()
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_CELL_VOLTAGES, cell_payload([3300] * 4)))
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(disconnected=0b0010)))
+    assert bms.protection.internal_failure == 2
+
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload(disconnected=0)))
+    assert bms.protection.internal_failure == 0
+
+
+def test_a_short_status_frame_changes_nothing():
+    bms = make_bms()
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_STATUS, status_payload()[:10]))
+
+    assert bms.charge_fet is None
+
+
+# ------------------------------------------------------------- 0x58 config
+
+
+def test_config_offsets(monkeypatch):
+    # opt in, so the DVCC-gated fields are populated and their offsets checked
+    monkeypatch.setattr(humsienk_ble, "USE_BMS_DVCC_VALUES", True)
+    bms = make_bms()
+    bms._parse_and_update(
+        frame(HumsiENK_Ble.CMD_CONFIG, config_payload(cell_count=4, capacity_centi_ah=10000, charge_ocp_deci_a=1000, discharge_ocp_deci_a=1500))
+    )
+
+    assert bms.cell_count == 4
+    assert bms.capacity == 100.0
+    assert bms.max_battery_charge_current == 100.0
+    assert bms.max_battery_discharge_current == 150.0
+
+
+def test_bms_dvcc_values_are_ignored_unless_the_user_opts_in(monkeypatch):
+    # Default (USE_BMS_DVCC_VALUES = False): the BMS settings frame must not
+    # touch the DVCC values. These are protection trip points, not charge
+    # targets - charging to the overvoltage protection is charging to the
+    # point the BMS opens the charge FET. The base class derives the limits
+    # from the configured cell voltages instead.
+    monkeypatch.setattr(humsienk_ble, "USE_BMS_DVCC_VALUES", False)
+    bms = make_bms()
+    bms._parse_and_update(
+        frame(
+            HumsiENK_Ble.CMD_CONFIG,
+            config_payload(cell_count=4, cell_ovp_mv=3650, cell_uvp_mv=2500, charge_ocp_deci_a=1000, discharge_ocp_deci_a=1500),
+        )
+    )
+
+    assert bms.max_battery_voltage is None
+    assert bms.min_battery_voltage is None
+    assert bms.max_battery_charge_current == utils.MAX_BATTERY_CHARGE_CURRENT
+    assert bms.max_battery_discharge_current == utils.MAX_BATTERY_DISCHARGE_CURRENT
+    # the frame is still parsed for everything that is not a DVCC value
+    assert bms.cell_count == 4
+
+
+def test_bms_dvcc_values_are_used_raw_when_the_user_opts_in(monkeypatch):
+    # Opted in: use what the BMS reports, unmodified. Matches battery_template
+    # and the other drivers honouring this option - the driver does not invent
+    # a clamping policy of its own.
+    monkeypatch.setattr(humsienk_ble, "USE_BMS_DVCC_VALUES", True)
+    bms = make_bms()
+    bms._parse_and_update(
+        frame(
+            HumsiENK_Ble.CMD_CONFIG,
+            config_payload(cell_count=4, cell_ovp_mv=3650, cell_uvp_mv=2500, charge_ocp_deci_a=1000, discharge_ocp_deci_a=1500),
+        )
+    )
+
+    assert bms.max_battery_voltage == round(3.65 * 4, 2)
+    assert bms.min_battery_voltage == round(2.5 * 4, 2)
+    assert bms.max_battery_charge_current == 100.0
+    assert bms.max_battery_discharge_current == 150.0
+
+
+def test_a_short_config_frame_changes_nothing():
+    bms = make_bms()
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_CONFIG, config_payload()[:40]))
+
+    assert bms.cell_count is None
+
+
+# ------------------------------------------------------------ 0xF5 version
+
+
+def test_version_frame_decodes_the_ascii_string():
+    bms = make_bms()
+    bms._parse_and_update(frame(HumsiENK_Ble.CMD_VERSION, b"\x00HS30A3-1.07\x00"))
+
+    assert bms.hardware_version == "HumsiENK vHS30A3-1.07"
+
+
+def test_an_unknown_command_is_ignored():
+    bms = make_bms()
+    bms._parse_and_update(frame(0x40, b"\x01\x02\x03"))
+
+    assert bms.voltage is None
+
+
+# --------------------------------------------------- connection setup budget
+
+
+def responding_handle():
+    return FakeBleHandle(
+        responses={
+            HumsiENK_Ble.CMD_CELL_VOLTAGES: frame(HumsiENK_Ble.CMD_CELL_VOLTAGES, cell_payload([3300, 3310, 3320, 3330])),
+            HumsiENK_Ble.CMD_BATTERY_INFO: frame(HumsiENK_Ble.CMD_BATTERY_INFO, battery_info_payload()),
+            HumsiENK_Ble.CMD_CONFIG: frame(HumsiENK_Ble.CMD_CONFIG, config_payload()),
+            HumsiENK_Ble.CMD_VERSION: frame(HumsiENK_Ble.CMD_VERSION, b"HS30A3-1.07"),
+        }
+    )
+
+
+def test_test_connection_reads_the_settings_frame(monkeypatch):
+    handle = responding_handle()
+    monkeypatch.setattr("bms.humsienk_ble.HumsiENK_Syncron_Ble", lambda *args, **kwargs: handle)
+    bms = make_bms(handle)
+
+    assert bms.test_connection() is True
+    # only reachable through get_settings(), which test_connection has to call.
+    # Capacity and the version string come from the config and version frames;
+    # the DVCC values are deliberately not asserted here because they are gated
+    # on USE_BMS_DVCC_VALUES, which is off by default.
+    assert bms.capacity == 100.0
+    assert bms.hardware_version == "HumsiENK vHS30A3-1.07"
+    assert [data[1] for data in handle.sent] == [
+        HumsiENK_Ble.CMD_HANDSHAKE,
+        HumsiENK_Ble.CMD_CELL_VOLTAGES,
+        HumsiENK_Ble.CMD_BATTERY_INFO,
+        HumsiENK_Ble.CMD_CONFIG,
+        HumsiENK_Ble.CMD_VERSION,
+    ]
+
+
+def test_request_stops_waiting_at_the_shared_deadline():
+    bms = make_bms()
+    bms._deadline = time.time() + 0.3
+
+    started = time.time()
+    assert bms._request(HumsiENK_Ble.CMD_CONFIG, timeout=30.0) is False
+    # the budget left was 0.3 s; allow scheduling slack but not a second request
+    assert time.time() - started < 1.0
+
+
+def test_request_does_not_even_send_once_the_budget_is_gone():
+    bms = make_bms()
+    bms._deadline = time.time() - 0.1
+
+    assert bms._request(HumsiENK_Ble.CMD_CONFIG) is False
+    assert bms.ble_handle.sent == []
+
+
+def test_test_connection_gives_up_within_its_budget_on_a_silent_link(monkeypatch):
+    handle = FakeBleHandle()  # link is up, BMS says nothing
+    monkeypatch.setattr("bms.humsienk_ble.HumsiENK_Syncron_Ble", lambda *args, **kwargs: handle)
+    bms = make_bms(handle)
+    bms.STARTUP_TIMEOUT_SECONDS = 1.0
+
+    started = time.time()
+    assert bms.test_connection() is False
+    assert time.time() - started < 4.0
+
+
+def test_test_connection_fails_fast_when_the_link_never_comes_up(monkeypatch):
+    handle = FakeBleHandle()
+    handle.connected = False
+    monkeypatch.setattr("bms.humsienk_ble.HumsiENK_Syncron_Ble", lambda *args, **kwargs: handle)
+    bms = make_bms(handle)
+
+    assert bms.test_connection() is False
+    assert handle.sent == []
+
+
+# ---------------------------------------------------------------- freshness
+
+
+def test_refresh_data_fails_while_no_frame_has_ever_arrived():
+    bms = make_bms()
+
+    assert bms.refresh_data() is False
+
+
+def test_refresh_data_succeeds_on_a_frame_that_just_arrived():
+    bms = make_bms()
+    bms.ble_handle.push(frame(HumsiENK_Ble.CMD_BATTERY_INFO, battery_info_payload()))
+
+    assert bms.refresh_data() is True
+
+
+def test_refresh_data_fails_again_once_the_data_has_aged_out():
+    bms = make_bms()
+    bms.ble_handle.push(frame(HumsiENK_Ble.CMD_BATTERY_INFO, battery_info_payload()))
+    assert bms.refresh_data() is True
+
+    bms._last_frame_time -= HumsiENK_Ble.DATA_FRESHNESS_SECONDS + 1
+    assert bms.refresh_data() is False
+
+
+# ------------------------------------------------- the backend seam
+#
+# The driver overrides connect_to_bms, so it does not inherit whatever the
+# base class does about subscribing. This pins the one thing the override
+# must keep doing: reach the notification characteristic through
+# backend.establish, which is where the late-GATT recovery lives
+# (tests/test_utils_ble.py covers the recovery itself).
+
+
+class _RecordingBackend:
+    def __init__(self):
+        self.established = []
+        self.released = []
+
+    def create_client(self, address, disconnected_callback):
+        return types.SimpleNamespace(is_connected=True, address=address)
+
+    async def establish(self, client, address, notify_char, notify_callback):
+        self.established.append((address, notify_char))
+        return client
+
+    async def release(self, client):
+        self.released.append(client)
+
+
+def _connect_once(backend, address="AA:BB:CC:DD:EE:FF"):
+    """Drive connect_to_bms on an instance built without __init__."""
+    ble = humsienk_ble.HumsiENK_Syncron_Ble.__new__(humsienk_ble.HumsiENK_Syncron_Ble)
+    ble.backend = backend
+    ble.client = None
+    ble.connected = False
+    ble.read_characteristic = "notify-uuid"
+    ble.notify_read_callback = lambda *a: None
+    ble.ble_connection_ready = threading.Event()
+    ble.feed_watchdog = lambda: None
+    # the link is supervised elsewhere; end it immediately so connect returns
+
+    async def _no_supervision():
+        return
+
+    ble.supervise_link = _no_supervision
+    asyncio.run(ble.connect_to_bms(address))
+    return ble
+
+
+def test_connect_subscribes_through_the_backend_seam():
+    backend = _RecordingBackend()
+
+    _connect_once(backend)
+
+    # one subscribe, on the notification characteristic, via the backend -
+    # not a direct client.start_notify that would bypass GATT recovery
+    assert backend.established == [("AA:BB:CC:DD:EE:FF", "notify-uuid")]
+
+
+def test_a_failed_subscribe_is_reported_rather_than_left_connected():
+    class _FailingBackend(_RecordingBackend):
+        async def establish(self, client, address, notify_char, notify_callback):
+            raise RuntimeError("characteristic missing")
+
+    ble = _connect_once(_FailingBackend())
+
+    assert ble.connected is False
+
+
+# ---------------------------------------------------- handshake re-send volume
+#
+# The pack's radio mutes for 10-15 s several times an hour. A re-send needs
+# 15 s of silence, so one is routine and must not narrate itself at INFO; a
+# second means 45 s on an open link, which is a different condition and is
+# said once. These assert the LEVEL and the count, not that a message exists.
+
+
+def _starve(bms, seconds):
+    """Age the clocks so the next refresh_data() re-sends the handshake."""
+    bms._last_frame_time -= seconds
+    bms._last_handshake_time -= HumsiENK_Ble.HANDSHAKE_RETRY_SECONDS + 1
+
+
+def test_an_ordinary_radio_mute_does_not_log_at_info(caplog):
+    bms = make_bms()
+    bms.ble_handle.push(frame(HumsiENK_Ble.CMD_BATTERY_INFO, battery_info_payload()))
+    bms.refresh_data()
+
+    with caplog.at_level("DEBUG", logger="SerialBattery"):
+        _starve(bms, HumsiENK_Ble.DATA_FRESHNESS_SECONDS + 1)
+        bms.refresh_data()
+
+    resends = [r for r in caplog.records if "re-sending handshake" in r.message]
+    assert len(resends) == 1
+    assert [r.levelname for r in resends] == ["DEBUG"]
+
+
+def test_a_pack_that_is_present_but_not_answering_is_said_once(caplog):
+    bms = make_bms()
+    bms.ble_handle.push(frame(HumsiENK_Ble.CMD_BATTERY_INFO, battery_info_payload()))
+    bms.refresh_data()
+
+    with caplog.at_level("DEBUG", logger="SerialBattery"):
+        for _ in range(4):
+            _starve(bms, HumsiENK_Ble.DATA_FRESHNESS_SECONDS + 1)
+            bms.refresh_data()
+
+    resends = [r for r in caplog.records if "re-sending handshake" in r.message]
+    assert len(resends) == 4
+    # exactly one INFO, on the crossing, and nothing after it
+    assert [r.levelname for r in resends] == ["DEBUG", "INFO", "DEBUG", "DEBUG"]
+    assert "2 consecutive" in resends[1].message
+
+
+def test_data_coming_back_rearms_the_escalation(caplog):
+    """Otherwise the second mute of the day is silent for the rest of it."""
+    bms = make_bms()
+    bms.ble_handle.push(frame(HumsiENK_Ble.CMD_BATTERY_INFO, battery_info_payload()))
+    bms.refresh_data()
+
+    for _ in range(2):
+        _starve(bms, HumsiENK_Ble.DATA_FRESHNESS_SECONDS + 1)
+        bms.refresh_data()
+    assert bms._handshake_resends == 2
+
+    bms.ble_handle.push(frame(HumsiENK_Ble.CMD_BATTERY_INFO, battery_info_payload()))
+    bms.refresh_data()
+    assert bms._handshake_resends == 0
+
+    caplog.clear()  # the first mute's records are not what this asserts on
+    with caplog.at_level("DEBUG", logger="SerialBattery"):
+        for _ in range(2):
+            _starve(bms, HumsiENK_Ble.DATA_FRESHNESS_SECONDS + 1)
+            bms.refresh_data()
+
+    resends = [r for r in caplog.records if "re-sending handshake" in r.message]
+    assert [r.levelname for r in resends] == ["DEBUG", "INFO"]
+
+
+# ------------------------------------------------- connect failure volume
+#
+# The reconnect loop retries for as long as a pack is away, so a failure
+# logged on every attempt would repeat for the whole outage. The first
+# failure is logged at INFO, so default logging shows it, with wording that
+# log monitoring can search for; the rest go to DEBUG.
+
+
+def _make_handle():
+    handle = humsienk_ble.HumsiENK_Syncron_Ble.__new__(humsienk_ble.HumsiENK_Syncron_Ble)
+    handle.backend = _RecordingBackend()
+    handle.client = None
+    handle.connected = False
+    handle.read_characteristic = "notify-uuid"
+    handle.notify_read_callback = lambda *a: None
+    handle.ble_connection_ready = threading.Event()
+    handle.feed_watchdog = lambda: None
+
+    async def _no_supervision():
+        return
+
+    handle.supervise_link = _no_supervision
+    return handle
+
+
+class _RefusingBackend(_RecordingBackend):
+    async def establish(self, client, address, notify_char, notify_callback):
+        raise RuntimeError("[org.bluez.Error.InProgress] Operation already in progress")
+
+
+def _attempt(handle, backend=None):
+    if backend is not None:
+        handle.backend = backend
+    asyncio.run(handle.connect_to_bms("AA:BB:CC:DD:EE:FF"))
+
+
+def test_a_pack_that_is_away_reports_its_absence_once(caplog):
+    handle = _make_handle()
+
+    with caplog.at_level("DEBUG", logger="SerialBattery"):
+        for _ in range(5):
+            _attempt(handle, _RefusingBackend())
+
+    failures = [r for r in caplog.records if "Failed when trying to connect" in r.message]
+    assert len(failures) == 5
+    assert [r.levelname for r in failures] == ["INFO", "DEBUG", "DEBUG", "DEBUG", "DEBUG"]
+
+
+def test_the_first_failure_is_logged_at_info_with_its_searchable_wording(caplog):
+    handle = _make_handle()
+
+    with caplog.at_level("INFO", logger="SerialBattery"):
+        _attempt(handle, _RefusingBackend())
+
+    emitted = [r for r in caplog.records if r.levelno >= 20]
+    assert any(r.message.startswith("Failed when trying to connect: ") for r in emitted)
+
+
+def test_coming_back_rearms_the_absence_report(caplog):
+    handle = _make_handle()
+    _attempt(handle, _RefusingBackend())
+    _attempt(handle, _RefusingBackend())
+    assert handle._connect_failures == 2
+
+    _attempt(handle, _RecordingBackend())
+    assert handle._connect_failures == 0
+
+    caplog.clear()
+    with caplog.at_level("DEBUG", logger="SerialBattery"):
+        _attempt(handle, _RefusingBackend())
+
+    failures = [r for r in caplog.records if "Failed when trying to connect" in r.message]
+    assert [r.levelname for r in failures] == ["INFO"]
+
+
+# ------------------------------------------- reporting the link up to utils_ble
+#
+# utils_ble logs the first connection and each recovery through the
+# backend's connected callback, which the base class wires when it builds the
+# backend - not from inside connect_to_bms. So this override gets that report
+# without doing anything, and must not make it itself. A call here would not
+# double the log, because _report_link_up only reports once per connection,
+# so nothing visible would show the mistake: this test is what catches it.
+
+
+def test_the_override_does_not_report_the_link_up_itself():
+    handle = _make_handle()
+    reported = []
+    handle._report_link_up = lambda: reported.append("up")
+
+    _attempt(handle, _RecordingBackend())
+
+    assert reported == []
+
+
+def test_a_failed_connect_does_not_report_a_link_that_never_came_up():
+    handle = _make_handle()
+    reported = []
+    handle._report_link_up = lambda: reported.append("up")
+
+    _attempt(handle, _RefusingBackend())
+
+    assert reported == []
+
+
+# ------------------------------------------------------- link supervision
+#
+# supervise_link replaced a 0.1 s spin with a wait that sleeps until something
+# ends the link. Four things may end it, and each is pinned here: a disconnect
+# callback, which wakes the wait through an event from another thread; the
+# data watchdog, which wakes it when due rather than at the next recheck; the
+# main thread going away; and a disconnect whose callback never fired. The
+# recheck is set long wherever an early finish is what proves the mechanism.
+
+
+class _SyncronBleBase:
+    """Stands in for utils_ble.Syncron_Ble, which this module stubs to object.
+
+    Placed after the driver's class in the MRO, it is what the override's
+    super().client_disconnected() reaches, and it records that it was reached.
+    """
+
+    def client_disconnected(self, client):
+        self.base_disconnects.append(client)
+
+
+class _Supervisable(humsienk_ble.HumsiENK_Syncron_Ble, _SyncronBleBase):
+    pass
+
+
+def _supervised(fed_ago=0.0, main_alive=True, client_connected=True, recheck=30.0):
+    ble = _Supervisable.__new__(_Supervisable)
+    ble.connected = True
+    ble._watchdog_last_fed = time.time() - fed_ago
+    ble.main_thread = types.SimpleNamespace(is_alive=lambda: main_alive)
+    ble.client = types.SimpleNamespace(is_connected=client_connected)
+    ble.SUPERVISION_RECHECK = recheck
+    ble.base_disconnects = []
+    return ble
+
+
+def _supervise(ble, within, while_waiting=None):
+    """Run supervise_link, failing unless it ends within `within` seconds.
+
+    With `while_waiting`, supervision must first be seen still waiting, and
+    the callable then runs - so ending afterwards is caused by it.
+    """
+
+    async def run():
+        ble._link_down = asyncio.Event()
+        ble._link_down_loop = asyncio.get_running_loop()
+        task = asyncio.ensure_future(ble.supervise_link())
+        if while_waiting is not None:
+            await asyncio.sleep(0.2)
+            assert not task.done(), "supervision ended before anything ended the link"
+            while_waiting()
+        await asyncio.wait_for(task, timeout=within)
+
+    started = time.monotonic()
+    asyncio.run(run())
+    return time.monotonic() - started
+
+
+def test_a_disconnect_wakes_supervision_from_another_thread():
+    ble = _supervised(recheck=30.0)
+
+    def disconnect():
+        threading.Thread(target=ble.client_disconnected, args=(ble.client,)).start()
+
+    # a 30 s recheck cannot be what ends this inside 2 s: the event did
+    _supervise(ble, within=2.0, while_waiting=disconnect)
+
+    # and the override still let the base class handle the disconnect
+    assert ble.base_disconnects == [ble.client]
+
+
+def test_an_expired_data_watchdog_drops_the_link(caplog):
+    ble = _supervised(fed_ago=humsienk_ble.HumsiENK_Syncron_Ble.WATCHDOG_TIMEOUT + 1)
+
+    with caplog.at_level("ERROR", logger="SerialBattery"):
+        _supervise(ble, within=1.0)
+
+    assert [r.message for r in caplog.records] == ["HumsiENK: no data for 180 s on an open link, dropping it to reconnect"]
+
+
+def test_the_data_watchdog_wakes_when_it_is_due_not_at_the_next_recheck(caplog):
+    watchdog = humsienk_ble.HumsiENK_Syncron_Ble.WATCHDOG_TIMEOUT
+    ble = _supervised(fed_ago=watchdog - 0.3, recheck=30.0)
+
+    with caplog.at_level("ERROR", logger="SerialBattery"):
+        _supervise(ble, within=2.0)
+
+    assert [r.message for r in caplog.records] == ["HumsiENK: no data for 180 s on an open link, dropping it to reconnect"]
+
+
+def test_supervision_ends_when_the_main_thread_has_gone():
+    ble = _supervised(main_alive=False, recheck=0.05)
+
+    _supervise(ble, within=1.0)
+
+
+def test_a_disconnect_whose_callback_never_fired_still_ends_supervision():
+    ble = _supervised(client_connected=False, recheck=0.05)
+
+    _supervise(ble, within=1.0)
+
+
+# ---------------------------------------------- a pack that never answered
+
+
+def test_a_pack_that_never_answered_is_not_given_an_age_from_the_epoch(caplog):
+    # _last_frame_time stays 0.0 until the first verified frame, so an age
+    # computed from it is the time since 1970 - once logged as "re-sending
+    # handshake after 1786848637 s without data".
+    bms = make_bms()
+    assert bms._last_frame_time == 0.0
+
+    with caplog.at_level("DEBUG", logger="SerialBattery"):
+        bms.refresh_data()
+
+    resends = [r.message for r in caplog.records if "re-sending handshake" in r.message]
+    assert resends == ["HumsiENK: re-sending handshake, no data since connection"]
+
+
+# ------------------------------------------------- steady-state polling
+#
+# Between connections the driver's whole job is two writes: ask for the three
+# data frames every poll interval, and re-send the handshake when the stream
+# has gone quiet, because the BMS sends nothing until it has one. These pin
+# that the writes actually happen, not just that something is logged.
+
+
+def _commands_sent(bms):
+    return [sent[1] for sent in bms.ble_handle.sent]
+
+
+def test_a_due_poll_asks_for_battery_info_status_and_cell_voltages():
+    bms = make_bms()
+    bms.ble_handle.push(frame(HumsiENK_Ble.CMD_BATTERY_INFO, battery_info_payload()))
+
+    bms.refresh_data()
+
+    assert _commands_sent(bms) == [HumsiENK_Ble.CMD_BATTERY_INFO, HumsiENK_Ble.CMD_STATUS, HumsiENK_Ble.CMD_CELL_VOLTAGES]
+
+
+def test_no_poll_is_sent_before_the_interval_has_passed():
+    bms = make_bms()
+    bms.ble_handle.push(frame(HumsiENK_Ble.CMD_BATTERY_INFO, battery_info_payload()))
+    bms.refresh_data()
+    bms.ble_handle.sent.clear()
+
+    bms.refresh_data()
+
+    assert _commands_sent(bms) == []
+
+
+def test_a_silent_link_is_sent_the_handshake_before_the_poll():
+    bms = make_bms()
+
+    bms.refresh_data()
+
+    assert _commands_sent(bms) == [
+        HumsiENK_Ble.CMD_HANDSHAKE,
+        HumsiENK_Ble.CMD_BATTERY_INFO,
+        HumsiENK_Ble.CMD_STATUS,
+        HumsiENK_Ble.CMD_CELL_VOLTAGES,
+    ]
+
+
+# ------------------------------------------- the connection's life in order
+
+
+def test_supervision_starts_with_the_link_marked_up_and_the_client_is_released_after():
+    handle = _make_handle()
+    seen = []
+
+    async def _record_supervision():
+        seen.append(handle.connected)
+
+    handle.supervise_link = _record_supervision
+
+    asyncio.run(handle.connect_to_bms("AA:BB:CC:DD:EE:FF"))
+
+    # supervised once, with the link already marked connected...
+    assert seen == [True]
+    # ...then the client handed back to the backend and the link marked down
+    assert handle.backend.released == [handle.client]
+    assert handle.connected is False
+
+
+# ------------------------------------------------- the real notification queue
+#
+# Every other test swaps the transport for FakeBleHandle. These run the real
+# HumsiENK_Syncron_Ble queue: notifications arrive on the Bluetooth thread and
+# are read on the main thread, so a chunk handed in on one must come out on
+# the other.
+
+
+def _real_transport():
+    ble = humsienk_ble.HumsiENK_Syncron_Ble()
+    ble.address = "AA:BB:CC:DD:EE:FF"
+    ble.response_event = False
+    return ble
+
+
+def test_a_notification_from_the_bluetooth_thread_reaches_the_reader():
+    ble = _real_transport()
+    chunk = bytes([0xAA, 0x21, 0x00, 0x21, 0x00])
+
+    timer = threading.Timer(0.1, ble.notify_read_callback, args=(None, bytearray(chunk)))
+    timer.start()
+    try:
+        received = ble.get_notification(timeout=2.0)
+    finally:
+        timer.join()
+
+    assert received == chunk
+    assert ble.get_notification() is None
+
+
+def test_feeding_the_watchdog_records_when_data_last_arrived():
+    ble = _real_transport()
+    ble._watchdog_last_fed = 0.0
+
+    ble.feed_watchdog()
+
+    assert time.time() - ble._watchdog_last_fed < 1.0
