@@ -284,9 +284,17 @@ def _refresh_with_device_gone(mod, monkeypatch):
     bms._connect_failures = 0
     bms._reconnect_hold_until = 0.0
     bms._reconnect_warned = False
+
     # run each poll's coroutine to completion inline: scheduling is
-    # _poll_update's job and is tested separately
-    bms._poll_update = lambda coro: bool(asyncio.run(coro()))
+    # _poll_update's job and is tested separately. Like _poll_update, treat an
+    # update that raised as "no fresh data" rather than letting it escape.
+    def _run_inline(coro):
+        try:
+            return bool(asyncio.run(coro()))
+        except Exception:
+            return False
+
+    bms._poll_update = _run_inline
     return bms, scans, log, clock
 
 
@@ -473,9 +481,16 @@ def test_hung_reconnect_is_paced(monkeypatch, stuck_in):
     mod = _load_driver()
     attempts = []
 
+    seen = []  # failures already counted when each attempt started
+
     async def _hang(stage):
         attempts.append(stage)
-        await asyncio.sleep(3600)  # never returns: cancelled by the poller
+        seen.append(bms._connect_failures)
+        # Never returns: cancelled by the poller. A nested task, not a bare
+        # sleep, because that is how a real BlueZ await chain looks, and with a
+        # bare sleep a count made inside the cancelled coroutine happens to land
+        # in time - the shape that hid the late count.
+        await asyncio.create_task(asyncio.sleep(3600))
 
     class _Scanner:
         @staticmethod
@@ -542,6 +557,9 @@ def test_hung_reconnect_is_paced(monkeypatch, stuck_in):
         assert len(attempts) == tried, f"a new attempt started while paced ({len(attempts) - tried} extra)"
         # and every hung attempt was counted, not just some of them
         assert bms._connect_failures == len(attempts), f"{len(attempts)} hung attempts ({attempts}) but {bms._connect_failures} counted"
+        # ...and counted BEFORE the next attempt started, or the pacing is one
+        # attempt late: attempt n must see the n failures before it
+        assert seen == list(range(len(seen))), f"attempts started having seen {seen} failures; expected {list(range(len(seen)))}"
     finally:
         if bms._loop is not None:
             bms._loop.call_soon_threadsafe(bms._loop.stop)
@@ -550,3 +568,132 @@ def test_hung_reconnect_is_paced(monkeypatch, stuck_in):
     # the only errors expected are the poller's own timeouts
     unexpected = [e for e in log.errors if "coroutine timed out" not in e]
     assert unexpected == [], f"refresh_data swallowed an exception: {unexpected[:1]}"
+
+
+@_needs_pep604
+def test_failed_scan_is_paced(monkeypatch):
+    """A scan that fails outright, e.g. org.bluez.Error.InProgress, counts too.
+
+    Such a failure raises out of the lookup instead of returning "not found".
+    Uncounted, it was retried on every poll - the discovery storm the
+    cache-first lookup exists to prevent - and silently, at debug level.
+    """
+    mod = _load_driver()
+    bms, _, log, clock = _refresh_with_device_gone(mod, monkeypatch)
+    scans = []
+
+    class _BusyScanner:
+        @staticmethod
+        async def find_device_by_address(address):
+            scans.append(address)
+            raise RuntimeError("org.bluez.Error.InProgress")
+
+    monkeypatch.setattr(mod, "BleakScanner", _BusyScanner)
+
+    for _ in range(120):
+        bms.refresh_data()
+    assert bms._connect_failures >= 2, "a scan that raises must count as a connect failure"
+    assert len(scans) < 12, f"a failing scan must not be retried on every poll ({len(scans)} scans in 120 polls)"
+    assert log.errors == [], f"refresh_data swallowed an exception: {log.errors[:1]}"
+
+
+@_needs_pep604
+def test_first_failure_of_an_outage_is_visible(monkeypatch):
+    """The first failed attempt of an outage logs a warning; the rest stay quiet.
+
+    A failed find or connect raises out of the update, and the poller used to
+    log that only at debug: an outage of a battery the driver has not yet
+    connected showed nothing until the pacing's own warning, minutes later.
+    """
+    import threading
+    import time
+
+    mod = _load_driver()
+    log = _Log()
+    monkeypatch.setattr(mod, "logger", log)
+    bms = _borrow(mod, "_poll_update", "_ensure_event_loop", "_release_update_lock", "_note_connect_failure")
+    bms.address = "A4:C1:38:33:41:24"
+    bms._loop = None
+    bms._loop_thread = None
+    bms._loop_ready = None
+    bms._coro_lock = threading.Lock()
+    bms._current_future = None
+    bms._update_lock_held = False
+    bms._update_started_at = None
+    bms._run_timeout = 10
+    bms._connect_failures = 0
+    bms._reconnect_hold_until = 0.0
+    bms._reconnect_warned = False
+    done = []
+
+    async def failing_attempt():
+        # what the reconnect branch does: count the failure, then raise
+        bms._note_connect_failure("device not found")
+        done.append(1)
+        raise RuntimeError("device not found")
+
+    try:
+        deadline = time.monotonic() + 5
+        while len(done) < 5 and time.monotonic() < deadline:
+            bms._poll_update(failing_attempt)
+            time.sleep(0.02)
+        # let the attempt the last poll scheduled run before the loop stops, so
+        # no coroutine is left un-awaited
+        time.sleep(0.05)
+    finally:
+        if bms._loop is not None:
+            bms._loop.call_soon_threadsafe(bms._loop.stop)
+            bms._loop_thread.join(timeout=2)
+
+    shown = [w for w in log.warnings if "background update failed" in w]
+    assert len(done) >= 5, f"expected at least 5 attempts, got {len(done)}"
+    assert len(shown) == 1, f"one warning for the first failure of an outage, got {len(shown)}"
+
+
+@_needs_pep604
+def test_startup_reading_starts_the_data_age_clock(monkeypatch):
+    """The first reading, taken by test_connection, arms the staleness check.
+
+    test_connection reads the battery once, then refresh_data only schedules
+    the first background update. If the data-age clock waited for that update,
+    a battery that went away right after startup would have its startup
+    reading published as current for as long as it stayed away.
+    """
+    mod = _load_driver()
+    log, clock = _Log(), _Clock()
+    monkeypatch.setattr(mod, "logger", log)
+    monkeypatch.setattr(mod, "time", clock)
+
+    names = ("test_connection", "refresh_data")
+    bms = _borrow(mod, *names, "_reconnect_on_hold", "_note_connect_failure", "_note_connect_success")
+    bms.address = "A4:C1:38:33:41:24"
+    bms.BATTERYTYPE = "test"
+    bms._initial_connect_timeout = 40
+    bms.aiobmsble_data = {"voltage": 13.2, "current": 0.0, "battery_level": 80}  # the startup reading
+    bms._aiobmsble = object()
+    bms._last_successful_update = None
+    bms._max_data_age = 5
+    bms._stale_warning_interval = 60
+    bms._stale_warned_at = 0.0
+    bms._connect_failures = 0
+    bms._reconnect_hold_until = 0.0
+    bms._reconnect_warned = False
+
+    # The startup read itself succeeds; what is under test is what follows it.
+    timeouts = []
+    bms._run_coro = lambda coro, timeout=None: timeouts.append(timeout) or True
+    bms.get_settings = lambda: True
+    bms.refresh_data = lambda: True  # test_connection's own final refresh is not under test
+    bms.disconnect = lambda: None
+    assert bms.test_connection() is True
+    del bms.refresh_data  # the real refresh_data from here on
+
+    # the first connection gets its own, longer budget than a refresh
+    assert timeouts == [bms._initial_connect_timeout], f"the startup read must use the first-connect budget, got {timeouts}"
+
+    # the battery goes away: no background update ever completes
+    bms._poll_update = lambda coro: False
+    clock.now += bms._max_data_age + 1
+    assert bms.refresh_data() is False, "a startup reading past its age limit must not be reported as current"
+    assert any("treating as failure" in w for w in log.warnings), "the stale startup reading must be reported"
+    assert log.errors == [], f"refresh_data swallowed an exception: {log.errors[:1]}"

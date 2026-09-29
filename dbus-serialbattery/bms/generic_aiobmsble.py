@@ -272,7 +272,12 @@ class Generic_AioBmsBle(Battery):
             except concurrent.futures.CancelledError:
                 pass
             except Exception as e:
-                logger.debug("aiobmsble: background update failed (addr=%s): %r", self.address, e)
+                # show the first failure of an outage; the pacing reports a long
+                # one once, so the rest stay at debug
+                if self._connect_failures <= 1:
+                    logger.warning("aiobmsble: background update failed (addr=%s): %r", self.address, e)
+                else:
+                    logger.debug("aiobmsble: background update failed (addr=%s): %r", self.address, e)
             self._release_update_lock()
         elif future is not None and self._update_started_at is not None:
             # a coroutine that never returns must not wedge every later poll
@@ -282,6 +287,11 @@ class Generic_AioBmsBle(Battery):
                     future.cancel()
                 except Exception:
                     pass
+                # A hang is a failed attempt. Count it here, on this thread and
+                # before the next attempt is scheduled below, so the pacing
+                # already applies to that attempt; counted inside the cancelled
+                # coroutine it can land after the next attempt has started.
+                self._note_connect_failure("timed out")
                 self._current_future = None
                 self._update_started_at = None
                 self._release_update_lock()
@@ -528,6 +538,13 @@ class Generic_AioBmsBle(Battery):
 
         try:
             result = self._run_coro(run_async, timeout=self._initial_connect_timeout)
+            if result:
+                # The startup reading is real, fresh data, so start the data-age
+                # clock on it. refresh_data below only schedules the first
+                # background update; if the clock waited for that update, a
+                # battery that went away now would have this reading published
+                # as current for as long as it stayed away.
+                self._last_successful_update = time.monotonic()
 
             # get settings to check if the data is valid and the connection is working
             result = result and self.get_settings()
@@ -645,11 +662,11 @@ class Generic_AioBmsBle(Battery):
                 # the BlueZ cache costs no scan at all in the common case.
                 try:
                     device: BLEDevice | None = await self._resolve_device()
-                except asyncio.CancelledError:
-                    # _poll_update cancels an attempt that outlives its timeout,
-                    # e.g. a scan waiting on an adapter another service holds.
-                    # Count the hang, or the pacing never engages.
-                    self._note_connect_failure("timed out")
+                except Exception as ex:
+                    # a scan can fail outright, e.g. org.bluez.Error.InProgress
+                    # while another service scans the adapter; count it, or the
+                    # pacing never engages. (A hang is counted by _poll_update.)
+                    self._note_connect_failure(repr(ex))
                     raise
                 if device is None:
                     self._note_connect_failure("device not found")
@@ -661,9 +678,6 @@ class Generic_AioBmsBle(Battery):
                     return False
                 try:
                     await self._aiobmsble_connect(self._aiobmsble)
-                except asyncio.CancelledError:
-                    self._note_connect_failure("timed out")
-                    raise
                 except Exception as ex:
                     self._note_connect_failure(repr(ex))
                     raise
@@ -675,9 +689,6 @@ class Generic_AioBmsBle(Battery):
                     self.aiobmsble_data = await update()
                     self._note_connect_success()
                     return True
-                except asyncio.CancelledError:
-                    self._note_connect_failure("timed out")
-                    raise
                 except Exception as ex:
                     # the client reconnects inside async_update, so this is the
                     # failure path of a lost connection: count it for the pacing
