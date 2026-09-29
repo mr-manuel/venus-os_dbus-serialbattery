@@ -5,7 +5,7 @@ import os
 import signal
 import sys
 from datetime import datetime
-from time import sleep
+from time import sleep, time
 from typing import Union
 
 from dbus.mainloop.glib import DBusGMainLoop
@@ -120,6 +120,35 @@ if CAPTURE_RAW_DATA:
 count_for_loops = 5
 delayed_loop_count = 0
 
+# rate limit for the slow poll warning, since a stalled connection triggers it every cycle
+poll_warning_interval = 60
+poll_warning_last_time = 0
+
+
+def should_log_poll_warning(batteries, current_time: int) -> bool:
+    """
+    Check whether the slow poll warning should be logged now.
+
+    A poll that waits on a battery which is already known to be offline is that outage,
+    not a second fault, and the offline state is reported by the dbushelper. Otherwise the
+    warning is rate limited, since a stalled connection makes every cycle a slow one.
+
+    :param batteries: the battery objects of this process
+    :param current_time: current time in seconds
+    :return: True if the warning should be logged, False if it should be suppressed
+    """
+    global poll_warning_last_time
+
+    # online is None until the first successful poll, so a slow start is still reported
+    if any(battery.online is False for battery in batteries):
+        return False
+
+    if current_time - poll_warning_last_time < poll_warning_interval:
+        return False
+
+    poll_warning_last_time = current_time
+    return True
+
 
 def main():
     global expected_bms_types, supported_bms_types
@@ -195,7 +224,8 @@ def main():
             delayed_loop_count += 1
             if delayed_loop_count > 1:
                 remaining = count_for_loops - delayed_loop_count
-                logger.warning(f"Polling took {runtime:.3f}s (refresh {refresh_runtime:.3f}s). Increase in {remaining} cycles.")
+                if should_log_poll_warning(battery.values(), int(time())):
+                    logger.warning(f"Polling took {runtime:.3f}s (refresh {refresh_runtime:.3f}s). Increase in {remaining} cycles.")
         else:
             delayed_loop_count = 0
 

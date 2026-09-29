@@ -1061,22 +1061,13 @@ class DbusHelper:
                             )
 
                             if not utils.BLOCK_ON_DISCONNECT:
+                                min_cell_voltage = self.battery.get_min_cell_voltage()
+                                max_cell_voltage = self.battery.get_max_cell_voltage()
                                 logger.error(
-                                    "    |- Cell voltages are"
-                                    + ("" if self.cell_voltages_good else " NOT")
-                                    + " in a safe threshold to proceed with charging/discharging without communication to the battery."
-                                )
-                                logger.error(
-                                    "    |- "
-                                    + f"Min cell voltage: {self.battery.get_min_cell_voltage():.3f} > "
-                                    + f"Min Threshold: {utils.BLOCK_ON_DISCONNECT_VOLTAGE_MIN:.3f} --> "
-                                    + ("OK" if self.battery.get_min_cell_voltage() > utils.BLOCK_ON_DISCONNECT_VOLTAGE_MIN else "NOT OK")
-                                )
-                                logger.error(
-                                    "    |- "
-                                    + f"Max cell voltage: {self.battery.get_max_cell_voltage():.3f} < "
-                                    + f"Max threshold: {utils.BLOCK_ON_DISCONNECT_VOLTAGE_MAX:.3f} --> "
-                                    + ("OK" if self.battery.get_max_cell_voltage() < utils.BLOCK_ON_DISCONNECT_VOLTAGE_MAX else "NOT OK")
+                                    f"    |- Cell voltages are{'' if self.cell_voltages_good else ' NOT'} in a safe threshold to proceed"
+                                    + " without communication to the battery: "
+                                    + f"min {min_cell_voltage:.3f} V (> {utils.BLOCK_ON_DISCONNECT_VOLTAGE_MIN:.3f} V), "
+                                    + f"max {max_cell_voltage:.3f} V (< {utils.BLOCK_ON_DISCONNECT_VOLTAGE_MAX:.3f} V)"
                                 )
 
                             self.battery.init_values()

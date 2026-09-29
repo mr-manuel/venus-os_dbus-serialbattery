@@ -52,6 +52,8 @@
 * Changed: D-bus charge limits - Skip None writes to `/Info/MaxChargeCurrent` and `/Info/MaxDischargeCurrent` so consumers like `dbus-aggregate-batteries` don't crash with `TypeError: unsupported operand type(s) for *: 'NoneType' and 'int'` during the brief window before the first charge-control decision lands by @hsteinhaus
 * Changed: Daly BMS & Daly CAN BMS: Fix high charge/discharge current alarm. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/378 by @mr-manuel
 * Changed: Daren 485 BMS - Fixed charge/discharge calculation with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/343 by @kopierschnitte
+* Changed: dbus-serialbattery.py - Rate limit the "Polling took ..." warning to once per 60 seconds and suppress it entirely while a battery is known to be offline. A stalled connection makes every poll a slow poll, so the warning was logged once per cycle for the whole outage, next to the disconnect that `dbushelper` already reports for the same event by @cgoudie
+* Changed: dbushelper.py - Condense the cell voltage threshold report logged when a battery stops responding from three lines to one, with the measured and configured voltages inline by @cgoudie
 * Changed: dbushelper.py - Ensure loading of newest battery data if more than one duplicate exists by @lex2k0
 * Changed: dbushelper.py - Refresh the `LastSeen` setting daily while the driver is running. Previously it was written only at startup, so after more than 30 days of continuous uptime a restart deleted the settings (device instance, custom name, history) of all other batteries sharing the port by @dmitrych5
 * Changed: dbushelper.py - Reworked save settings methods by @lex2k0
