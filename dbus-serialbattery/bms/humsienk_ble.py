@@ -98,18 +98,14 @@ class HumsiENK_Syncron_Ble(Syncron_Ble):
     _link_down_loop = None
 
     # Consecutive failed connect attempts, reset by the next success. The
-    # reconnect loop retries indefinitely, so a pack that is simply out of
-    # range writes this line on every attempt for as long as it is away -
-    # 4,400 times across one prod log corpus. The first failure of an episode
-    # is the one worth reading; the rest are the same fact again.
+    # reconnect loop retries indefinitely, so a pack that is out of range
+    # would otherwise log a failure on every attempt for as long as it is
+    # away. The first failure of an outage is the one worth reading; the rest
+    # repeat it.
     _connect_failures = 0
 
     def client_disconnected(self, client):
-        """Wake supervision as well as logging it.
-
-        Defined here rather than relying on the base class so this driver
-        does not depend on which utils_ble revision it is paired with.
-        """
+        """Log the disconnect, and wake supervise_link, which waits on an event."""
         super(HumsiENK_Syncron_Ble, self).client_disconnected(client)
         event, loop = self._link_down, self._link_down_loop
         if event is None or loop is None:
@@ -161,22 +157,14 @@ class HumsiENK_Syncron_Ble(Syncron_Ble):
             self.feed_watchdog()
             self.connected = True
             self._connect_failures = 0
-            # Deliberately NO link-up report here. utils_ble delivers the
-            # once-per-life "connected to bluetooth device ... on adapter" line
-            # and the "BLE link recovered for" episode terminator through the
-            # backend's connected callback, wired by the base class when it
-            # builds the backend (utils_ble.py: _new_backend / _record_landed),
-            # so an override of connect_to_bms gets both ends of an episode
-            # without doing anything. Field 2026-09-06: against the earlier
-            # utils_ble that reported from inside the base connect_to_bms this
-            # override needed an explicit call; against the seam the seam owns
-            # the report and a call here is dead code that stays quiet only
-            # because _report_link_up latches (a second call emits nothing) -
-            # someone else's internal detail, not a contract to lean on.
+            # No link-up report here: utils_ble logs the first connection and
+            # each recovery through the backend's connected callback, which the
+            # base class wires when it builds the backend (_new_backend), so
+            # this override gets both without doing anything.
         except Exception as e:
             self._connect_failures += 1
-            # Said once per episode, at a level prod emits, and worded exactly
-            # as before so anything keyed on this string keeps working.
+            # Logged once per outage, at INFO so default logging shows it.
+            # Keep the wording: log monitoring may search for it.
             if self._connect_failures == 1:
                 logger.info(f"Failed when trying to connect: {e}")
             else:
