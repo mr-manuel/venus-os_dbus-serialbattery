@@ -938,7 +938,7 @@ class Battery(ABC):
                             self.soc_calc_capacity_remain = self.capacity
                             self.soc_calc_reset_start_time = None
 
-                    elif self.charge_mode.startswith("Float Transition"):
+                    elif self.charge_mode is not None and self.charge_mode.startswith("Float Transition"):
                         elapsed_time = current_time - self.transition_start_time
                         # Voltage reduction per second
                         voltage_reduction = min(

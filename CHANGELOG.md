@@ -81,6 +81,7 @@
 * Changed: Fixed problems with the `BLOCK_ON_DISCONNECT` behavior. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/309 by @mr-manuel
 * Changed: Fixed SOC manual reset via GUI having no effect when `SOC_CALCULATION` is enabled by @mr-manuel
 * Changed: Fixed typo in activation instructions by @mr-manuel
+* Changed: Guard `charge_mode` against `None` in `manage_charge_voltage_limit()`. It is declared as `str` but initialised to `None`, and the float branch tests it twice: the first arm checks for `None`, the second does not, so a `None` fails the first check and is dereferenced by the second. The surrounding handler only catches `TypeError`, so the resulting `AttributeError` leaves the method by @cgoudie
 * Changed: Guard voltage and current limit assignments with `USE_BMS_DVCC_VALUES`; replace hardcoded limits with `MAX_CELL_VOLTAGE`, `MAX_BATTERY_CHARGE_CURRENT`, and `MAX_BATTERY_DISCHARGE_CURRENT` config constants. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/454 by @mr-manuel
 * Changed: GUI clearing of CustomName was silently ignored — `callback_custom_name` returned the new value, which is falsy for the empty string and caused VeDbusService to reject the write while `set_settings` had already persisted it; callback now returns truthy on success by @hsteinhaus
 * Changed: GUIv2 - With Venus OS `v3.80~21` GUIv2 plugins are used instead of fully customized GUI by @mr-manuel
