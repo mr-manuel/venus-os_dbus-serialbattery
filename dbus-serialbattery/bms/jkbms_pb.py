@@ -611,10 +611,12 @@ class Jkbms_pb(Battery):
             logger.warning(f"[{addr_str}] bad frame marker: {payload[2:4].hex()} (expected eb90)")
             return False
 
-        ftype = payload[4] | payload[5] << 8
+        # Only byte 4 is the frame type. Byte 5 differs between firmwares
+        # (0x00 and 0x05 seen) without changing the payload layout.
+        ftype = payload[4]
         expected = self.EXPECTED_FTYPE.get(command)
         if expected is not None and ftype != expected:
-            logger.warning(f"[{addr_str}] wrong frame type: 0x{ftype:04X} (expected 0x{expected:04X})")
+            logger.warning(f"[{addr_str}] wrong frame type: 0x{ftype:02X} (expected 0x{expected:02X}, byte 5: 0x{payload[5]:02X})")
             return False
 
         if not self._verify_checksum(payload):
