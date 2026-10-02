@@ -1,0 +1,279 @@
+name: Temporary active balance builder
+
+on:
+  pull_request:
+    branches:
+      - active_balance
+    types: [opened]
+
+permissions:
+  contents: write
+
+jobs:
+  build-active-balance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: active_balance
+          fetch-depth: 0
+
+      - name: Apply active balancing drivers
+        shell: bash
+        run: |
+          python - <<'PY'
+          import base64, gzip, pathlib, re
+          text = pathlib.Path('.github/workflows/active-balance-builder.yml').read_text()
+          block = text.split('payload = (', 1)[1].split('\n          )', 1)[0]
+          chunks = re.findall(r'^\s*"([A-Za-z0-9+/=]+)"\s*$', block, re.M)
+          if not chunks:
+              raise SystemExit('embedded patch payload not found')
+          raw = gzip.decompress(base64.b64decode(''.join(chunks)))
+          a, b = raw.split(b'\n###KS###\n', 1)
+          assert a.startswith(b'###DAREN###\n')
+          pathlib.Path('/tmp/daren.patch').write_bytes(a[len(b'###DAREN###\n'):])
+          pathlib.Path('/tmp/ks.patch').write_bytes(b)
+          PY
+
+          cd dbus-serialbattery/bms
+          if ! grep -q 'BALANCER_SUPERVISOR_DELTA_START = 0.020' daren_485.py; then
+            patch -p3 --reject-file=/tmp/daren.rej < /tmp/daren.patch || true
+            python - <<'PY'
+          from pathlib import Path
+          p = Path('daren_485.py')
+          s = p.read_text()
+          old = '''            temperature_count = read_u8("temperature_count")
+            if temperature_count > 32:
+                raise ValueError("invalid temperature sensor count {}".format(temperature_count))
+
+            for i in range(temperature_count):
+                temperature = read_i16("temperature_{}".format(i + 1)) / 10
+                # Battery exposes four generic battery temperature slots. Consume any
+                # additional sensors to keep the payload aligned, but publish only 1..4.
+                if i < 4:
+                    self.to_temperature(i + 1, temperature)
+'''
+          new = '''            temperature_count = read_u8("temperature_count")
+            if temperature_count > 32:
+                raise ValueError("invalid temperature sensor count {}".format(temperature_count))
+
+            temperature_sensors = []
+            for i in range(temperature_count):
+                temperature = read_i16("temperature_{}".format(i + 1)) / 10
+                temperature_sensors.append(temperature)
+                # Battery exposes four generic battery temperature slots. Consume any
+                # additional sensors to keep the payload aligned, but publish only 1..4.
+                if i < 4:
+                    self.to_temperature(i + 1, temperature)
+
+            self._last_temperature_ambient = temperature_ambient
+            self._last_temperature_pack = temperature_pack
+            self._last_temperature_mos = temperature_mos
+            self._last_temperature_sensors = temperature_sensors
+'''
+          if old in s:
+              p.write_text(s.replace(old, new, 1))
+          elif 'self._last_temperature_sensors = temperature_sensors' not in s:
+              raise SystemExit('Daren temperature parser anchor not found')
+          PY
+            rm -f daren_485.py.rej /tmp/daren.rej
+          fi
+
+          if ! grep -q 'BALANCER_SUPERVISOR_DELTA_START = 0.020' ks48100.py; then
+            patch -p3 < /tmp/ks.patch
+          fi
+
+      - name: Add adaptive cell-drift CCL taper
+        shell: bash
+        run: |
+          cd dbus-serialbattery/bms
+          python - <<'PY'
+          from pathlib import Path
+
+          constants = '''
+    # Adaptive charge-current taper for top-of-charge cell imbalance. AggregateBatteries
+    # uses the lowest per-pack CCL and multiplies it by the number of parallel packs.
+    CELL_DRIFT_CCL_MIN_CELL_VOLTAGE = 3.390
+    CELL_DRIFT_CCL_RELEASE_CELL_VOLTAGE = 3.380
+    CELL_DRIFT_CCL_STAGE1_DELTA = 0.020
+    CELL_DRIFT_CCL_STAGE2_DELTA = 0.030
+    CELL_DRIFT_CCL_STAGE3_DELTA = 0.040
+    CELL_DRIFT_CCL_STAGE1_RELEASE = 0.015
+    CELL_DRIFT_CCL_STAGE2_RELEASE = 0.025
+    CELL_DRIFT_CCL_STAGE3_RELEASE = 0.035
+    CELL_DRIFT_CCL_STAGE1_LIMIT = 20.0
+    CELL_DRIFT_CCL_STAGE2_LIMIT = 10.0
+    CELL_DRIFT_CCL_STAGE3_LIMIT = 4.0
+'''
+
+          method = '''
+    def _apply_cell_drift_charge_limit(self, bms_limit):
+        """Cap CCL when a high cell separates from the pack median near top charge."""
+        try:
+            bms_limit = float(bms_limit)
+        except (TypeError, ValueError):
+            return bms_limit
+
+        if bms_limit <= 0:
+            return bms_limit
+
+        voltages = []
+        for cell in self.cells:
+            voltage = getattr(cell, "voltage", None)
+            if isinstance(voltage, (int, float)) and 2.0 <= voltage <= 4.5:
+                voltages.append(float(voltage))
+
+        if len(voltages) < 2:
+            return bms_limit
+
+        voltages.sort()
+        midpoint = len(voltages) // 2
+        if len(voltages) % 2:
+            median_voltage = voltages[midpoint]
+        else:
+            median_voltage = (voltages[midpoint - 1] + voltages[midpoint]) / 2
+
+        max_voltage = voltages[-1]
+        high_side_delta = max_voltage - median_voltage
+        previous_stage = getattr(self, "_cell_drift_ccl_stage", 0)
+        stage = 0
+
+        if max_voltage >= self.CELL_DRIFT_CCL_RELEASE_CELL_VOLTAGE:
+            may_enter = max_voltage >= self.CELL_DRIFT_CCL_MIN_CELL_VOLTAGE
+
+            if (may_enter and high_side_delta >= self.CELL_DRIFT_CCL_STAGE3_DELTA) or (
+                previous_stage == 3 and high_side_delta >= self.CELL_DRIFT_CCL_STAGE3_RELEASE
+            ):
+                stage = 3
+            elif (may_enter and high_side_delta >= self.CELL_DRIFT_CCL_STAGE2_DELTA) or (
+                previous_stage >= 2 and high_side_delta >= self.CELL_DRIFT_CCL_STAGE2_RELEASE
+            ):
+                stage = 2
+            elif (may_enter and high_side_delta >= self.CELL_DRIFT_CCL_STAGE1_DELTA) or (
+                previous_stage >= 1 and high_side_delta >= self.CELL_DRIFT_CCL_STAGE1_RELEASE
+            ):
+                stage = 1
+
+        stage_limits = {
+            1: self.CELL_DRIFT_CCL_STAGE1_LIMIT,
+            2: self.CELL_DRIFT_CCL_STAGE2_LIMIT,
+            3: self.CELL_DRIFT_CCL_STAGE3_LIMIT,
+        }
+        ccl = min(bms_limit, stage_limits.get(stage, bms_limit))
+
+        self._cell_drift_ccl_stage = stage
+        self._cell_drift_ccl_limit = ccl
+        self._cell_drift_median_voltage = median_voltage
+        self._cell_drift_high_side_delta = high_side_delta
+
+        if stage != previous_stage:
+            logger.info(
+                "CELL DRIFT CCL: stage {} -> {} | max={:.3f} V | median={:.3f} V | "
+                "high-side={:.0f} mV | CCL={:.1f} A (BMS={:.1f} A)".format(
+                    previous_stage,
+                    stage,
+                    max_voltage,
+                    median_voltage,
+                    high_side_delta * 1000,
+                    ccl,
+                    bms_limit,
+                )
+            )
+
+        return ccl
+'''
+
+          for filename in ('daren_485.py', 'ks48100.py'):
+              path = Path(filename)
+              source = path.read_text()
+
+              if 'CELL_DRIFT_CCL_STAGE1_LIMIT = 20.0' not in source:
+                  anchor = '    BALANCE_OFF_DELAY_SECONDS = 10\n'
+                  if anchor not in source:
+                      raise SystemExit(f'{filename}: class constant anchor not found')
+                  source = source.replace(anchor, anchor + constants, 1)
+
+              if 'def _apply_cell_drift_charge_limit(self, bms_limit):' not in source:
+                  anchor = '    def get_cells_params(self, ser):\n'
+                  if anchor not in source:
+                      raise SystemExit(f'{filename}: get_cells_params anchor not found')
+                  source = source.replace(anchor, method + '\n' + anchor, 1)
+
+              old = '                    self.max_battery_charge_current = CHG_C_limit\n'
+              new = (
+                  '                    self.max_battery_charge_current = '
+                  'self._apply_cell_drift_charge_limit(CHG_C_limit)\n'
+              )
+              if new not in source:
+                  if source.count(old) != 1:
+                      raise SystemExit(
+                          f'{filename}: expected one BMS CCL assignment, found {source.count(old)}'
+                      )
+                  source = source.replace(old, new, 1)
+
+              path.write_text(source)
+          PY
+
+      - name: Validate drivers and CCL taper
+        shell: bash
+        run: |
+          cd dbus-serialbattery/bms
+          python -m py_compile daren_485.py ks48100.py
+          grep -q 'BALANCER_SUPERVISOR_DELTA_START = 0.020' daren_485.py
+          grep -q 'BALANCER_SUPERVISOR_DELTA_START = 0.020' ks48100.py
+          grep -q 'SUPERVISOR v28 DELTA MODE' daren_485.py
+          grep -q 'SUPERVISOR v6 DELTA MODE' ks48100.py
+          grep -q 'CELL_DRIFT_CCL_STAGE3_LIMIT = 4.0' daren_485.py
+          grep -q 'CELL_DRIFT_CCL_STAGE3_LIMIT = 4.0' ks48100.py
+
+          PYTHONPATH=.. python - <<'PY'
+          from types import SimpleNamespace
+          from daren_485 import Daren485
+          from ks48100 import KS48100
+
+          def cells(base, high):
+              return [SimpleNamespace(voltage=base) for _ in range(15)] + [
+                  SimpleNamespace(voltage=high)
+              ]
+
+          for cls in (Daren485, KS48100):
+              battery = object.__new__(cls)
+
+              battery.cells = cells(3.300, 3.360)
+              assert battery._apply_cell_drift_charge_limit(60) == 60
+
+              battery.cells = cells(3.390, 3.411)
+              assert battery._apply_cell_drift_charge_limit(60) == 20.0
+
+              battery.cells = cells(3.390, 3.421)
+              assert battery._apply_cell_drift_charge_limit(60) == 10.0
+
+              battery.cells = cells(3.390, 3.431)
+              assert battery._apply_cell_drift_charge_limit(60) == 4.0
+              assert battery._apply_cell_drift_charge_limit(3) == 3.0
+
+              battery.cells = cells(3.390, 3.426)
+              assert battery._apply_cell_drift_charge_limit(60) == 4.0
+
+              battery.cells = cells(3.390, 3.419)
+              assert battery._apply_cell_drift_charge_limit(60) == 10.0
+
+              battery.cells = cells(3.390, 3.409)
+              assert battery._apply_cell_drift_charge_limit(60) == 20.0
+
+              battery.cells = cells(3.360, 3.374)
+              assert battery._apply_cell_drift_charge_limit(60) == 60
+          PY
+
+      - name: Commit drivers to active_balance
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dbus-serialbattery/bms/daren_485.py dbus-serialbattery/bms/ks48100.py
+          if git diff --cached --quiet; then
+            echo "No driver changes to commit"
+          else
+            git commit -m "Add adaptive cell-drift CCL taper to Daren and KS48100"
+            git push origin HEAD:active_balance
+          fi
