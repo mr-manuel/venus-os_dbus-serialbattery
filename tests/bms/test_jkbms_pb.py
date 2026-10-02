@@ -228,7 +228,26 @@ class TestReadResponse:
         result = bms._read_response(ser, bms.command_settings, timeout=0.5)
         assert result is not False
         assert len(result) == 300
-        assert result[4] | result[5] << 8 == 1  # ftype=1 = settings
+        assert result[4] == 0x01  # frame type = settings
+
+    def test_settings_response_with_byte5_set(self):
+        """JK-PB2A16S20P fw 15.38 sends 0x05 in byte 5; only byte 4 is the frame type."""
+        bms = _make_bms(addr=0x03)
+        frame = bytearray(SETTINGS_RESPONSE)
+        frame[5] = 0x05
+        frame[299] = (frame[299] + 0x05) & 0xFF
+        ser = MockSerial(bytes(frame) + b"\x00" + FC16_ACK_SETTINGS)
+        result = bms._read_response(ser, bms.command_settings, timeout=0.5)
+        assert result is not False
+        assert result[4] == 0x01
+        assert result[5] == 0x05
+
+    def test_wrong_frame_type_rejected(self):
+        """A status frame must not be accepted as a settings response."""
+        bms = _make_bms(addr=0x03)
+        ser = MockSerial(STATUS_RESPONSE + b"\x00" + FC16_ACK)
+        result = bms._read_response(ser, bms.command_settings, timeout=0.5)
+        assert result is False
 
 
 class TestNaming:
