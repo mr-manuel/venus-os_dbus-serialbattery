@@ -698,6 +698,14 @@ class Generic_AioBmsBle(Battery):
                         await self._aiobmsble_disconnect(self._aiobmsble)
                     except Exception:
                         pass
+                    # Drop the client. It is bound to the device object it was
+                    # built from, and that object names the adapter it was
+                    # found on. If that adapter has gone, the client can never
+                    # reconnect, even with the battery in range of another
+                    # adapter. The next attempt resolves the device afresh and
+                    # builds a new client on whichever adapter has it now.
+                    self._aiobmsble = None
+                    self._aiobmsble_device = None
                     return False
             return False
 

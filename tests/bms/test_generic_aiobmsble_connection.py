@@ -272,8 +272,9 @@ def _refresh_with_device_gone(mod, monkeypatch):
     monkeypatch.setattr(mod, "logger", log)
     monkeypatch.setattr(mod, "time", clock)
 
-    names = ("refresh_data", "_resolve_device", "_aiobmsble_disconnect")
+    names = ("refresh_data", "_resolve_device", "_ensure_aiobmsble", "_aiobmsble_connect", "_aiobmsble_disconnect")
     bms = _borrow(mod, *names, "_reconnect_on_hold", "_note_connect_failure", "_note_connect_success")
+    bms.AIOBMSBLE_CLASS = None  # a test that models recovery sets a client class
     bms.address = "A4:C1:38:33:41:24"
     bms._aiobmsble = None
     bms.aiobmsble_data = {"voltage": 13.2, "current": 0.0, "battery_level": 80}
@@ -329,40 +330,152 @@ def test_lost_connection_is_paced(monkeypatch):
     updates = []
 
     class _Client:
-        """An aiobmsble client whose battery has gone away."""
-
-        back = False
+        """The client from startup; its battery has gone away."""
 
         async def async_update(self):
             updates.append(clock.now)
-            if not self.back:
-                raise RuntimeError("Failed to connect after 4 attempt(s)")
-            return {"voltage": 13.3}
+            raise RuntimeError("Failed to connect after 4 attempt(s)")
 
         async def disconnect(self):
             pass
 
-    client = _Client()
-    bms._aiobmsble = client  # it was connected, then the battery went away
+    bms._aiobmsble = _Client()  # it was connected, then the battery went away
 
     # three minutes at one poll a second
     for _ in range(180):
         bms.refresh_data()
         clock.now += 1
-    assert scans == [], "with a client in place the driver must not scan for the device"
-    assert len(updates) < 12, f"a lost connection must not be retried on every poll ({len(updates)} tries in 180 polls)"
+    # the startup client is tried once and then dropped: it is bound to the
+    # adapter it was found on, so later attempts resolve the device afresh
+    assert len(updates) == 1, f"the startup client must be tried once, then dropped ({len(updates)} tries)"
+    assert scans, "after the lost link the device must be resolved afresh"
+    attempts = len(updates) + len(scans)
+    assert attempts < 12, f"a lost connection must not be retried on every poll ({attempts} tries in 180 polls)"
     assert sum("unreachable after" in w for w in log.warnings) == 1, "a long outage must be reported once"
     unexpected = [e for e in log.errors if "Failed to refresh BMS data" not in e]
     assert unexpected == [], f"refresh_data swallowed an exception: {unexpected[:1]}"
 
-    # the battery comes back: the next try succeeds and clears the pacing.
+    # the battery comes back, seen by an adapter that is present: the next try
+    # builds a new client on it, succeeds, and clears the pacing.
     # (Parsing the data needs the real Battery class, so this one poll logs an
     # error on the stand-in after the pacing has been reset; that is expected.)
-    client.back = True
+    device, built = object(), []
+
+    class _Found:
+        @staticmethod
+        async def find_device_by_address(address):
+            return device
+
+    class _Fresh:
+        def __init__(self, ble_device):
+            built.append(ble_device)
+
+        async def connect(self):
+            pass
+
+        async def async_update(self):
+            return {"voltage": 13.3, "current": 0.0, "battery_level": 81}
+
+        async def disconnect(self):
+            pass
+
+    monkeypatch.setattr(mod, "BleakScanner", _Found)
+    bms.AIOBMSBLE_CLASS = _Fresh
     clock.now = bms._reconnect_hold_until + 0.01
     bms.refresh_data()
+    assert built == [device], "recovery must build a new client on the adapter that has the device"
     assert bms._connect_failures == 0, "a successful update must clear the pacing"
     assert any("reachable again after" in w for w in log.warnings), "the recovery must be reported"
+
+
+@_needs_pep604
+def test_lost_connection_rebinds_to_the_adapter_that_has_the_device(monkeypatch):
+    """After a lost connection the device is resolved afresh, not reused.
+
+    The client is built from a device object that names the adapter it was
+    found on. When that adapter is removed and the battery is reachable
+    through another, a client that keeps the old object can never reconnect:
+    on the test system the driver retried for the life of the process while
+    four working adapters sat idle.
+    """
+    import asyncio
+    import types
+
+    mod = _load_driver()
+    log, clock = _Log(), _Clock()
+    monkeypatch.setattr(mod, "logger", log)
+    monkeypatch.setattr(mod, "time", clock)
+    monkeypatch.setitem(sys.modules, "bleak_retry_connector", types.ModuleType("bleak_retry_connector"))
+
+    resolved = []
+    new_adapter_device = object()
+
+    class _Scanner:
+        @staticmethod
+        async def find_device_by_address(address):
+            resolved.append(address)
+            return new_adapter_device  # the battery, seen by an adapter that is present
+
+    monkeypatch.setattr(mod, "BleakScanner", _Scanner)
+
+    class _StaleClient:
+        """Bound to an adapter that no longer exists: every reconnect fails."""
+
+        async def async_update(self):
+            raise RuntimeError("Failed to connect after 4 attempt(s): device not found")
+
+        async def disconnect(self):
+            pass
+
+    built = []
+
+    class _FreshClient:
+        def __init__(self, ble_device):
+            built.append(ble_device)
+
+        async def connect(self):
+            pass
+
+        async def async_update(self):
+            return {"voltage": 13.3, "current": 0.0, "battery_level": 81}
+
+        async def disconnect(self):
+            pass
+
+    names = ("refresh_data", "_resolve_device", "_ensure_aiobmsble", "_aiobmsble_connect", "_aiobmsble_disconnect")
+    bms = _borrow(mod, *names, "_reconnect_on_hold", "_note_connect_failure", "_note_connect_success")
+    bms.address = "A4:C1:38:33:41:24"
+    bms.AIOBMSBLE_CLASS = _FreshClient
+    bms._aiobmsble = _StaleClient()  # connected at startup through an adapter since removed
+    bms._aiobmsble_device = object()
+    bms.aiobmsble_data = {"voltage": 13.2, "current": 0.0, "battery_level": 80}
+    bms._last_successful_update = clock.now
+    bms._max_data_age = 5
+    bms._stale_warning_interval = 60
+    bms._stale_warned_at = 0.0
+    bms._connect_failures = 0
+    bms._reconnect_hold_until = 0.0
+    bms._reconnect_warned = False
+
+    def _run_inline(coro):
+        try:
+            return bool(asyncio.run(coro()))
+        except Exception:
+            return False
+
+    bms._poll_update = _run_inline
+
+    # the link is lost; keep polling through the pacing until an attempt succeeds
+    for _ in range(300):
+        bms.refresh_data()
+        if bms._connect_failures == 0 and built:
+            break
+        clock.now += 1
+
+    assert resolved, "after a lost connection the device must be resolved afresh"
+    assert built == [new_adapter_device], f"a new client must be built on the adapter that has the device, got {built}"
+    assert bms.aiobmsble_data["battery_level"] == 81, "data must flow from the new client"
+    assert bms._connect_failures == 0, "the successful reconnect must clear the pacing"
 
 
 @_needs_pep604
