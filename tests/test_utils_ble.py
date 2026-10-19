@@ -1198,6 +1198,7 @@ print(json.dumps(landed))
 """
 
 
+@pytest.mark.skipif(sys.version_info < (3, 10), reason="the bleak in ext/ cannot be imported before Python 3.10")
 @pytest.mark.parametrize("foreign_caller_first", [False, True], ids=["driver alone", "after another caller"])
 @pytest.mark.parametrize(
     "kind, driver_calls",
