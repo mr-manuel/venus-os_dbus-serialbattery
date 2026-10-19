@@ -1167,6 +1167,14 @@ def _plain_client_arguments(monkeypatch):
     return calls
 
 
+def _bundled_bleak_parent():
+    """The folder under ext/ that holds the bundled bleak package, wherever ext/ keeps it."""
+    for folder, subfolders, _ in os.walk(os.path.join(DRIVER_DIR, "ext")):
+        if "bleak" in subfolders and os.path.isfile(os.path.join(folder, "bleak", "__init__.py")):
+            return folder
+    raise AssertionError("no bleak package found under ext/")
+
+
 # Replays the driver's arguments through the real bleak in ext/, in a child
 # process because this suite stubs bleak. Only bleak's own constructor runs;
 # the platform backend is a recorder, so no radio or D-Bus is needed.
@@ -1216,7 +1224,7 @@ def test_each_attempt_reaches_the_adapter_it_asked_for_in_the_bundled_bleak(monk
 
     calls = driver_calls(monkeypatch)
     result = subprocess.run(
-        [sys.executable, "-c", _REPLAY_THROUGH_BUNDLED_BLEAK, os.path.join(DRIVER_DIR, "ext"), kind, "1" if foreign_caller_first else "0", json.dumps(calls)],
+        [sys.executable, "-c", _REPLAY_THROUGH_BUNDLED_BLEAK, _bundled_bleak_parent(), kind, "1" if foreign_caller_first else "0", json.dumps(calls)],
         capture_output=True,
         text=True,
         timeout=60,
