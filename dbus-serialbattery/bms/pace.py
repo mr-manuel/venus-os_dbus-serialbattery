@@ -4,7 +4,8 @@
 # Added by https://github.com/KoljaWindeler
 
 from battery import Battery, Cell
-from utils import SOC_CALCULATION, read_serial_data, logger
+from utils import SOC_CALCULATION, capture_raw_data, get_connection_error_message, logger
+import serial
 import sys
 
 
@@ -89,7 +90,7 @@ class Pace(Battery):
         # Set the current limits, populate cell count, etc
         # Return True if success, False for failure
         logger.debug("requesting settings")
-        status_data = self.read_serial_data_pace(self.command_status, 160)
+        status_data = self.read_serial_data_pace(self.command_status)
         # check if connection success
         if status_data is False:
             return False
@@ -106,8 +107,7 @@ class Pace(Battery):
 
         # ######################### SOFTWARE VERSION #############################
         logger.debug("requesting software version")
-        # 13 + 5 + 40, should be 58, but doesn't ever trigger, so we use 57, that works fine
-        status_data = self.read_serial_data_pace(self.command_software_version, 57)
+        status_data = self.read_serial_data_pace(self.command_software_version)
         if status_data is False:
             return True
         else:
@@ -119,8 +119,7 @@ class Pace(Battery):
             self.hardware_version = sw_version
         # ######################### SERIAL NR #############################
         logger.debug("requesting serial nr")
-        # 13 + 5 + 40, should be 58, but doesn't ever trigger, so we use 57, that works fine
-        status_data = self.read_serial_data_pace(self.command_serial_nr, 97)
+        status_data = self.read_serial_data_pace(self.command_serial_nr)
         if status_data is False:
             return True
         else:
@@ -152,8 +151,7 @@ class Pace(Battery):
 
     def read_fuses_data(self):
         logger.debug("run read_fuses_data()")
-        # same here, should be 96 but we have to request 95 .. have to check why
-        status_data = self.read_serial_data_pace(self.command_fuses, 95)
+        status_data = self.read_serial_data_pace(self.command_fuses)
         if status_data is False:
             return False
         # ## reset all warnings ###
@@ -359,7 +357,7 @@ class Pace(Battery):
 
     def read_status_data(self):
         logger.debug("run read_status_data()")
-        status_data = self.read_serial_data_pace(self.command_status, 160)
+        status_data = self.read_serial_data_pace(self.command_status)
         # check if connection success
         if status_data is False:
             return False
@@ -451,28 +449,30 @@ class Pace(Battery):
                 max_cell = c
         return max_cell
 
-    def read_serial_data_pace(self, command: str, length: int) -> bool:
+    def read_serial_data_pace(self, command: bytes) -> bool:
         """
-        use the read_serial_data() function to read the data and then do BMS specific checks (crc, start bytes, etc)
+        Send a command, read the reply up to its end-of-information byte (0x0D) and then do BMS specific checks (crc, start bytes, etc).
+        Reading up to the end byte instead of a fixed length works for any number of cells and temperature sensors.
         :param command: the command to be sent to the bms
-        :return: True if everything is fine, else False
+        :return: the received data if everything is fine, else False
         """
-        data = read_serial_data(
-            command,
-            self.port,
-            self.baud_rate,
-            self.LENGTH_POS,  # ignored
-            self.LENGTH_CHECK,  # ignored
-            length,
-            self.LENGTH_SIZE,  # ignored
-            battery_online=self.online,
-        )
+        try:
+            with serial.Serial(self.port, baudrate=self.baud_rate, timeout=1) as ser:
+                ser.reset_input_buffer()
+                ser.write(command)
+                capture_raw_data(self.port, "tx", command)
+                data = ser.read_until(b"\r")
+                capture_raw_data(self.port, "rx", data)
+        except serial.SerialException as e:
+            logger.error(e)
+            return False
+
+        if not data:
+            get_connection_error_message(self.online)
+            return False
 
         logger.debug("received:")
         logger.debug(data.hex(" "))
-
-        if data is False:
-            return False
 
         if data[0] == 0x7E:
             logger.debug("SOI found")
