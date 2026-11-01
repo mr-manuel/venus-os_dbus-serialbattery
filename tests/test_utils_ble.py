@@ -30,6 +30,25 @@ if "bleak" not in sys.modules:
         BleakCharacteristicNotFoundError=type("BleakCharacteristicNotFoundError", (_bleak_error,), {}),
     )
     sys.modules["bleak.exc"] = sys.modules["bleak"].exc
+# A tests/bms/* stub collected earlier may already own "bleak"/"bleak.exc" with fewer
+# names than utils_ble imports (the setdefault race). Add what is missing onto the
+# existing stub instead of losing; never overwrite a name another test defined.
+_bleak_stub = sys.modules.get("bleak")
+_exc_stub = sys.modules.get("bleak.exc") or getattr(_bleak_stub, "exc", None)
+if _exc_stub is not None:
+    _base = getattr(_exc_stub, "BleakError", None) or type("BleakError", (Exception,), {})
+    if not hasattr(_exc_stub, "BleakError"):
+        _exc_stub.BleakError = _base
+    if not hasattr(_exc_stub, "BleakCharacteristicNotFoundError"):
+        _exc_stub.BleakCharacteristicNotFoundError = type("BleakCharacteristicNotFoundError", (_base,), {})
+    sys.modules.setdefault("bleak.exc", _exc_stub)
+if _bleak_stub is not None:
+    if not hasattr(_bleak_stub, "BleakClient"):
+        _bleak_stub.BleakClient = type("BleakClient", (), {"__init__": lambda self, *a, **kw: None})
+    if not hasattr(_bleak_stub, "BleakScanner"):
+        _bleak_stub.BleakScanner = object
+    if not hasattr(_bleak_stub, "exc"):
+        _bleak_stub.exc = _exc_stub
 if "bleak_retry_connector" not in sys.modules:
     # utils_ble only needs these four names; stubbing keeps BleakRetryBackend
     # in supported_ble_backends so the generic backend tests cover it too.
@@ -446,6 +465,29 @@ def test_a_bleak_that_moves_the_rebuild_call_fails_loudly():
         raise AssertionError("a missing backend call must be reported, not ignored")
     except utils_ble.BleakError as e:
         assert "_get_services" in str(e)
+
+
+def test_a_rebuild_that_cannot_happen_is_said_at_warning_once(monkeypatch, caplog):
+    """
+    The raise alone is not seen at the default log level: connection failures
+    are logged at DEBUG, so an operator would see only "rebuilding it" repeat
+    every attempt with the reason hidden. Said once, at WARNING, because it
+    means the installed bleak does not fit this driver and no attempt will
+    change that.
+    """
+    import asyncio
+
+    monkeypatch.setattr(utils_ble, "_rediscovery_unavailable_reported", False)
+    client = _GattClient(appears_after=99, backend=types.SimpleNamespace())
+    with caplog.at_level("WARNING", logger="SerialBattery"):
+        for _ in range(3):
+            try:
+                asyncio.run(utils_ble.rediscover_services(client, "char"))
+                raise AssertionError("a missing backend call must still fail the connection")
+            except utils_ble.BleakError:
+                pass
+    warned = [m for m in caplog.messages if "_get_services" in m]
+    assert len(warned) == 1
 
 
 def test_neither_backend_subscribes_without_the_rebuild_guard():
@@ -880,6 +922,348 @@ def test_without_strict_an_absent_pin_still_attempts(monkeypatch):
         assert attempts == [PINNED, PINNED]
     finally:
         _configure(original_pins, original_pool)
+
+
+# --------- the reconnect loop's guards ---------
+#
+# These ran in production for weeks with nothing asserting them: a review
+# deleted each one in turn and every test still passed. Each test below is
+# the one that fails if its guard is removed.
+
+
+def _connecting_battery(backend):
+    """A Syncron_Ble with the threads left out, so connect_to_bms can be run directly."""
+    import threading
+
+    battery = utils_ble.Syncron_Ble.__new__(utils_ble.Syncron_Ble)
+    battery.address = PINNED
+    battery.backend = backend
+    battery.main_thread = types.SimpleNamespace(is_alive=lambda: True)
+    battery.ble_connection_ready = threading.Event()
+    battery._reset_counters()
+    return battery
+
+
+def test_an_establish_that_never_answers_is_abandoned(monkeypatch):
+    """
+    One unanswered D-Bus await once silenced reconnection for four hours
+    without a log line. The deadline is the backstop; a backstop that
+    quietly stopped working would bring that silence straight back.
+    """
+    import asyncio as aio
+
+    monkeypatch.setattr(utils_ble, "BLE_ESTABLISH_TIMEOUT", 0.05)
+
+    async def never(*args, **kwargs):
+        await aio.Event().wait()
+
+    backend = types.SimpleNamespace(create_client=lambda address, callback: None, establish=never)
+    battery = _connecting_battery(backend)
+    assert aio.run(aio.wait_for(battery.connect_to_bms(PINNED), timeout=2.0)) is False
+
+
+def test_a_release_that_never_answers_is_abandoned(monkeypatch, caplog):
+    """A disconnect that never completes must not prevent the next attempt."""
+    import asyncio as aio
+
+    monkeypatch.setattr(utils_ble, "BLE_RELEASE_TIMEOUT", 0.05)
+    monkeypatch.setattr(utils_ble, "BLE_SUPERVISION_RECHECK", 0.01)
+
+    async def connected(*args, **kwargs):
+        return _FakeClient(False)
+
+    async def never(*args, **kwargs):
+        await aio.Event().wait()
+
+    backend = types.SimpleNamespace(create_client=lambda address, callback: None, establish=connected, release=never)
+    battery = _connecting_battery(backend)
+    with caplog.at_level("WARNING", logger="SerialBattery"):
+        aio.run(aio.wait_for(battery.connect_to_bms(PINNED), timeout=2.0))
+    assert any("disconnect did not complete" in m for m in caplog.messages)
+
+
+def test_an_abandoned_generation_stops_attempting(monkeypatch):
+    """
+    A thread rebuild starts a new generation and leaves the old thread to
+    retire itself at its next loop pass. Without the guard both generations
+    would reconnect the same battery, each fighting the other for the link.
+    """
+    battery, attempts, asyncio_mod = _loop_battery(monkeypatch, {}, iterations=6)
+
+    async def rebuild_after_first(address):
+        attempts.append(address)
+        battery._ble_thread_generation += 1
+
+    battery.connect_to_bms = rebuild_after_first
+    asyncio_mod.run(battery.async_main(PINNED, 0))
+    assert attempts == [PINNED]
+
+
+def test_a_hold_flag_stops_every_attempt(monkeypatch, tmp_path, caplog):
+    battery, attempts, asyncio_mod = _loop_battery(monkeypatch, {}, iterations=4)
+    flag = tmp_path / "ble-hold"
+    flag.write_text("operator")
+    monkeypatch.setattr(utils_ble, "ble_hold_flag_path", lambda address: str(flag))
+    with caplog.at_level("WARNING", logger="SerialBattery"):
+        asyncio_mod.run(battery.async_main(PINNED, 0))
+    assert attempts == []
+    # an operator's flag is theirs to remove
+    assert flag.exists()
+    assert len([m for m in caplog.messages if "pausing connection attempts" in m]) == 1
+
+
+def test_an_automatic_hold_expires_by_itself(monkeypatch, tmp_path):
+    battery, attempts, asyncio_mod = _loop_battery(monkeypatch, {}, iterations=3)
+    flag = tmp_path / "ble-hold"
+    flag.write_text("auto")
+    expired = time.time() - utils_ble.BLE_HOLD_AUTO_EXPIRY - 60
+    os.utime(flag, (expired, expired))
+    monkeypatch.setattr(utils_ble, "ble_hold_flag_path", lambda address: str(flag))
+    asyncio_mod.run(battery.async_main(PINNED, 0))
+    assert not flag.exists()
+    assert attempts
+
+
+def test_the_reconnect_backoff_climbs_and_resets_after_a_long_session(monkeypatch):
+    """
+    The sequence is not obvious from the code: the first entry is only used
+    after a session that held for over a minute, so a fresh failure waits the
+    second entry, then the third, and stays there.
+    """
+    battery, attempts, asyncio_mod = _loop_battery(monkeypatch, {}, iterations=5)
+    monkeypatch.setattr(utils_ble, "BLE_RECONNECT_BACKOFF", [10, 20, 30])
+    real_sleep = asyncio_mod.sleep
+    slept = []
+
+    async def recording_sleep(delay, *args, **kwargs):
+        slept.append(delay)
+        await real_sleep(0)
+
+    monkeypatch.setattr(utils_ble.asyncio, "sleep", recording_sleep)
+    clock = [1000.0]
+    monkeypatch.setattr(utils_ble.time, "time", lambda: clock[0])
+
+    async def connect(address):
+        attempts.append(address)
+        # the first session holds for over a minute; the rest fail at once
+        if len(attempts) == 1:
+            clock[0] += 61
+
+    battery.connect_to_bms = connect
+    asyncio_mod.run(battery.async_main(PINNED, 0))
+    assert slept == [10, 20, 30, 30]
+
+
+def test_the_retry_backend_closes_stale_links_and_asks_for_its_adapter(monkeypatch):
+    """
+    Two things the retry backend exists to do beyond plain bleak: close a link
+    left over from a previous session before connecting, and connect over the
+    adapter this battery was assigned rather than whichever BlueZ picks.
+    """
+    import asyncio as aio
+
+    device = object()
+    closed = []
+    passed = {}
+
+    async def fake_resolve(address):
+        return device
+
+    async def fake_close(dev):
+        closed.append(dev)
+
+    async def fake_establish(client_class, dev, address, **kwargs):
+        passed.update(kwargs)
+        return _GattClient()
+
+    backend = utils_ble.get_ble_backend("BleakRetryBackend")
+    backend.current_adapter = "hci3"
+    backend._resolve_device = fake_resolve
+    monkeypatch.setattr(utils_ble, "close_stale_connections", fake_close)
+    monkeypatch.setattr(utils_ble, "retry_establish_connection", fake_establish)
+    aio.run(backend._establish(None, PINNED, "char", "callback"))
+    assert closed == [device]
+    assert passed.get("bluez") == {"adapter": "hci3"}
+    assert "adapter" not in passed
+
+
+# --------- asking bleak for an adapter ---------
+#
+# bleak 3.0 copies the deprecated top-level adapter= into a bluez= default dict
+# shared by every call, so the first adapter= in a process wins over every
+# later one. A battery moving to its next adapter kept discovering on the
+# first, where every connect failed, for 19 hours. Every call that names an
+# adapter has to pass its own bluez dict instead.
+
+
+def test_a_call_without_an_adapter_gets_a_fresh_empty_bluez_dict():
+    """bleak's shared default may already hold another caller's adapter."""
+    first, second = utils_ble.bluez_adapter_args(None), utils_ble.bluez_adapter_args(None)
+
+    assert first == second == {"bluez": {}}
+    assert first["bluez"] is not second["bluez"]
+
+
+_ATTEMPT_ADAPTERS = ["hci8", "hci0", None]
+
+
+def _scan_arguments(monkeypatch):
+    """What the retry backend hands BleakScanner on a cache miss, per attempt."""
+    import asyncio as aio
+
+    calls = []
+
+    async def cache_miss(address, adapter=None):
+        return None
+
+    async def fake_find(address, timeout, **kwargs):
+        calls.append(kwargs)
+
+    monkeypatch.setattr(utils_ble, "get_device_by_adapter", cache_miss)
+    monkeypatch.setattr(utils_ble, "get_device", cache_miss)
+    monkeypatch.setattr(utils_ble, "BleakScanner", types.SimpleNamespace(find_device_by_address=fake_find))
+    backend = utils_ble.get_ble_backend("BleakRetryBackend")
+    for adapter in _ATTEMPT_ADAPTERS:
+        backend.current_adapter = adapter
+        aio.run(backend._resolve_device(PINNED))
+    return calls
+
+
+def _retry_client_arguments(monkeypatch):
+    """What the retry backend hands the connector for its BleakClient, per attempt."""
+    import asyncio as aio
+
+    calls = []
+
+    async def found(address):
+        return object()
+
+    async def no_stale_links(device):
+        pass
+
+    async def fake_establish(client_class, device, address, **kwargs):
+        kwargs.pop("disconnected_callback")
+        calls.append(kwargs)
+        return _GattClient()
+
+    monkeypatch.setattr(utils_ble, "close_stale_connections", no_stale_links)
+    monkeypatch.setattr(utils_ble, "retry_establish_connection", fake_establish)
+    backend = utils_ble.get_ble_backend("BleakRetryBackend")
+    backend._resolve_device = found
+    for adapter in _ATTEMPT_ADAPTERS:
+        backend.current_adapter = adapter
+        aio.run(backend._establish(None, PINNED, "char", "callback"))
+    return calls
+
+
+def _plain_client_arguments(monkeypatch):
+    """What the plain backend hands BleakClient, per attempt."""
+    calls = []
+    monkeypatch.setattr(utils_ble, "BleakClient", lambda address, disconnected_callback, **kwargs: calls.append(kwargs))
+    backend = utils_ble.get_ble_backend("BleakBackend")
+    for adapter in _ATTEMPT_ADAPTERS:
+        monkeypatch.setattr(utils_ble, "adapters_in_attempt_order", lambda address, present=None, a=adapter: [a] if a else [])
+        backend.create_client(PINNED, None)
+    return calls
+
+
+def _bundled_bleak_parent():
+    """The folder under ext/ that holds the bundled bleak package, wherever ext/ keeps it."""
+    for folder, subfolders, _ in os.walk(os.path.join(DRIVER_DIR, "ext")):
+        if "bleak" in subfolders and os.path.isfile(os.path.join(folder, "bleak", "__init__.py")):
+            return folder
+    raise AssertionError("no bleak package found under ext/")
+
+
+# Replays the driver's arguments through the real bleak in ext/, in a child
+# process because this suite stubs bleak. Only bleak's own constructor runs;
+# the platform backend is a recorder, so no radio or D-Bus is needed.
+_REPLAY_THROUGH_BUNDLED_BLEAK = """
+import json, sys, warnings
+sys.path.insert(0, sys.argv[1])
+from bleak import BleakClient, BleakScanner
+
+kind, foreign_caller_first, calls = sys.argv[2], sys.argv[3] == "1", json.loads(sys.argv[4])
+landed = []
+
+class Recorder:
+    def __init__(self, *args, bluez, **kwargs):
+        landed.append(bluez.get("adapter"))
+
+def make(**kwargs):
+    if kind == "scanner":
+        BleakScanner(backend=Recorder, **kwargs)
+    else:
+        BleakClient("C8:47:8C:00:00:00", backend=Recorder, **kwargs)
+
+warnings.simplefilter("ignore", DeprecationWarning)
+if foreign_caller_first:
+    make(adapter="hci9")
+    landed.clear()
+for kwargs in calls:
+    make(**kwargs)
+print(json.dumps(landed))
+"""
+
+
+@pytest.mark.skipif(sys.version_info < (3, 10), reason="the bleak in ext/ cannot be imported before Python 3.10")
+@pytest.mark.parametrize("foreign_caller_first", [False, True], ids=["driver alone", "after another caller"])
+@pytest.mark.parametrize(
+    "kind, driver_calls",
+    [("scanner", _scan_arguments), ("client", _retry_client_arguments), ("client", _plain_client_arguments)],
+    ids=["retry scan", "retry client", "plain client"],
+)
+def test_each_attempt_reaches_the_adapter_it_asked_for_in_the_bundled_bleak(monkeypatch, kind, driver_calls, foreign_caller_first):
+    """
+    Three attempts in one process - hci8, then hci0, then no adapter - must
+    each land where they asked, both when the driver is bleak's only caller
+    and when something else in the process used adapter= first.
+    """
+    import json
+    import subprocess
+
+    calls = driver_calls(monkeypatch)
+    result = subprocess.run(
+        [sys.executable, "-c", _REPLAY_THROUGH_BUNDLED_BLEAK, _bundled_bleak_parent(), kind, "1" if foreign_caller_first else "0", json.dumps(calls)],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == _ATTEMPT_ADAPTERS
+
+
+def test_send_data_runs_the_command_on_the_ble_thread_s_own_loop():
+    """
+    It used to wrap every command in asyncio.run(), building and tearing down
+    a whole event loop on the calling thread per command. It now schedules
+    onto the loop the BLE thread already runs, and waits for the answer.
+    """
+    import asyncio as aio
+    import threading
+
+    loop = aio.new_event_loop()
+    worker = threading.Thread(target=loop.run_forever, daemon=True)
+    worker.start()
+    try:
+        battery = utils_ble.Syncron_Ble.__new__(utils_ble.Syncron_Ble)
+        battery.ble_async_thread_event_loop = loop
+        seen = {}
+
+        async def fake_send(data):
+            seen["thread"] = threading.current_thread()
+            seen["data"] = data
+            return b"reply"
+
+        battery.ble_thread_send_com = fake_send
+        assert battery.send_data(b"cmd") == b"reply"
+        assert seen["data"] == b"cmd"
+        assert seen["thread"] is worker
+    finally:
+        loop.call_soon_threadsafe(loop.stop)
+        worker.join(1)
+        loop.close()
 
 
 # --------- one line per episode, not three per attempt ---------
@@ -1400,6 +1784,31 @@ def test_supervision_returns_when_the_main_thread_is_gone():
         aio.run(run())
     finally:
         utils_ble.BLE_SUPERVISION_RECHECK = original
+
+
+def test_supervision_keeps_waiting_while_the_link_is_healthy(monkeypatch):
+    """
+    The three tests above check that supervision RETURNS when it should. None
+    checked that it WAITS when it should, so a supervision that returned at
+    once passed all of them - and would have turned every healthy connection
+    into an immediate release and reconnect.
+    """
+    import asyncio as aio
+
+    monkeypatch.setattr(utils_ble, "BLE_SUPERVISION_RECHECK", 0.01)
+
+    async def run():
+        s = _supervisor(connected=True, main_alive=True)
+        s._disconnected = aio.Event()
+        s._disconnected_loop = aio.get_running_loop()
+        # many recheck intervals pass with the link up and nothing signalled
+        try:
+            await aio.wait_for(s.supervise_connection(), timeout=0.2)
+        except aio.TimeoutError:
+            return
+        raise AssertionError("supervision returned while the link was healthy")
+
+    aio.run(run())
 
 
 def test_signalling_without_a_connection_is_harmless():

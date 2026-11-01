@@ -114,7 +114,7 @@ def _adapters_from_hciconfig():
     """{hciN: MAC} by parsing one bare hciconfig call.
 
     One call returns the whole table, so this spawns a single subprocess
-    however many adapters the box has - the production GX device has seven.
+    however many adapters the box has.
     """
     try:
         result = subprocess.run(["hciconfig"], capture_output=True, text=True, timeout=5)
@@ -599,6 +599,11 @@ GATT_REDISCOVERY_ATTEMPTS = 3
 GATT_REDISCOVERY_SETTLE = 0.5
 
 
+# Whether the rebuild has been found impossible in this process; see
+# rediscover_services.
+_rediscovery_unavailable_reported = False
+
+
 async def rediscover_services(client, notify_char):
     """
     Rebuild a connected client's GATT tree from what BlueZ holds now.
@@ -614,10 +619,20 @@ async def rediscover_services(client, notify_char):
     backend = getattr(client, "_backend", None)
     get_services = getattr(backend, "_get_services", None)
     if get_services is None or not hasattr(backend, "services"):
-        raise BleakError(
+        message = (
             f"characteristic {notify_char} is missing from the resolved GATT tree, and this bleak "
             "offers no way to rebuild it (expected _backend._get_services); connection unusable"
         )
+        # The raise alone is not enough to be seen: connection failures are
+        # logged at DEBUG, so at the default level only the "rebuilding it"
+        # warning would show, repeating every attempt with the reason hidden.
+        # Said once per process at WARNING: it means the installed bleak is not
+        # one this driver can work with, which no later attempt will change.
+        global _rediscovery_unavailable_reported
+        if not _rediscovery_unavailable_reported:
+            _rediscovery_unavailable_reported = True
+            logger.warning(message)
+        raise BleakError(message)
     # _get_services returns the tree it already has, so it has to be dropped
     # first for the rebuild to read BlueZ again. The rebuild goes to live
     # BlueZ state rather than any cached collection, so a client that was
@@ -672,6 +687,20 @@ def landed_adapter(client):
         if re.fullmatch(r"hci\d+", part):
             return part
     return None
+
+
+def bluez_adapter_args(adapter):
+    """
+    Keyword arguments that ask bleak for an adapter, or for none.
+
+    bleak 3.0 deprecated the top-level adapter= argument and now copies it into
+    its bluez= argument, whose default is a single dict shared by every call.
+    The first adapter= in a process is written into that dict and then wins
+    over every later one, so a battery moving to its next adapter keeps
+    scanning and connecting on the first, and a call that asks for no adapter
+    inherits it too. A fresh bluez dict on every call avoids both.
+    """
+    return {"bluez": {"adapter": adapter} if adapter else {}}
 
 
 class BleConnectionBackend:
@@ -770,11 +799,8 @@ class BleakBackend(BleConnectionBackend):
         return adapters[self.adapter_index % len(adapters)]
 
     def create_client(self, address, disconnected_callback):
-        kwargs = {}
         self.current_adapter = self._select_adapter(address)
-        if self.current_adapter:
-            kwargs["adapter"] = self.current_adapter
-        return BleakClient(address, disconnected_callback=disconnected_callback, **kwargs)
+        return BleakClient(address, disconnected_callback=disconnected_callback, **bluez_adapter_args(self.current_adapter))
 
     async def establish(self, client, address, notify_char, notify_callback):
         try:
@@ -846,8 +872,9 @@ class BleakRetryBackend(BleConnectionBackend):
         if device is None:
             raise BleakError(f"bluetooth device {address} not found" + (f" on adapter {self.current_adapter}" if self.current_adapter else ""))
         await close_stale_connections(device)
-        kwargs = {"adapter": self.current_adapter} if self.current_adapter else {}
-        client = await retry_establish_connection(BleakClient, device, address, disconnected_callback=self.disconnected_callback, **kwargs)
+        client = await retry_establish_connection(
+            BleakClient, device, address, disconnected_callback=self.disconnected_callback, **bluez_adapter_args(self.current_adapter)
+        )
         self._record_landed(client)
         await start_notify_when_resolved(client, notify_char, notify_callback)
         return client
@@ -866,8 +893,7 @@ class BleakRetryBackend(BleConnectionBackend):
         if device is None:
             self.scans += 1
             logger.debug(f"bluetooth device {address} not in BlueZ cache, scanning")
-            kwargs = {"adapter": self.current_adapter} if self.current_adapter else {}
-            device = await BleakScanner.find_device_by_address(address, timeout=10.0, **kwargs)
+            device = await BleakScanner.find_device_by_address(address, timeout=10.0, **bluez_adapter_args(self.current_adapter))
         return device
 
     async def release(self, client):
