@@ -1365,17 +1365,9 @@ class DbusHelper:
                 # Update TimeToGo item
                 if utils.TIME_TO_GO_ENABLE and percent_per_seconds is not None:
 
-                    # Get settings from dbus
-                    settings_battery_life = self.get_settings_with_values(
-                        get_bus(VICTRON_SETTINGS_DBUS_NAME),
-                        VICTRON_SETTINGS_DBUS_NAME,
-                        "/Settings/CGwacs/BatteryLife",
-                    )
-                    settings_hub4mode = self.get_settings_with_values(
-                        get_bus(VICTRON_SETTINGS_DBUS_NAME),
-                        VICTRON_SETTINGS_DBUS_NAME,
-                        "/Settings/CGwacs/Hub4Mode",
-                    )
+                    # Only four settings are used below. Avoid walking the
+                    # schedules and other unrelated settings in the main loop.
+                    settings_battery_life, settings_hub4mode = self.get_time_to_go_settings()
 
                     hub4mode = int(settings_hub4mode["Settings"]["CGwacs"]["Hub4Mode"]) if "Settings" in settings_hub4mode else None
                     state = (
@@ -1527,6 +1519,27 @@ class DbusHelper:
                 d = d[part]
             d[parts[-1]] = value
         return cascaded
+
+    def get_time_to_go_settings(self):
+        """Read the four current ESS settings needed by the TimeToGo display.
+
+        A failed read reaches publish_dbus's existing exception handler. No
+        cached values are substituted and no charging settings are written.
+        """
+        bus = get_bus(VICTRON_SETTINGS_DBUS_NAME)
+        battery_life = {}
+        hub4mode = {}
+        for suffix in ("State", "MinimumSocLimit", "SocLimit"):
+            path = "/Settings/CGwacs/BatteryLife/" + suffix
+            value = bus.get_object(VICTRON_SETTINGS_DBUS_NAME, path, introspect=False).GetValue(dbus_interface="com.victronenergy.BusItem", timeout=1)
+            if type(value) is not dbus.Dictionary:
+                battery_life[suffix] = str(value)
+        value = bus.get_object(VICTRON_SETTINGS_DBUS_NAME, "/Settings/CGwacs/Hub4Mode", introspect=False).GetValue(
+            dbus_interface="com.victronenergy.BusItem", timeout=1
+        )
+        if type(value) is not dbus.Dictionary:
+            hub4mode = {"Settings": {"CGwacs": {"Hub4Mode": str(value)}}}
+        return {"Settings": {"CGwacs": {"BatteryLife": battery_life}}}, hub4mode
 
     def get_settings_with_values(self, bus, service: str, object_path: str, recursive: bool = True) -> dict:
         """
