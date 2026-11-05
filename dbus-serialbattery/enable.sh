@@ -284,34 +284,19 @@ if [ "$bluetooth_length" -gt 0 ]; then
         mkdir -p "/service/dbus-blebattery.$1/log"
         {
             echo "#!/bin/sh"
-            echo "exec multilog t s500000 n4 /var/log/dbus-blebattery.$1"
+            echo "exec multilog t s1500000 n20 /var/log/dbus-blebattery.$1"
         } > "/service/dbus-blebattery.$1/log/run"
         chmod 755 "/service/dbus-blebattery.$1/log/run"
 
         {
             echo "#!/bin/sh"
             echo
-            echo "# Forward signals to the child process"
-            echo "trap 'kill -TERM \$PID' TERM INT"
-            echo
             # close all open connections, else the driver can't connect
             echo "bluetoothctl disconnect $3 > /dev/null 2>&1"
             echo
             echo "# Start the main process"
             echo "exec 2>&1"
-            echo "python /data/apps/dbus-serialbattery/dbus-serialbattery.py $2 $3 &"
-            echo
-            echo "# Capture the PID of the child process"
-            echo "PID=\$!"
-            echo
-            echo "# Wait for the child process to exit"
-            echo "wait \$PID"
-            echo
-            echo "# Capture the exit status"
-            echo "EXIT_STATUS=\$?"
-            echo
-            echo "# Exit with the same status"
-            echo "exit \$EXIT_STATUS"
+            echo "exec python /data/apps/dbus-serialbattery/dbus-serialbattery.py $2 $3"
         } > "/service/dbus-blebattery.$1/run"
         chmod 755 "/service/dbus-blebattery.$1/run"
     }
@@ -402,31 +387,16 @@ if [ "$can_length" -gt 0 ]; then
         mkdir -p "/service/dbus-canbattery.$1/log"
         {
             echo "#!/bin/sh"
-            echo "exec multilog t s500000 n4 /var/log/dbus-canbattery.$1"
+            echo "exec multilog t s1500000 n20 /var/log/dbus-canbattery.$1"
         } > "/service/dbus-canbattery.$1/log/run"
         chmod 755 "/service/dbus-canbattery.$1/log/run"
 
         {
             echo "#!/bin/sh"
             echo
-            echo "# Forward signals to the child process"
-            echo "trap 'kill -TERM \$PID' TERM INT"
-            echo
             echo "# Start the main process"
             echo "exec 2>&1"
-            echo "python /data/apps/dbus-serialbattery/dbus-serialbattery.py $1 &"
-            echo
-            echo "# Capture the PID of the child process"
-            echo "PID=\$!"
-            echo
-            echo "# Wait for the child process to exit"
-            echo "wait \$PID"
-            echo
-            echo "# Capture the exit status"
-            echo "EXIT_STATUS=\$?"
-            echo
-            echo "# Exit with the same status"
-            echo "exit \$EXIT_STATUS"
+            echo "exec python /data/apps/dbus-serialbattery/dbus-serialbattery.py $1"
         } > "/service/dbus-canbattery.$1/run"
         chmod 755 "/service/dbus-canbattery.$1/run"
     }
@@ -509,31 +479,16 @@ if [ "$mqtt_length" -gt 0 ]; then
         mkdir -p "/service/dbus-mqttbattery/log"
         {
             echo "#!/bin/sh"
-            echo "exec multilog t s500000 n4 /var/log/dbus-mqttbattery"
+            echo "exec multilog t s1500000 n20 /var/log/dbus-mqttbattery"
         } > "/service/dbus-mqttbattery/log/run"
         chmod 755 "/service/dbus-mqttbattery/log/run"
 
         {
             echo "#!/bin/sh"
             echo
-            echo "# Forward signals to the child process"
-            echo "trap 'kill -TERM \$PID' TERM INT"
-            echo
             echo "# Start the main process"
             echo "exec 2>&1"
-            echo "python /data/apps/dbus-serialbattery/dbus-serialbattery.py mqtt \"$1\" &"
-            echo
-            echo "# Capture the PID of the child process"
-            echo "PID=\$!"
-            echo
-            echo "# Wait for the child process to exit"
-            echo "wait \$PID"
-            echo
-            echo "# Capture the exit status"
-            echo "EXIT_STATUS=\$?"
-            echo
-            echo "# Exit with the same status"
-            echo "exit \$EXIT_STATUS"
+            echo "exec python /data/apps/dbus-serialbattery/dbus-serialbattery.py mqtt \"$1\""
         } > "/service/dbus-mqttbattery/run"
         chmod 755 "/service/dbus-mqttbattery/run"
     }

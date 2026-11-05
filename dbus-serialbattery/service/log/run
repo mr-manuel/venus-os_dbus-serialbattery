@@ -3,4 +3,4 @@ exec 2>&1
 LOG_DIR="$(dirname "$(readlink -f "$0")")"
 SVC_DIR="${LOG_DIR%/log}"
 PORT_NAME="${SVC_DIR##*/dbus-serialbattery.}"
-exec multilog t s500000 n4 "/var/log/dbus-serialbattery.$PORT_NAME"
+exec multilog t s1500000 n20 "/var/log/dbus-serialbattery.$PORT_NAME"
