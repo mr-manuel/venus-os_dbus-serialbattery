@@ -2160,6 +2160,18 @@ class Battery(ABC):
             logger.error(f"Exception occurred: {repr(exception_object)} of type {exception_type} in {file} line #{line}")
             logger.error("External current sensor setup failed, fallback to internal sensor")
 
+    def get_voltage(self) -> Union[float, None]:
+        """
+        Get the voltage of the battery.
+
+        Accessor symmetry with get_current(), get_soc() and get_temperature():
+        the published voltage goes through a getter, so it can be sourced from
+        somewhere other than the raw BMS attribute.
+
+        :return: The voltage
+        """
+        return self.voltage
+
     def get_current(self) -> Union[float, None]:
         """
         Get the current, either from:

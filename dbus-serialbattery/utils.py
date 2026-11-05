@@ -309,10 +309,49 @@ EXTERNAL_SENSOR_DBUS_PATH_CURRENT: Union[str, None] = config["DEFAULT"]["EXTERNA
 EXTERNAL_SENSOR_DBUS_PATH_SOC: Union[str, None] = config["DEFAULT"]["EXTERNAL_SENSOR_DBUS_PATH_SOC"] or None
 
 
+# --------- Fallback Sensor ---------
+FALLBACK_SENSOR_DBUS_DEVICE: Union[str, None] = config["DEFAULT"]["FALLBACK_SENSOR_DBUS_DEVICE"] or None
+FALLBACK_SENSOR_DBUS_PATH_VOLTAGE: Union[str, None] = config["DEFAULT"]["FALLBACK_SENSOR_DBUS_PATH_VOLTAGE"] or None
+FALLBACK_SENSOR_DBUS_PATH_CURRENT: Union[str, None] = config["DEFAULT"]["FALLBACK_SENSOR_DBUS_PATH_CURRENT"] or None
+FALLBACK_SENSOR_DBUS_PATH_TEMPERATURE: Union[str, None] = config["DEFAULT"]["FALLBACK_SENSOR_DBUS_PATH_TEMPERATURE"] or None
+FALLBACK_SENSOR_DBUS_PATH_SOC: Union[str, None] = config["DEFAULT"]["FALLBACK_SENSOR_DBUS_PATH_SOC"] or None
+FALLBACK_BMS_CABLE_WARN_MINUTES: float = get_float_from_config("DEFAULT", "FALLBACK_BMS_CABLE_WARN_MINUTES", 10)
+FALLBACK_SAFE_CELL_VOLTAGE_MIN: float = get_float_from_config("DEFAULT", "FALLBACK_SAFE_CELL_VOLTAGE_MIN")
+FALLBACK_SAFE_CELL_VOLTAGE_MAX: float = get_float_from_config("DEFAULT", "FALLBACK_SAFE_CELL_VOLTAGE_MAX")
+
+
 # Common configuration checks
 check_config_issue(
     SOC_CALCULATION and EXTERNAL_SENSOR_DBUS_PATH_SOC is not None,
     "SOC_CALCULATION and EXTERNAL_SENSOR_DBUS_PATH_SOC are both enabled. This will lead to a conflict. Please disable one of them in the configuration.",
+)
+
+check_config_issue(
+    FALLBACK_SENSOR_DBUS_DEVICE is None
+    and (
+        FALLBACK_SENSOR_DBUS_PATH_VOLTAGE is not None
+        or FALLBACK_SENSOR_DBUS_PATH_CURRENT is not None
+        or FALLBACK_SENSOR_DBUS_PATH_TEMPERATURE is not None
+        or FALLBACK_SENSOR_DBUS_PATH_SOC is not None
+    ),
+    "FALLBACK_SENSOR_DBUS_PATH_* is set but FALLBACK_SENSOR_DBUS_DEVICE is empty. "
+    "The fallback sensor requires a device to read the paths from. Please check the configuration.",
+)
+
+check_config_issue(
+    FALLBACK_SENSOR_DBUS_DEVICE is not None and BLOCK_ON_DISCONNECT,
+    "FALLBACK_SENSOR_DBUS_DEVICE and BLOCK_ON_DISCONNECT are both enabled. "
+    "Fallback mode is not entered when BLOCK_ON_DISCONNECT is active. Please disable one of them in the configuration.",
+)
+
+check_config_issue(
+    (FALLBACK_SAFE_CELL_VOLTAGE_MIN > 0) != (FALLBACK_SAFE_CELL_VOLTAGE_MAX > 0),
+    "FALLBACK_SAFE_CELL_VOLTAGE_MIN and FALLBACK_SAFE_CELL_VOLTAGE_MAX must be set together. Please check the configuration.",
+)
+
+check_config_issue(
+    FALLBACK_SAFE_CELL_VOLTAGE_MIN > 0 and FALLBACK_SAFE_CELL_VOLTAGE_MAX > 0 and FALLBACK_SAFE_CELL_VOLTAGE_MIN >= FALLBACK_SAFE_CELL_VOLTAGE_MAX,
+    "FALLBACK_SAFE_CELL_VOLTAGE_MIN is greater or equal to FALLBACK_SAFE_CELL_VOLTAGE_MAX. Please check the configuration.",
 )
 
 

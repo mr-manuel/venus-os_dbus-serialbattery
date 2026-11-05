@@ -13,6 +13,7 @@ from gi.repository import GLib
 
 from battery import Battery
 from dbushelper import DbusHelper
+from fallback_battery import FallbackBattery
 from utils import (
     BATTERY_ADDRESSES,
     BMS_TYPE,
@@ -114,6 +115,27 @@ if CAPTURE_RAW_DATA:
     logger.warning("!!! flash wear and disk usage.                        !!!")
     logger.warning("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
     logger.warning("")
+
+
+def with_fallback(battery: Union[Battery, None]) -> Union[Battery, None]:
+    """
+    Wrap a battery in FallbackBattery when a fallback sensor is configured for it.
+
+    This is the fallback feature's only hook into the driver: everything the
+    feature does lives in fallback_battery.py, and an unwrapped battery behaves
+    exactly as it did before the feature existed.
+
+    :param battery: the freshly constructed battery, or None
+    :return: the battery, wrapped if a fallback sensor is mapped to it
+    """
+    if battery is None or isinstance(battery, FallbackBattery):
+        return battery
+    try:
+        if FallbackBattery.configured_for(battery):
+            return FallbackBattery(battery)
+    except Exception as e:
+        logger.error(f"Fallback sensor could not be set up for {battery.port}: {repr(e)}")
+    return battery
 
 
 # count loops
@@ -267,11 +289,15 @@ def main():
                 )
                 batteryClass = test["bms"]
                 baud = test["baud"] if "baud" in test else None
+                # The candidate is probed UNWRAPPED: the wrapper's stash-backed
+                # test_connection() would accept whichever BMS class happens to
+                # be probed first while the BMS is unreachable. Only the class
+                # that genuinely answered gets wrapped.
                 battery: Battery = batteryClass(port=_port, baud=baud, address=_bms_address)
                 battery.set_can_transport_interface(can_transport_interface)
                 if battery.test_connection() and battery.validate_data():
                     logger.info("-- Connection established to " + battery.__class__.__name__)
-                    return battery
+                    return with_fallback(battery)
             except KeyboardInterrupt:
                 raise
             except Exception:
@@ -438,7 +464,7 @@ def main():
             class_ = eval(port)
 
             # do not remove ble_ prefix, since the dbus service cannot be only numbers
-            testbms = class_("ble_" + ble_address.replace(":", "").lower(), 9600, ble_address)
+            testbms = with_fallback(class_("ble_" + ble_address.replace(":", "").lower(), 9600, ble_address))
 
             if testbms.test_connection():
                 logger.info("-- Connection established to " + testbms.__class__.__name__)
@@ -461,7 +487,7 @@ def main():
             ble_address = sys.argv[2]
 
             # do not remove ble_ prefix, since the dbus service cannot be only numbers
-            testbms = Generic_AioBmsBle(port.replace("aiobmsble_", ""), None, ble_address)
+            testbms = with_fallback(Generic_AioBmsBle(port.replace("aiobmsble_", ""), None, ble_address))
 
             if testbms.test_connection():
                 logger.info("-- Connection established to " + port)
@@ -565,7 +591,7 @@ def main():
             logger.info("MQTT topics: " + ", ".join(mqtt_topics))
 
             # do not remove mqtt_ prefix, since the dbus service cannot be only numbers
-            testbms = Generic_Mqtt("mqtt_0", None, mqtt_topics[0])
+            testbms = with_fallback(Generic_Mqtt("mqtt_0", None, mqtt_topics[0]))
 
             if testbms.test_connection():
                 logger.info("-- Connection established to " + testbms.__class__.__name__)
