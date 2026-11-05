@@ -122,18 +122,21 @@ to CH341 TX echo).  `0xEB 0x90` at bytes 2–3 is a constant frame
 marker present in all responses.  Byte 299 is a sum-8 checksum
 (`sum(bytes[0:299]) & 0xFF`).
 
-**Offset 4–5** is a *frame type* identifier, NOT the responding battery
-address.  The 0x55AA payload contains **no battery address field at
-all**.  Frame types observed:
+**Offset 4** is the *frame type*, NOT the responding battery address.
+The 0x55AA payload contains **no battery address field at all**.
+Frame types observed:
 
 | Frame type | Meaning  | Trigger register |
 |------------|----------|------------------|
-| 0x0001     | settings | 0x161E           |
-| 0x0002     | status   | 0x1620           |
-| 0x0003     | about    | 0x161C           |
+| 0x01       | settings | 0x161E           |
+| 0x02       | status   | 0x1620           |
+| 0x03       | about    | 0x161C           |
 
 All four batteries (three slaves at addr 1–3 plus the bus master at
-addr 0) return the same frame-type bytes for the same trigger.
+addr 0) return the same frame-type byte for the same trigger.
+
+**Offset 5** is a frame counter.  Its value varies between firmware
+versions and does not affect the payload layout.  The driver ignores it.
 
 **Critical for any master implementation:** all 310 bytes after the
 0x55AA header must be consumed before the next command, or the trailing
@@ -143,9 +146,9 @@ ACK + padding will appear as stale leading bytes on the next response.
 
 | Command (8-byte body)        | Register | Frame type | Used by BMS bus master | Used by JKBMS Monitor | Used by this driver |
 |------------------------------|----------|------------|------------------------|-----------------------|---------------------|
-| `10 16 20 00 01 02 00 00`    | 0x1620   | 0x0002 status   | yes (every cycle) | yes (steady-state poll) | **yes** |
-| `10 16 1e 00 01 02 00 00`    | 0x161E   | 0x0001 settings | yes (every cycle) | yes (init only)         | **yes** |
-| `10 16 1c 00 01 02 00 00`    | 0x161C   | 0x0003 about    | **no** (never observed in 60s of capture) | yes (init only) | **yes** (startup only) |
+| `10 16 20 00 01 02 00 00`    | 0x1620   | 0x02 status     | yes (every cycle) | yes (steady-state poll) | **yes** |
+| `10 16 1e 00 01 02 00 00`    | 0x161E   | 0x01 settings   | yes (every cycle) | yes (init only)         | **yes** |
+| `10 16 1c 00 01 02 00 00`    | 0x161C   | 0x03 about      | **no** (never observed in 60s of capture) | yes (init only) | **yes** (startup only) |
 
 The "about" trigger appears unique to *external* clients: the BMS bus
 master never reads it, but both JKBMS Monitor and this driver do.
@@ -212,7 +215,7 @@ master.  Init sequence captured:
 1. About (0x161C) × 2, then Settings (0x161E) × 2, ~160 ms apart
 2. Steady-state: Status (0x1620) every ~800 ms
 
-About response (ftype=0x0003) returns device ID `JK_PB2A16S20P`,
+About response (ftype=0x03) returns device ID `JK_PB2A16S20P`,
 firmware `15.41`.
 
 #### Request→response sequence (slave's perspective)
@@ -404,7 +407,7 @@ All offsets below are from the `0x55 0xAA` header.  Values are
 
 **Offset rule:** For both status and settings responses, the 0x55AA
 payload offset = official register byte offset + 6 (accounting for the
-4-byte header `55 AA EB 90` + 2-byte frame type).  This means the
+4-byte header `55 AA EB 90` + frame type byte + byte 5).  This means the
 official register maps above can be used directly by adding 6 to each
 byte offset.
 
@@ -423,7 +426,8 @@ Captured.
 |--------|------|---------|------|------------------------|
 | 0–1    | 2    | —       | V | Magic header `0x55 0xAA` |
 | 2–3    | 2    | —       | V | Frame marker `0xEB 0x90` (constant) |
-| 4–5    | 2    | uint16  | V | Frame type: 0x0002=status, 0x0001=settings. **Not** the battery address. |
+| 4      | 1    | uint8   | V | Frame type: 0x02=status, 0x01=settings. **Not** the battery address. |
+| 5      | 1    | uint8   | V | Frame counter. Ignored by the driver. |
 | 6+2n   | 2    | uint16  | V | Cell voltage [n] in mV (n=0..15 for 16S). ÷1000 for volts. |
 | 38–69  | 32   | —       | V | Unused cell slots 17–32 (all zeros on 16S) |
 | 70–73  | 4    | uint32  | V | Cell presence bitmask (0x0000FFFF for 16S) |
@@ -545,7 +549,7 @@ Higher offsets (derived from official register map, offset = register + 6):
 ### About (trigger 0x161C) — driver offsets
 
 Not used by the BMS bus master.  Observed in JKBMS Monitor init
-sequence : ftype=0x0003, 300-byte payload (310 bytes total
+sequence : ftype=0x03, 300-byte payload (310 bytes total
 on wire including padding + ACK), checksum at byte 299.
 Device ID and firmware version confirmed readable.  Field offsets below
 are from the driver source.
@@ -605,7 +609,7 @@ designed and tuned around it. In practice that means:
 - Address filtering works correctly when single commands are sent at
   reasonable intervals (≥100 ms gap between commands).
 - The 0x55AA payload does NOT contain the responding BMS's address
-  (offset 4–5 is a frame type, not an address). The FC 0x10 ACK that
+  (offset 4 is a frame type, not an address). The FC 0x10 ACK that
   follows the payload does contain the correct battery address and is
   used for responder verification by the driver.
 - The slaves stay responsive as long as FC 0x10 traffic continues —
