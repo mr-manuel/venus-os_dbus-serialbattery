@@ -291,11 +291,35 @@ if [ "$bluetooth_length" -gt 0 ]; then
         {
             echo "#!/bin/sh"
             echo
+            # The BLE stack dies natively now and then - SIGSEGV and
+            # malloc_consolidate aborts inside the C libraries under bleak,
+            # always within a second of initiating a connect or scan. Without
+            # faulthandler those deaths leave nothing behind but a shell line
+            # in the log, and the process restarts with the cause unrecorded.
+            # With it, the crashing thread's Python stack (and every other
+            # thread's) is printed into the service log as it dies.
+            echo "# Print Python thread stacks if the process dies natively"
+            echo "export PYTHONFAULTHANDLER=1"
+            echo
             echo "# Forward signals to the child process"
             echo "trap 'kill -TERM \$PID' TERM INT"
             echo
-            # close all open connections, else the driver can't connect
-            echo "bluetoothctl disconnect $3 > /dev/null 2>&1"
+            # close all open connections, else the driver can't connect.
+            # Use dbus-send instead of bluetoothctl: the interactive
+            # bluetoothctl client can segfault on some GX hardware (observed
+            # SIGSEGV on an Allwinner A20 Cerbo), silently skipping the
+            # disconnect and leaving a stale LE link that blocks the next
+            # connection attempt. Try the device object on every adapter.
+            # hci0-hci15 rather than the adapters actually present: the list
+            # is fixed so it needs nothing from the platform to be right, and
+            # a disconnect sent to an adapter that does not exist fails
+            # quietly. It was hci0-hci4, which missed a stale link on hci5 and
+            # above - and GX devices run with ten adapters.
+            echo "MACPATH=\$(echo $3 | tr ':' '_')"
+            echo "for N in 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do"
+            echo "    dbus-send --system --print-reply --dest=org.bluez \\"
+            echo "        \"/org/bluez/hci\$N/dev_\$MACPATH\" org.bluez.Device1.Disconnect > /dev/null 2>&1"
+            echo "done"
             echo
             echo "# Start the main process"
             echo "exec 2>&1"

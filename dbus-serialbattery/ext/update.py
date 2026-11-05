@@ -27,10 +27,10 @@ modules = [
     {"name": "wrapt", "user/repository": "GrahamDumpleton/wrapt", "extract": "/src/wrapt"},
     # needed for aiobmsble
     {"name": "aiobmsble", "user/repository": "patman15/aiobmsble", "extract": "/aiobmsble"},
-    {"name": "aiooui", "user/repository": "Bluetooth-Devices/aiooui", "extract": "/src/aiooui"},
-    {"name": "bleak_retry_connector", "user/repository": "Bluetooth-Devices/bleak-retry-connector", "extract": "/src/bleak_retry_connector"},
-    {"name": "bleak", "user/repository": "hbldh/bleak", "extract": "/bleak"},
-    {"name": "bluetooth_adapters", "user/repository": "Bluetooth-Devices/bluetooth-adapters", "extract": "/src/bluetooth_adapters"},
+    {"name": "aiooui", "user/repository": "Bluetooth-Devices/aiooui", "extract": "/src/aiooui", "subdir": "ble"},
+    {"name": "bleak_retry_connector", "user/repository": "Bluetooth-Devices/bleak-retry-connector", "extract": "/src/bleak_retry_connector", "subdir": "ble"},
+    {"name": "bleak", "user/repository": "hbldh/bleak", "extract": "/bleak", "subdir": "ble"},
+    {"name": "bluetooth_adapters", "user/repository": "Bluetooth-Devices/bluetooth-adapters", "extract": "/src/bluetooth_adapters", "subdir": "ble"},
 ]
 
 root_dir = "./dbus-serialbattery/ext"
@@ -61,7 +61,7 @@ def update_file(dir, url):
     print(f'File "{filename}" downloaded and saved in "{dir}".')
 
 
-def update_module(name, repo_url, extract):
+def update_module(name, repo_url, extract, subdir=""):
     print(f"Updating module: {name}...")
 
     # Fetch the latest release information from the GitHub API
@@ -128,7 +128,9 @@ def update_module(name, repo_url, extract):
             tar.extractall(path=temp_dir, members=members)
 
     # Module destination directory
-    directory_name = f"{root_dir}/{name}"
+    # BLE stack lives under ext/ble so it never shadows a box-installed
+    # bleak/brc supplied on PYTHONPATH; everything else stays flat in ext/.
+    directory_name = f"{root_dir}/{subdir}/{name}" if subdir else f"{root_dir}/{name}"
 
     # Clean the directory if it exists
     if os.path.exists(directory_name):
@@ -171,7 +173,7 @@ if __name__ == "__main__":
     print()
 
     for entry in modules:
-        update_module(entry["name"], entry["user/repository"], entry["extract"])
+        update_module(entry["name"], entry["user/repository"], entry["extract"], entry.get("subdir", ""))
 
     # remove the temporary directory
     print("Remove temporary directory")

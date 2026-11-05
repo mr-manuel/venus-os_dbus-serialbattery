@@ -7,7 +7,9 @@ import sys
 import os
 
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), "ext"))
-# export PYTHONPATH="/data/apps/dbus-serialbattery/ext:$PYTHONPATH"
+# bleak and its companions live in ext/ble, apart from the rest of ext/
+sys.path.insert(1, os.path.join(os.path.dirname(__file__), "ext", "ble"))
+# export PYTHONPATH="/data/apps/dbus-serialbattery/ext/ble:/data/apps/dbus-serialbattery/ext:$PYTHONPATH"
 
 from bleak import BleakScanner  # noqa: E402
 from bleak.backends.device import BLEDevice  # noqa: E402

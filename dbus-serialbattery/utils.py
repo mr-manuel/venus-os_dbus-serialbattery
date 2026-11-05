@@ -261,6 +261,33 @@ CURRENT_CORRECTION: bool = CURRENT_REPORTED_BY_BMS != CURRENT_MEASURED_BY_USER
 # --------- Bluetooth BMS ---------
 BLUETOOTH_USE_POLLING = get_bool_from_config("DEFAULT", "BLUETOOTH_USE_POLLING")
 BLUETOOTH_FORCE_RESET_BLE_STACK = get_bool_from_config("DEFAULT", "BLUETOOTH_FORCE_RESET_BLE_STACK")
+BLUETOOTH_CONNECTION_BACKEND: str = config["DEFAULT"]["BLUETOOTH_CONNECTION_BACKEND"].strip()
+# Bluetooth adapters (hciX) to use for BLE BMS connections. A plain hciX entry
+# joins the shared pool, an entry of the form MAC@hciX pins that device to that
+# adapter. Empty list = use the system default adapter.
+BLUETOOTH_ADAPTERS: List[str] = get_list_from_config("DEFAULT", "BLUETOOTH_ADAPTERS", str)
+# Refuse to connect at all when none of a battery's configured adapters are
+# present, instead of falling back to whatever is. See config.default.ini.
+BLUETOOTH_ADAPTER_PIN_STRICT: bool = get_bool_from_config("DEFAULT", "BLUETOOTH_ADAPTER_PIN_STRICT")
+# Folder holding a shared bleak-connection-manager install (its src/ and
+# ext/ are added to sys.path when present). Empty means never look, which
+# is the default: a box without a shared install runs plain vendored bleak.
+BLUETOOTH_CONNECTION_MANAGER_DIR: str = config["DEFAULT"]["BLUETOOTH_CONNECTION_MANAGER_DIR"].strip()
+# Fleet policy: force bleak's StartNotify path. AcquireNotify is the only path
+# that reaches the BlueZ 5.72 notify_io double-free, so it is never allowed.
+BLUETOOTH_CONNECTION_MANAGER_FORCE_START_NOTIFY: bool = get_bool_from_config("DEFAULT", "BLUETOOTH_CONNECTION_MANAGER_FORCE_START_NOTIFY")
+# Opt-in: route every bleak client in this process through the shared
+# bleak-connection-manager (claim-aware adapter selection, link slots,
+# connection parameter tuning), coordinated across processes via /run/bt-claims
+BLUETOOTH_CONNECTION_MANAGER: bool = get_bool_from_config("DEFAULT", "BLUETOOTH_CONNECTION_MANAGER")
+# Established-link capacity per adapter, hciX:N entries; only used with
+# BLUETOOTH_CONNECTION_MANAGER = True, and an uncapped adapter is never gated
+BLUETOOTH_CONNECTION_MANAGER_LINK_CAPS: List[str] = get_list_from_config("DEFAULT", "BLUETOOTH_CONNECTION_MANAGER_LINK_CAPS", str)
+# Also rebind bleak.BleakScanner to the catcher's adapter-bound scanner
+BLUETOOTH_CONNECTION_MANAGER_WRAP_SCANNER: bool = get_bool_from_config("DEFAULT", "BLUETOOTH_CONNECTION_MANAGER_WRAP_SCANNER")
+# Reject connections whose GATT discovery comes back empty (phantom links),
+# tolerating chips that register their vendor services late
+BLUETOOTH_CONNECTION_MANAGER_VALIDATION: bool = get_bool_from_config("DEFAULT", "BLUETOOTH_CONNECTION_MANAGER_VALIDATION")
 
 # --------- Daisy Chain Configuration (Multiple BMS on one cable) ---------
 BATTERY_ADDRESSES: list = get_list_from_config("DEFAULT", "BATTERY_ADDRESSES", str)

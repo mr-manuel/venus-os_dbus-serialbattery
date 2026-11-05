@@ -108,6 +108,8 @@ from bms.seplosv3 import Seplosv3
 
 # add ext folder to sys.path
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), "ext"))
+# bleak and its companions live in ext/ble, apart from the rest of ext/
+sys.path.insert(1, os.path.join(os.path.dirname(__file__), "ext", "ble"))
 
 # enabled only if explicitly set in config under "BMS_TYPE"
 if "ANT" in BMS_TYPE:
