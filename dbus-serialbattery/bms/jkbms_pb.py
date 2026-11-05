@@ -31,6 +31,10 @@ class Jkbms_pb(Battery):
     LENGTH_POS = 2  # ignored
     LENGTH_SIZE = "H"  # ignored
 
+    # Plausible cell count range. JK PB hardware supports up to 32 cells.
+    CELL_COUNT_MIN = 3
+    CELL_COUNT_MAX = 32
+
     _shared_ser = None  # shared serial port, kept open across calls
 
     # Minimum gap between consecutive commands on the RS485 bus (seconds).
@@ -120,9 +124,20 @@ class Jkbms_pb(Battery):
             logger.error(f"[{addr_str}] serial error: {e}")
             return False
 
-        status_data = self._read_with_retry(ser, self.command_settings, timeout=1.0)
-        if not status_data:
-            logger.warning(f"get_settings: command_settings failed for addr {addr_str}")
+        # The sum8 checksum is weak (1/256 of corrupted frames pass), so also
+        # sanity check the cell count and re-read if it is implausible.
+        status_data = None
+        for _ in range(3):
+            status_data = self._read_with_retry(ser, self.command_settings, timeout=1.0)
+            if not status_data:
+                logger.warning(f"get_settings: command_settings failed for addr {addr_str}")
+                return False
+            if self._cell_count_valid(unpack_from("<i", status_data, 114)[0], status_data):
+                break
+            status_data = None
+
+        if status_data is None:
+            # keep the previous cell_count (0 on first start, driver retries the connection)
             return False
 
         VolSmartSleep = unpack_from("<i", status_data, 6)[0] / 1000
@@ -338,6 +353,16 @@ class Jkbms_pb(Battery):
 
         return True
 
+    def _cell_count_valid(self, cell_count, raw):
+        """Return True if cell_count is plausible, else log a warning with the raw frame."""
+        if self.CELL_COUNT_MIN <= cell_count <= self.CELL_COUNT_MAX:
+            return True
+        logger.warning(
+            f"[{self.addr_str}] ignoring implausible cell count {cell_count} "
+            f"(allowed {self.CELL_COUNT_MIN}-{self.CELL_COUNT_MAX}), keeping {self.cell_count}. Raw: {bytes(raw).hex()}"
+        )
+        return False
+
     def refresh_data(self):
         addr_str = self.addr_str
         t0 = time.monotonic()
@@ -358,6 +383,11 @@ class Jkbms_pb(Battery):
         return result
 
     def read_status_data(self, status_data):
+        # never parse cell voltages before a valid cell count is known
+        if not (self.CELL_COUNT_MIN <= self.cell_count <= self.CELL_COUNT_MAX) or len(self.cells) < self.cell_count:
+            logger.warning(f"[{self.addr_str}] status frame skipped: cell count {self.cell_count} not initialised")
+            return False
+
         # cell voltages — EMA low-pass filter to suppress 1mV ADC jitter
         # and reduce dbus write traffic (cache proxy suppresses unchanged values)
         for c in range(self.cell_count):
@@ -628,7 +658,9 @@ class Jkbms_pb(Battery):
         if ack_pos >= 0 and len(tail) >= ack_pos + ACK_SIZE:
             ack = bytes(tail[ack_pos : ack_pos + ACK_SIZE])
             if not self._verify_ack(ack, command):
-                logger.warning(f"[{addr_str}] ACK validation failed: {ack.hex()}")
+                # wrong address/register/CRC: the frame may belong to another BMS on the bus
+                logger.warning(f"[{addr_str}] ACK validation failed, frame rejected: {ack.hex()}")
+                return False
         elif ack_pos >= 0:
             logger.warning(f"[{addr_str}] ACK truncated: {len(tail) - ack_pos}/{ACK_SIZE} bytes")
         else:

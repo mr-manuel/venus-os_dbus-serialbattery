@@ -1841,6 +1841,11 @@ class DbusHelper:
         Check if telemetry should be uploaded
         """
         if utils.TELEMETRY:
+            # postpone the upload until the battery data is valid (cell count known and plausible)
+            cell_count = self.battery.cell_count
+            if not isinstance(cell_count, int) or not (3 <= cell_count <= 127):
+                return
+
             # check if telemetry should be uploaded
             if not self.telemetry_upload_running and self.telemetry_upload_last + self.telemetry_upload_interval < int(time()):
                 self.telemetry_upload_thread = threading.Thread(target=self.telemetry_upload_async)
@@ -1850,6 +1855,11 @@ class DbusHelper:
         """
         Run telemetry upload in a separate thread
         """
+        # re-check, the value may have changed since telemetry_upload() ran
+        cell_count = self.battery.cell_count
+        if not isinstance(cell_count, int) or not (3 <= cell_count <= 127):
+            return
+
         self.telemetry_upload_running = True
 
         # logger.info("Uploading telemetry data")
@@ -1862,7 +1872,7 @@ class DbusHelper:
             "driver_version": utils.DRIVER_VERSION,
             "device_instance": self.instance,
             "bms_type": self.battery.type,
-            "cell_count": self.battery.cell_count,
+            "cell_count": cell_count,
             "connection_type": self.battery.connection_name(),
             "driver_runtime": int(time()) - self.battery.start_time,
             "error_code": (self.battery.error_code if self.battery.error_code is not None else 0),

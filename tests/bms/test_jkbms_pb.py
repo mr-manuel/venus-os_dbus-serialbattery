@@ -231,6 +231,43 @@ class TestReadResponse:
         assert result[4] | result[5] << 8 == 1  # ftype=1 = settings
 
 
+class TestCellCountProtection:
+    def setup_method(self):
+        Jkbms_pb._last_command_time = 0.0
+        Jkbms_pb.COMMAND_GAP = 0
+
+    @staticmethod
+    def _corrupt_settings_with_valid_checksum():
+        """Settings frame with garbage cell count but a matching sum8 checksum."""
+        bad = bytearray(SETTINGS_RESPONSE)
+        bad[114:118] = bytes.fromhex("90d6cf81")  # -2117085552
+        bad[299] = sum(bad[:299]) & 0xFF
+        return bytes(bad)
+
+    def test_corrupted_settings_do_not_change_cell_count(self):
+        bms = _make_bms(addr=0x03)
+        bms.cell_count = 16
+        bms.cells = []
+        bms.port = "/dev/mock0"
+        bms._get_ser = lambda: MockSerial(self._corrupt_settings_with_valid_checksum() + b"\x00" + FC16_ACK_SETTINGS)
+        assert bms.get_settings() is False
+        assert bms.cell_count == 16
+        assert bms.cells == []
+
+    def test_bad_ack_rejects_frame(self):
+        """Frame followed by an ACK for our address but wrong register/CRC is rejected."""
+        bms = _make_bms(addr=0x05)
+        bad_ack = b"\x05" + FC16_ACK_SETTINGS[1:]  # address 0x05, register of settings, CRC invalid
+        ser = MockSerial(STATUS_RESPONSE + b"\x00" + bad_ack)
+        assert bms._read_response(ser, bms.command_status, timeout=0.2) is False
+
+    def test_status_skipped_without_valid_cell_count(self):
+        bms = _make_bms(addr=0x03)
+        bms.cell_count = 0
+        bms.cells = []
+        assert bms.read_status_data(STATUS_RESPONSE) is False
+
+
 class TestNaming:
     """ProductName carries dynamic serial+interface info (base-class default
     in battery.py); CustomName is a pure user-override slot (empty by

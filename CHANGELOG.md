@@ -53,6 +53,7 @@
 * Changed: Daly BMS & Daly CAN BMS: Fix high charge/discharge current alarm. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/378 by @mr-manuel
 * Changed: Daren 485 BMS - Fixed charge/discharge calculation with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/343 by @kopierschnitte
 * Changed: dbushelper.py - Ensure loading of newest battery data if more than one duplicate exists by @lex2k0
+* Changed: dbushelper.py - Postpone the telemetry upload until the battery reports a plausible cell count, preventing garbage cell counts from being uploaded by @mr-manuel
 * Changed: dbushelper.py - Refresh the `LastSeen` setting daily while the driver is running. Previously it was written only at startup, so after more than 30 days of continuous uptime a restart deleted the settings (device instance, custom name, history) of all other batteries sharing the port by @dmitrych5
 * Changed: dbushelper.py - Reworked save settings methods by @lex2k0
 * Changed: Decoupled SOC Reset after x days from the need that the battery has to switch to bulk charge, thus after every x days are passed by there will be a bulk charge / top balancing by @lex2k0
@@ -95,6 +96,7 @@
 * Changed: JKBMS CAN - Correct calculation of arbitration_id for device_address > 0. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/288 with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/306 by @Hooorny
 * Changed: JKBMS PB - Auto-recover the shared RS485 port when the driver gets stuck after a USB re-plug or a persistent dead-bus: after 8 consecutive failed reads the fd is closed and reopened on next access by @hsteinhaus
 * Changed: JKBMS PB - Older hardware versions support dedicated heating values with latest firmware with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/459 by @phreaker0
+* Changed: JKBMS PB - Reject corrupted frames on the shared RS485 bus: settings frames with an implausible cell count (outside 3-32) are re-read instead of applied, status frames are skipped until a valid cell count is known, and frames with an invalid ACK (e.g. belonging to another BMS) are discarded by @mr-manuel
 * Changed: JKBMS PB: Alarms were not set correctly @mr-manuel
 * Changed: KS48100 BMS - Fixed charge/discharge calculation with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/343 by @kopierschnitte
 * Changed: LiTime BLE BMS - Fixed unbounded cell-array growth in `parse_status` that flooded the log with `KeyError('/Voltages/CellN')` exceptions because `dbushelper` only registers paths for the initial cell count. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/440
