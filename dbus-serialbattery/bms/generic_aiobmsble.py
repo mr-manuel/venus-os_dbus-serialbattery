@@ -29,6 +29,21 @@ from bleak.exc import BleakError  # noqa: E402
 from aiobmsble import BMSInfo, BMSSample, TempSensor  # noqa: E402
 
 
+# Reconnect pacing for a device the adapter cannot reach.
+#
+# refresh_data polls once a second, and every poll that finds no client runs a
+# full establish_connection, which makes its own four BlueZ attempts before it
+# raises. For a device that is powered off, removed or out of range, retrying
+# on every poll cannot succeed and only costs load.
+#
+# Indexed by the number of consecutive failures, which is at least 1, so the
+# first entry is never used: after the first failure the next attempt is
+# immediate, then the waits are 5, 15, 30 and 60 seconds. A pack that slept
+# through one advertising window still recovers straight away; only a
+# sustained run of failures earns a long wait.
+RECONNECT_BACKOFF_SECONDS = (0, 0, 5, 15, 30, 60)
+
+
 class Generic_AioBmsBle(Battery):
     def __init__(self, port, baud, address):
         super(Generic_AioBmsBle, self).__init__(port, baud, address)
@@ -66,13 +81,32 @@ class Generic_AioBmsBle(Battery):
         self._coro_lock = threading.Lock()
         # timeouts (seconds)
         self._run_timeout: int = 10
+        # The first connection races a BMS that may be advertising sparsely:
+        # establish_connection waits for the device's next connectable
+        # advertisement, and a JBD module idling between app sessions can sit
+        # on a multi-second interval. 10 s loses that race; the initial
+        # attempt gets a budget that wins it.
+        self._initial_connect_timeout: int = 40
         self._grace_timeout: int = 2
         self._cancel_timeout: int = 1
         # track the currently scheduled Future on the background loop
         self._current_future = None
+        # background-update bookkeeping: whether we hold _coro_lock on behalf
+        # of an in-flight refresh, and when it was scheduled
+        self._update_lock_held = False
+        self._update_started_at: float | None = None
         # staleness tracking
         self._last_successful_update: float | None = None
         self._max_data_age: int = 5  # seconds before stale cached data causes failure
+        # the stale-data warning would fire on every poll while the BMS is away;
+        # log it when a stale spell starts, then at most this often
+        self._stale_warning_interval: int = 60
+        self._stale_warned_at: float = 0.0
+        # reconnect pacing: consecutive failed connects, when the next attempt
+        # is allowed, and whether the sustained-failure warning has been logged
+        self._connect_failures: int = 0
+        self._reconnect_hold_until: float = 0.0
+        self._reconnect_warned: bool = False
 
     BATTERYTYPE = "Generic aiobmsble BMS"
 
@@ -118,6 +152,63 @@ class Generic_AioBmsBle(Battery):
             await aexit(None, None, None)
             logger.debug("aiobmsble: disconnected via context manager")
 
+    def _reconnect_on_hold(self) -> bool:
+        """True while the next connect attempt is still being paced out."""
+        return time.monotonic() < self._reconnect_hold_until
+
+    def _note_connect_failure(self, reason: str) -> None:
+        """Record a failed connect and pace the next attempt.
+
+        Emits exactly ONE warning per outage, when the ladder reaches its
+        longest step, so a long outage cannot flood the log.
+        """
+        self._connect_failures += 1
+        delay = RECONNECT_BACKOFF_SECONDS[min(self._connect_failures, len(RECONNECT_BACKOFF_SECONDS) - 1)]
+        self._reconnect_hold_until = time.monotonic() + delay
+        if delay == RECONNECT_BACKOFF_SECONDS[-1] and not self._reconnect_warned:
+            self._reconnect_warned = True
+            logger.warning(
+                "aiobmsble: %s unreachable after %d attempts (%s); retrying every %ds until it returns",
+                self.address,
+                self._connect_failures,
+                reason,
+                delay,
+            )
+        else:
+            logger.debug("aiobmsble: connect failed for %s (%s), next attempt in %ds", self.address, reason, delay)
+
+    def _note_connect_success(self) -> None:
+        """Clear the pacing state so the next outage starts from the top."""
+        if self._reconnect_warned:
+            logger.warning("aiobmsble: %s reachable again after %d failed attempts", self.address, self._connect_failures)
+        self._connect_failures = 0
+        self._reconnect_hold_until = 0.0
+        self._reconnect_warned = False
+
+    async def _resolve_device(self) -> BLEDevice | None:
+        """BLEDevice for this address from the BlueZ cache, scanning as fallback.
+
+        A sleeping BMS can advertise too sparsely for an active scan window
+        to catch, while a connect to its cached device object still works -
+        BlueZ's create-connection waits for the next connectable
+        advertisement instead of needing a scan report. The scan remains the
+        fallback for a device BlueZ has never seen.
+        """
+        try:
+            from bleak_retry_connector import get_device
+        except ImportError:
+            get_device = None
+        if get_device is not None:
+            try:
+                device = await get_device(self.address)
+            except Exception as e:
+                logger.debug("BlueZ cache lookup failed for %s: %r", self.address, e)
+                device = None
+            if device is not None:
+                logger.debug("aiobmsble: %s resolved from BlueZ cache", self.address)
+                return device
+        return await BleakScanner.find_device_by_address(self.address)
+
     def _ensure_aiobmsble(self, device: BLEDevice):
         # Instantiate the aiobmsble client once, keep for reuse
         if self._aiobmsble is None:
@@ -155,6 +246,76 @@ class Generic_AioBmsBle(Battery):
             logger.warning("aiobmsble: background event loop did not signal readiness in time")
         else:
             logger.debug("aiobmsble: background event loop ready")
+
+    def _poll_update(self, coro):
+        """Harvest a finished background update and start the next one.
+
+        NEVER waits on the BMS. refresh_data runs on the GLib main thread,
+        which is also the thread that answers D-Bus, so blocking here for a
+        coroutine timeout stops the driver serving anything at all - the
+        battery's own service stops answering /Soc, /Connected and
+        /Mgmt/Connection while remaining registered. An unreachable pack
+        blocked the main thread for the whole coroutine timeout on every poll.
+
+        Returns True only when an update completed successfully since the
+        last poll; the caller's staleness logic decides what to serve.
+        """
+        self._ensure_event_loop()
+        completed_ok = False
+
+        future = self._current_future
+        if future is not None and future.done():
+            self._current_future = None
+            self._update_started_at = None
+            try:
+                completed_ok = bool(future.result(0))
+            except concurrent.futures.CancelledError:
+                pass
+            except Exception as e:
+                # show the first failure of an outage; the pacing reports a long
+                # one once, so the rest stay at debug
+                if self._connect_failures <= 1:
+                    logger.warning("aiobmsble: background update failed (addr=%s): %r", self.address, e)
+                else:
+                    logger.debug("aiobmsble: background update failed (addr=%s): %r", self.address, e)
+            self._release_update_lock()
+        elif future is not None and self._update_started_at is not None:
+            # a coroutine that never returns must not wedge every later poll
+            if time.monotonic() - self._update_started_at > self._run_timeout:
+                logger.error("aiobmsble coroutine timed out for %s (addr=%s)", getattr(coro, "__name__", repr(coro)), self.address)
+                try:
+                    future.cancel()
+                except Exception:
+                    pass
+                # A hang is a failed attempt. Count it here, on this thread and
+                # before the next attempt is scheduled below, so the pacing
+                # already applies to that attempt; counted inside the cancelled
+                # coroutine it can land after the next attempt has started.
+                self._note_connect_failure("timed out")
+                self._current_future = None
+                self._update_started_at = None
+                self._release_update_lock()
+
+        if self._current_future is None:
+            # non-blocking: if something else holds the loop, skip this poll
+            if self._coro_lock.acquire(blocking=False):
+                self._update_lock_held = True
+                try:
+                    self._current_future = asyncio.run_coroutine_threadsafe(coro(), self._loop)
+                    self._update_started_at = time.monotonic()
+                except Exception as e:
+                    logger.debug("aiobmsble: could not schedule update (addr=%s): %r", self.address, e)
+                    self._release_update_lock()
+
+        return completed_ok
+
+    def _release_update_lock(self):
+        if self._update_lock_held:
+            self._update_lock_held = False
+            try:
+                self._coro_lock.release()
+            except RuntimeError:
+                pass
 
     def _run_coro(self, coro, timeout: float | None = None):
         try:
@@ -328,7 +489,7 @@ class Generic_AioBmsBle(Battery):
         result = False
 
         async def run_async():
-            device: BLEDevice | None = await BleakScanner.find_device_by_address(self.address)
+            device: BLEDevice | None = await self._resolve_device()
 
             if device is None:
                 logger.error(f'Battery "{self.BATTERYTYPE}" with MAC "{self.address}" not found. Is it powered on and in range?')
@@ -376,7 +537,14 @@ class Generic_AioBmsBle(Battery):
                 return False
 
         try:
-            result = self._run_coro(run_async)
+            result = self._run_coro(run_async, timeout=self._initial_connect_timeout)
+            if result:
+                # The startup reading is real, fresh data, so start the data-age
+                # clock on it. refresh_data below only schedules the first
+                # background update; if the clock waited for that update, a
+                # battery that went away now would have this reading published
+                # as current for as long as it stayed away.
+                self._last_successful_update = time.monotonic()
 
             # get settings to check if the data is valid and the connection is working
             result = result and self.get_settings()
@@ -476,44 +644,90 @@ class Generic_AioBmsBle(Battery):
 
         # Try to (re)fetch data from the stored aiobmsble client if available
         async def _update_async():
+            # Pace an unreachable device rather than hammering it, on both
+            # paths below: finding and connecting it here, and the client's own
+            # reconnect inside async_update once a client exists. Every attempt
+            # costs a full establish_connection of four BlueZ attempts, and for
+            # a device that is not there none of them can win.
+            if self._reconnect_on_hold():
+                return False
             # ensure we have a client, try to find device and connect if not
             if self._aiobmsble is None:
-                device: BLEDevice | None = await BleakScanner.find_device_by_address(self.address)
+                # Cache-first, like test_connection: a bare
+                # find_device_by_address here starts a fresh BlueZ discovery on
+                # EVERY poll of a battery whose client was lost, which on a GX
+                # device with another service already scanning fails outright
+                # with org.bluez.Error.InProgress - and then blocks the caller
+                # for the whole coroutine timeout while it does. Resolving from
+                # the BlueZ cache costs no scan at all in the common case.
+                try:
+                    device: BLEDevice | None = await self._resolve_device()
+                except Exception as ex:
+                    # a scan can fail outright, e.g. org.bluez.Error.InProgress
+                    # while another service scans the adapter; count it, or the
+                    # pacing never engages. (A hang is counted by _poll_update.)
+                    self._note_connect_failure(repr(ex))
+                    raise
                 if device is None:
+                    self._note_connect_failure("device not found")
                     logger.debug(f"Could not find device {self.address} for refresh")
                     return False
                 self._ensure_aiobmsble(device)
                 if self._aiobmsble is None:
+                    self._note_connect_failure("no aiobmsble client")
                     return False
-                await self._aiobmsble_connect(self._aiobmsble)
+                try:
+                    await self._aiobmsble_connect(self._aiobmsble)
+                except Exception as ex:
+                    self._note_connect_failure(repr(ex))
+                    raise
+                self._note_connect_success()
 
             update = getattr(self._aiobmsble, "async_update", None)
             if callable(update):
                 try:
                     self.aiobmsble_data = await update()
+                    self._note_connect_success()
                     return True
                 except Exception as ex:
+                    # the client reconnects inside async_update, so this is the
+                    # failure path of a lost connection: count it for the pacing
+                    self._note_connect_failure(repr(ex))
                     logger.error("Failed to refresh BMS data: %s", ex)
                     try:
                         await self._aiobmsble_disconnect(self._aiobmsble)
                     except Exception:
                         pass
+                    # Drop the client. It is bound to the device object it was
+                    # built from, and that object names the adapter it was
+                    # found on. If that adapter has gone, the client can never
+                    # reconnect, even with the battery in range of another
+                    # adapter. The next attempt resolves the device afresh and
+                    # builds a new client on whichever adapter has it now.
+                    self._aiobmsble = None
+                    self._aiobmsble_device = None
                     return False
             return False
 
         try:
             # perform an async update (keeps connection open on success)
-            ok = self._run_coro(_update_async)
+            ok = self._poll_update(_update_async)
             if ok:
                 self._last_successful_update = time.monotonic()
             elif self._last_successful_update is not None:
                 data_age = time.monotonic() - self._last_successful_update
                 if data_age > self._max_data_age:
-                    logger.warning(
-                        "aiobmsble: cached data is %ds old, treating as failure (addr=%s)",
-                        int(data_age),
-                        self.address,
-                    )
+                    # Warn when a stale spell starts - no warning since the last
+                    # good data - and then once a minute; the growing age in the
+                    # message shows the spell continuing.
+                    now = time.monotonic()
+                    if self._stale_warned_at < self._last_successful_update or now - self._stale_warned_at >= self._stale_warning_interval:
+                        self._stale_warned_at = now
+                        logger.warning(
+                            "aiobmsble: cached data is %ds old, treating as failure (addr=%s)",
+                            int(data_age),
+                            self.address,
+                        )
                     return False
                 logger.debug("aiobmsble: using cached data (%.1fs old) (addr=%s)", data_age, self.address)
             elif not isinstance(self.aiobmsble_data, dict):
