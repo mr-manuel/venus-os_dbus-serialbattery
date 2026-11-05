@@ -638,6 +638,13 @@ def main():
         # Calculate the initial values for the battery
         battery[key_address].set_calculated_data()
 
+        # Publish them immediately: setup_vedbus() registers the measured
+        # values (/Dc/0/Voltage, /Soc, cell voltages, ...) as None, and
+        # without this any consumer reading the service before the first
+        # poll tick gets None. The charge limits are still decided on that
+        # first tick, so /Info/MaxChargeVoltage reads None until then.
+        helper[key_address].publish_dbus()
+
     # get first key from battery dict
     first_key = list(battery.keys())[0]
 
