@@ -159,13 +159,14 @@ class LltJbd_Ble(LltJbd):
 
                 def shutdown_ble_atexit(thread):
                     self.run = False
-                    thread.join()
+                    thread.join(timeout=5)
 
                 atexit.register(shutdown_ble_atexit, self.bt_thread)
             try:
                 return await asyncio.wait_for(self.ready_event.wait(), timeout=5)
             except asyncio.TimeoutError:
                 logger.error(">>> ERROR: Unable to connect with BLE device")
+                self.run = False
                 return False
         else:
             return False
