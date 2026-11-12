@@ -42,10 +42,13 @@ class EG4_LL(Battery):
         self.runtime = 0  # TROUBLESHOOTING for no reply errors
         self.data = {}
 
-    statuslogger = False  # Prints to STDOut After Each BMS Poll
-    LoadBMSSettings = True  # Load BMS Config on Startup && Use Driver Based Alarms
-    protectionLogger = True  # Print to STDOut when BMS raises an error
-    crcchecksumlogger = False  # Print to stdout when the BMS Reply fails the CRC checksum
+    statuslogger = utils.get_bool_from_config("DEFAULT", "EG4_LL_STATUS_LOGGER")  # Prints to STDOut After Each BMS Poll
+    LoadBMSSettings = utils.get_bool_from_config("DEFAULT", "EG4_LL_LOAD_BMS_SETTINGS")  # Load BMS Config on Startup && Use Driver Based Alarms
+    protectionLogger = utils.get_bool_from_config("DEFAULT", "EG4_LL_PROTECTION_LOGGER")  # Print to STDOut when BMS raises an error
+    crcchecksumlogger = utils.get_bool_from_config("DEFAULT", "EG4_LL_CRC_CHECKSUM_LOGGER")  # Print to stdout when the BMS Reply fails the CRC checksum
+    protectionOnlyEvents = utils.get_bool_from_config(
+        "DEFAULT", "EG4_LL_PROTECTION_ONLY_EVENTS"
+    )  # True: only protection-level (2) alarms trigger events/logging; warnings (1) are ignored
 
     battery_stats = {}
     serialTimeout = 2  # Serial Connection timeout
@@ -198,7 +201,8 @@ class EG4_LL(Battery):
             return True
         # Log when driver-level alarm state changes (after update_alarm_dbus so protection attrs are current)
         if self.LoadBMSSettings is True and self.alarm_mgr._alarms_changed:
-            active_alarms = {k: v for k, v in alarm_status.items() if v != 0}
+            trigger_level = 2 if self.protectionOnlyEvents else 1
+            active_alarms = {k: v for k, v in alarm_status.items() if v >= trigger_level}
             if active_alarms:
                 logger.error("** BMS Error, Protect or Warning Event Code Found In Polling Cycle **")
                 self.eg4ll_logger(bank_stats, 2, active_alarms)
