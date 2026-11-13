@@ -113,6 +113,7 @@
 * Changed: UBMS CAN code style to snake_case, various improvements and fixes by @gimx
 * Changed: Use Bluetooth MAC address as unique identifier for all Bluetooth BMS by @mr-manuel
 * Changed: Use correct temperature sensors for Daly CAN BMS instead of min/max values by @lex2k0
+* Changed: Use port and address as unique identifier - Fixed `ValueError` on startup for Bluetooth BMS when `USE_PORT_AS_UNIQUE_ID` is enabled. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/535 by @SAY-5
 * Changed: Use port and address as unique identifier is now available for all serial BMS by @mr-manuel
 
 ## v2.0.20250729

@@ -800,6 +800,9 @@ def generate_unique_identifier(port: str, address) -> str:
     :param address: Battery address
     :return: Unique identifier
     """
+    if isinstance(address, str):
+        # Bluetooth BMS use the MAC address as address
+        return str(port).replace("/dev/", "") + "__" + address.replace(":", "").lower()
     return str(port).replace("/dev/", "") + "__" + (bytearray_to_string(address).replace("\\", "0") if address is not None else "0x01")
 
 
