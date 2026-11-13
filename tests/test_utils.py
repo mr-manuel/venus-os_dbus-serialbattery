@@ -1,10 +1,10 @@
 """
-Tests for methods in utils.py. Currently only read_serialport_data() is tested.
+Tests for methods in utils.py.
 """
 
 import pytest
 from unittest.mock import MagicMock, patch, PropertyMock
-from utils import read_serialport_data
+from utils import generate_unique_identifier, read_serialport_data
 import serial
 
 
@@ -202,3 +202,15 @@ class TestReadSerialportData:
 
         assert result is None
         mock_logger.exception.assert_called_once()
+
+
+# =============================================================================
+# Tests for generate_unique_identifier()
+# =============================================================================
+
+
+class TestGenerateUniqueIdentifier:
+    """Tests for generate_unique_identifier()"""
+
+    def test_ble_mac_address(self) -> None:
+        assert generate_unique_identifier("ble_c0d63c552d06", "C0:D6:3C:55:2D:06") == "ble_c0d63c552d06__c0d63c552d06"
