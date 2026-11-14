@@ -122,6 +122,8 @@ class Daly(Battery):
         # Open serial port to be used for all data reads instead of opening multiple times
         try:
             with open_serial_port(self.port, self.baud_rate) as ser:
+                self.write_charge_discharge_mos(ser)
+
                 result = self.read_soc_data(ser)
                 self.soc_reset_to = self.soc if self.soc else 0
                 if self.runtime > 0.200:  # TROUBLESHOOTING for no reply errors
@@ -160,8 +162,6 @@ class Daly(Battery):
                 result = self.read_cells_volts(ser) and result
                 if self.runtime > 0.200:  # TROUBLESHOOTING for no reply errors
                     logger.debug("  |- refresh_data: read_cells_volts - result: " + str(result) + " - runtime: " + str(f"{self.runtime:.1f}") + "s")
-
-                self.write_charge_discharge_mos(ser)
 
                 if AUTO_RESET_SOC:
                     self.update_soc_on_bms(ser)
@@ -646,48 +646,49 @@ class Daly(Battery):
         return False
 
     def write_charge_discharge_mos(self, ser):
-        # wait shortly, else the Daly is not ready and throws a lot of no reply errors
-        # if you see a lot of errors, try to increase in steps of 0.005
-        sleep(0.020)
+        """
+        Write pending charge/discharge MOS changes to the BMS.
 
+        A trigger is only cleared after the BMS confirmed the new MOS state, so a write
+        that fails (the Daly UART drops a lot of frames) is retried on the next poll
+        instead of being lost while the GUI already shows the new state.
+        """
         if self.trigger_force_disable_charge is None and self.trigger_force_disable_discharge is None:
             return False
 
+        result = True
+        if self.trigger_force_disable_charge is not None:
+            if self.write_mos(ser, self.command_disable_charge_mos, self.trigger_force_disable_charge, "charging"):
+                self.trigger_force_disable_charge = None
+            else:
+                result = False
+
+        if self.trigger_force_disable_discharge is not None:
+            if self.write_mos(ser, self.command_disable_discharge_mos, self.trigger_force_disable_discharge, "discharging"):
+                self.trigger_force_disable_discharge = None
+            else:
+                result = False
+
+        return result
+
+    def write_mos(self, ser, command, force_disable, name):
         # wait shortly, else the Daly is not ready and throws a lot of no reply errors
         # if you see a lot of errors, try to increase in steps of 0.005
         sleep(0.020)
 
-        cmd = bytearray(self.command_base)
+        cmd = self.generate_command(command)
+        cmd[4] = 0 if force_disable else 1
+        cmd[12] = sum(cmd[:12]) & 0xFF
+        logger.info(f"write force disable {name}: {'true' if force_disable else 'false'}")
+        ser.flushOutput()
+        ser.flushInput()
+        ser.write(cmd)
 
-        if self.trigger_force_disable_charge is not None:
-            cmd[2] = self.command_disable_charge_mos[0]
-            cmd[4] = 0 if self.trigger_force_disable_charge else 1
-            cmd[12] = sum(cmd[:12]) & 0xFF
-            logger.info(f"write force disable charging: {'true' if self.trigger_force_disable_charge else 'false'}")
-            self.trigger_force_disable_charge = None
-            ser.flushOutput()
-            ser.flushInput()
-            ser.write(cmd)
-
-            reply = self.read_sentence(ser, self.command_disable_charge_mos)
-            if reply is False or reply[0] != cmd[4]:
-                logger.error("write force disable charge/discharge failed")
-                return False
-
-        if self.trigger_force_disable_discharge is not None:
-            cmd[2] = self.command_disable_discharge_mos[0]
-            cmd[4] = 0 if self.trigger_force_disable_discharge else 1
-            cmd[12] = sum(cmd[:12]) & 0xFF
-            logger.info(f"write force disable discharging: {'true' if self.trigger_force_disable_discharge else 'false'}")
-            self.trigger_force_disable_discharge = None
-            ser.flushOutput()
-            ser.flushInput()
-            ser.write(cmd)
-
-            reply = self.read_sentence(ser, self.command_disable_discharge_mos)
-            if reply is False or reply[0] != cmd[4]:
-                logger.error("write force disable charge/discharge failed")
-                return False
+        # the BMS replies with the new MOS state in the first data byte
+        reply = self.read_sentence(ser, command)
+        if reply is False or reply[0] != cmd[4]:
+            logger.error(f"write force disable {name} failed, retrying on next poll")
+            return False
         return True
 
     def generate_command(self, command):
