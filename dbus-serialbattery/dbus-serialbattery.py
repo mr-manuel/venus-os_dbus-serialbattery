@@ -148,6 +148,20 @@ def main():
 
         # Stop the CanReceiverThread
         elif port.startswith(("can", "vecan", "vcan")):
+            # Let CAN batteries leave the BMS in a defined state while the bus is still up,
+            # e.g. the U-BMS has to be commanded to standby before its keep alive message stops
+            try:
+                batteries = list(battery.values())
+            except NameError:
+                # exit before any battery was set up
+                batteries = []
+            for _battery in batteries:
+                if hasattr(_battery, "disconnect") and callable(_battery.disconnect):
+                    try:
+                        _battery.disconnect()
+                    except Exception:
+                        logger.exception("Error while disconnecting battery")
+
             if "can_thread" in globals() and can_thread is not None:
                 can_thread.stop()
 

@@ -17,7 +17,7 @@ from utils import (
     SOC_CALCULATION,
     logger,
 )
-from time import time
+from time import sleep, time
 import sys
 import can
 import struct
@@ -25,8 +25,12 @@ import itertools
 
 
 class Ubms_Can(Battery):
-    # Mapping UBMS to Victron States
-    opState = {0: 0, 1: 9, 2: 9}
+    # Mapping UBMS to Victron States: standby (contactor open) 14, charge and drive 9
+    opState = {0: 14, 1: 9, 2: 9}
+
+    # U-BMS modes commanded by the cyclic VMU message 0x440
+    MODE_STANDBY = 0
+    MODE_DRIVE = 2
 
     def __init__(self, port, baud, address):
         super(Ubms_Can, self).__init__(port, baud, address)
@@ -90,8 +94,18 @@ class Ubms_Can(Battery):
         self.number_of_modules_communicating = 0
         self.cyclic_mode_task = None
 
-        self.charge_fet = 1
-        self.discharge_fet = 1
+        # derived from the reported U-BMS mode and the force off flags in decode_can()
+        self.charge_fet = False
+        self.discharge_fet = False
+
+        # same control as dbus-ubms: the U-BMS has one contactor for both directions,
+        # it is only opened (standby) when charging and discharging are both forced off,
+        # a single direction is blocked by reporting its FET as off (CCL/DCL 0)
+        self.force_charging_off = False
+        self.force_discharging_off = False
+        self.commanded_mode = self.MODE_DRIVE
+        self.has_settings = True
+        self.callbacks_available.extend(["callback_charging_force_off", "callback_discharging_force_off"])
 
     BATTERYTYPE = "UBMS CAN"
 
@@ -179,13 +193,95 @@ class Ubms_Can(Battery):
             # create a cyclic mode command message simulating a VMU master
             # a U-BMS in slave mode according to manual section 6.4.1 switches to standby
             # after 20 seconds of not receiving it
-            # default: drive mode, i.e. contactor closed
-            msg = can.Message(arbitration_id=0x440, data=[0, 2, 0, 0], is_extended_id=False)
-
-            self.cyclic_mode_task = self.can_transport_interface.can_bus.send_periodic(msg, 1)
+            # default: drive mode, i.e. contactor closed, matching both force off flags at 0
+            if self.cyclic_mode_task is None:
+                self.cyclic_mode_task = self.can_transport_interface.can_bus.send_periodic(self._mode_message(self.commanded_mode), 1)
             return True
         else:
             return False
+
+    @staticmethod
+    def _mode_message(mode):
+        return can.Message(arbitration_id=0x440, data=[0, mode, 0, 0], is_extended_id=False)
+
+    def _set_mode(self, mode) -> bool:
+        """Change the mode commanded by the cyclic VMU message, standby (0) or drive (2)."""
+        if mode == self.commanded_mode:
+            return True
+
+        if self.cyclic_mode_task is None:
+            logger.warning("Cannot change U-BMS mode, keep alive message not running")
+            return False
+
+        msg = self._mode_message(mode)
+        try:
+            if isinstance(self.cyclic_mode_task, can.ModifiableCyclicTaskABC):
+                self.cyclic_mode_task.modify_data(msg)
+            else:
+                self.cyclic_mode_task.stop()
+                self.cyclic_mode_task = self.can_transport_interface.can_bus.send_periodic(msg, 1)
+            # apply right away instead of waiting up to one period
+            self.can_transport_interface.can_bus.send(msg, timeout=0.2)
+        except can.CanError as e:
+            logger.error(f"Failed to command U-BMS mode {mode}: {e}")
+            return False
+
+        self.commanded_mode = mode
+        logger.info("Commanding U-BMS %s mode", "standby" if mode == self.MODE_STANDBY else "drive")
+        return True
+
+    def _apply_force_off(self, force_charging_off, force_discharging_off) -> bool:
+        # contactor only opens when both directions are forced off
+        mode = self.MODE_STANDBY if force_charging_off and force_discharging_off else self.MODE_DRIVE
+        if not self._set_mode(mode):
+            return False
+        self.force_charging_off = force_charging_off
+        self.force_discharging_off = force_discharging_off
+        return True
+
+    def callback_charging_force_off(self, path, value):
+        if value not in (0, 1):
+            return False
+        return self._apply_force_off(bool(value), self.force_discharging_off)
+
+    def callback_discharging_force_off(self, path, value):
+        if value not in (0, 1):
+            return False
+        return self._apply_force_off(self.force_charging_off, bool(value))
+
+    def disconnect(self, timeout: float = 5.0) -> None:
+        """
+        Leave the U-BMS in commanded standby before the driver stops.
+
+        Stopping the 0x440 keep-alive while the U-BMS is in drive mode makes it run
+        into the VMU timeout (manual section 6.4.1). The standby it then falls into
+        can only be left by power cycling the U-BMS. So first command standby, wait
+        until the U-BMS reports it, and only then stop the keep-alive.
+        Must be called while the CAN bus and the receiver thread are still running.
+        """
+        if self.cyclic_mode_task is None:
+            return
+
+        logger.info("Commanding U-BMS standby before exit")
+        if self._set_mode(self.MODE_STANDBY):
+            deadline = time() + timeout
+            confirmed = False
+            while time() < deadline:
+                data = self.can_transport_interface.can_message_cache_callback().get(0xC0)
+                if data is not None and (data[1] & 0x3) == self.MODE_STANDBY:
+                    confirmed = True
+                    break
+                sleep(0.1)
+            if confirmed:
+                logger.info("U-BMS confirmed standby")
+            else:
+                logger.warning(f"U-BMS did not confirm standby within {timeout}s")
+
+        try:
+            self.cyclic_mode_task.stop()
+        except Exception as e:
+            logger.error(f"Failed to stop U-BMS keep alive message: {e}")
+        self.cyclic_mode_task = None
 
     def refresh_data(self):
         # call all functions that will refresh the battery data.
@@ -251,7 +347,12 @@ class Ubms_Can(Battery):
             if msg.arbitration_id == 0xC0:
                 self.soc = msg.data[0]
                 self.mode = msg.data[1]
-                self.state = self.opState[self.mode & 0x3]
+                bms_mode = self.mode & 0x3
+                self.state = self.opState.get(bms_mode, 10)
+                # in standby the contactor is open, so the battery can neither be charged nor
+                # discharged, otherwise a direction may be blocked by its force off flag
+                self.charge_fet = bms_mode != self.MODE_STANDBY and not self.force_charging_off
+                self.discharge_fet = bms_mode == self.MODE_DRIVE and not self.force_discharging_off
                 self.balancing = True if (self.mode & 0x10) != 0 else False
                 self.voltage_and_cell_t_alarms = msg.data[2]
                 self.internal_errors = msg.data[3]
