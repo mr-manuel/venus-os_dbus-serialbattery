@@ -95,6 +95,7 @@
 * Changed: JKBMS BLE - Fixed negative temperature display. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/369 by @mr-manuel
 * Changed: JKBMS CAN - Correct calculation of arbitration_id for device_address > 0. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/288 with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/306 by @Hooorny
 * Changed: JKBMS PB - Auto-recover the shared RS485 port when the driver gets stuck after a USB re-plug or a persistent dead-bus: after 8 consecutive failed reads the fd is closed and reopened on next access by @hsteinhaus
+* Changed: JKBMS PB - Fixed connection failing with "wrong frame type" on firmware that sends a non-zero byte 5 (e.g. 0x05 on FW 15.38); only byte 4 is checked as frame type by @thatisfree
 * Changed: JKBMS PB - Older hardware versions support dedicated heating values with latest firmware with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/459 by @phreaker0
 * Changed: JKBMS PB - Reject corrupted frames on the shared RS485 bus: settings frames with an implausible cell count (outside 3-32) are re-read instead of applied, status frames are skipped until a valid cell count is known, and frames with an invalid ACK (e.g. belonging to another BMS) are discarded by @mr-manuel
 * Changed: JKBMS PB: Alarms were not set correctly @mr-manuel
