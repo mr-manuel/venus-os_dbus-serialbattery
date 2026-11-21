@@ -18,6 +18,8 @@ from utils_ble import (
     BLE_HOLD_POLL_INTERVAL,
     BLE_RELEASE_TIMEOUT,
     ble_hold_active,
+    ble_link_up,
+    ble_strict_pin_blocks,
     get_ble_backend,
     restart_ble_hardware_and_bluez_driver,
 )
@@ -128,6 +130,7 @@ class LltJbd_Ble(LltJbd):
                 timeout=BLE_ESTABLISH_TIMEOUT,
             )
             self.bt_client = client
+            ble_link_up(self.address)
             logger.info("|- Device connected, check if it's really a LLT/JBD BMS")
             self.bt_loop = asyncio.get_event_loop()
             self.response_queue = asyncio.Queue()
@@ -175,7 +178,7 @@ class LltJbd_Ble(LltJbd):
 
     def background_loop(self):
         while self.run and self.main_thread.is_alive():
-            if ble_hold_active(self.address):
+            if ble_hold_active(self.address) or ble_strict_pin_blocks(self.address):
                 sleep(BLE_HOLD_POLL_INTERVAL)
                 continue
             asyncio.run(self.bt_main_loop())

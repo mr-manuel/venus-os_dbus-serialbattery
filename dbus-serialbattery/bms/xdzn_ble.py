@@ -29,7 +29,7 @@ from typing import Optional
 
 from battery import Battery, Cell
 from utils import logger, MAX_CELL_VOLTAGE, MAX_BATTERY_CHARGE_CURRENT, MAX_BATTERY_DISCHARGE_CURRENT, capture_raw_data
-from utils_ble import BLE_ESTABLISH_TIMEOUT, BLE_RELEASE_TIMEOUT, ble_hold_active, get_ble_backend
+from utils_ble import BLE_ESTABLISH_TIMEOUT, BLE_RELEASE_TIMEOUT, ble_hold_active, ble_link_up, ble_strict_pin_blocks, get_ble_backend
 
 # ── BLE UUIDs ──────────────────────────────────────────────────────────────
 
@@ -225,7 +225,7 @@ class Xdzn_Ble(Battery):
             if self._client and self._client.is_connected:
                 return True
 
-            if ble_hold_active(self.address):
+            if ble_hold_active(self.address) or ble_strict_pin_blocks(self.address):
                 # no attempts while the device is held; the next poll retries
                 return False
 
@@ -239,6 +239,7 @@ class Xdzn_Ble(Battery):
                 timeout=BLE_ESTABLISH_TIMEOUT,
             )
             self._client = client
+            ble_link_up(self.address)
 
             await self._client.write_gatt_char(AUTH_UUID, AUTH_KEY, response=False)
             await asyncio.sleep(0.5)

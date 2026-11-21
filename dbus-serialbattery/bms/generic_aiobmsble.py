@@ -28,7 +28,7 @@ from bleak.backends.device import BLEDevice  # noqa: E402
 from bleak.exc import BleakError  # noqa: E402
 from bleak_retry_connector import get_device, get_device_by_adapter  # noqa: E402
 from aiobmsble import BMSInfo, BMSSample, TempSensor  # noqa: E402
-from utils_ble import adapters_in_attempt_order, ble_hold_active  # noqa: E402
+from utils_ble import adapters_in_attempt_order, ble_hold_active, ble_link_up, ble_strict_pin_blocks  # noqa: E402
 
 
 class Generic_AioBmsBle(Battery):
@@ -552,6 +552,10 @@ class Generic_AioBmsBle(Battery):
                         self._aiobmsble_device = None
                         self._run_coro(lambda: self._aiobmsble_disconnect(bms))
                 ok = None
+            elif self._aiobmsble is None and ble_strict_pin_blocks(self.address):
+                # a strict pin whose adapters are all missing: no new
+                # connection over any other radio; cached data ages out
+                ok = None
             else:
                 if self._ble_hold_logged:
                     self._ble_hold_logged = False
@@ -560,6 +564,7 @@ class Generic_AioBmsBle(Battery):
                 ok = self._run_coro(_update_async)
             if ok:
                 self._last_successful_update = time.monotonic()
+                ble_link_up(self.address)
             elif self._last_successful_update is not None:
                 data_age = time.monotonic() - self._last_successful_update
                 if data_age > self._max_data_age:

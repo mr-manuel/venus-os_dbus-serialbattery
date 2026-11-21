@@ -19,6 +19,8 @@ from utils_ble import (
     BLE_HOLD_POLL_INTERVAL,
     BLE_RELEASE_TIMEOUT,
     ble_hold_active,
+    ble_link_up,
+    ble_strict_pin_blocks,
     get_ble_backend,
 )
 from typing import Optional
@@ -92,6 +94,7 @@ class Kilovault_Ble(Battery):
                 timeout=BLE_ESTABLISH_TIMEOUT,
             )
             self.client = client
+            ble_link_up(self.address)
             # register a callback to stop notifications
             atexit.register(self.stop_notifications_and_disconnect)
             # find the BMS service out of the list of services
@@ -136,7 +139,7 @@ class Kilovault_Ble(Battery):
     # this is the body of the worker thread loop.  It just tries to stay connected to the battery
     def background_loop(self):
         while self.run and self.main_thread.is_alive():
-            if ble_hold_active(self.address):
+            if ble_hold_active(self.address) or ble_strict_pin_blocks(self.address):
                 sleep(BLE_HOLD_POLL_INTERVAL)
                 continue
             asyncio.run(self.connection_thread())

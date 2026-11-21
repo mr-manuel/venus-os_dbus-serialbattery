@@ -32,6 +32,8 @@ else:
         BLE_HOLD_POLL_INTERVAL,
         BLE_RELEASE_TIMEOUT,
         ble_hold_active,
+        ble_link_up,
+        ble_strict_pin_blocks,
         get_ble_backend,
     )
 
@@ -472,7 +474,7 @@ class Jkbms_Brn:
         # is what advances to the next radio after a failed attempt
         backend = get_ble_backend()
         while self.run and self.main_thread.is_alive():  # autoreconnect
-            if ble_hold_active(self.address):
+            if ble_hold_active(self.address) or ble_strict_pin_blocks(self.address):
                 await asyncio.sleep(BLE_HOLD_POLL_INTERVAL)
                 continue
             self.bt_client = backend.create_client(self.address, None)
@@ -508,6 +510,7 @@ class Jkbms_Brn:
                 # connected and subscribed: the link is good, so the failure
                 # streak ends here even if this session later drops
                 consecutive_failures = 0
+                ble_link_up(self.address)
 
                 await self.request_bt("device_info", self.bt_client)
 

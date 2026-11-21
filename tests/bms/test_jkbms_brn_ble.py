@@ -42,6 +42,8 @@ _enrich(
     BLE_RELEASE_TIMEOUT=1.0,
     BLE_HOLD_POLL_INTERVAL=0.01,
     ble_hold_active=lambda address: False,
+    ble_strict_pin_blocks=lambda address: False,
+    ble_link_up=lambda address: None,
     get_ble_backend=lambda name=None: None,
 )
 
@@ -96,6 +98,8 @@ def _make_jk(backend, monkeypatch):
     monkeypatch.setattr(jkbms_brn, "get_ble_backend", lambda name=None: backend)
     monkeypatch.setattr(jkbms_brn, "ble_hold_active", lambda address: False)
     monkeypatch.setattr(jkbms_brn, "RECONNECT_BACKOFF_S", [0])
+    monkeypatch.setattr(jkbms_brn, "ble_strict_pin_blocks", lambda address: False)
+    monkeypatch.setattr(jkbms_brn, "ble_link_up", lambda address: None)
     jk = jkbms_brn.Jkbms_Brn("C8:47:8C:00:00:00")
     jk.main_thread = threading.current_thread()
     return jk
@@ -176,3 +180,45 @@ def test_a_hold_flag_pauses_attempts_without_ending_the_loop(monkeypatch):
     asyncio.run(scrape_then_stop())
     assert backend.create_calls == 0
     assert backend.establish_calls == 0
+
+
+def test_a_strict_pin_without_its_adapter_makes_no_attempt(monkeypatch):
+    """BLUETOOTH_ADAPTER_PIN_STRICT: waiting beats connecting over the wrong radio."""
+    backend = RecordingBackend([])
+    jk = _make_jk(backend, monkeypatch)
+    monkeypatch.setattr(jkbms_brn, "ble_strict_pin_blocks", lambda address: True)
+    monkeypatch.setattr(jkbms_brn, "BLE_HOLD_POLL_INTERVAL", 0.01)
+
+    async def scrape_then_stop():
+        task = asyncio.ensure_future(jk.asy_connect_and_scrape())
+        await asyncio.sleep(0.05)
+        jk.run = False
+        await asyncio.wait_for(task, timeout=2)
+
+    asyncio.run(scrape_then_stop())
+    assert backend.create_calls == 0
+    assert backend.establish_calls == 0
+
+
+def test_a_connected_session_reports_the_link_up(monkeypatch):
+    """The pin warning is re-armed per connection, so the next lost card is said again."""
+    client = FakeClient(connected_polls=1000)
+    backend = RecordingBackend([client])
+    monkeypatch.setattr(jkbms_brn, "MAX_CONSECUTIVE_FAILURES", 1)
+    jk = _make_jk(backend, monkeypatch)
+    links = []
+    monkeypatch.setattr(jkbms_brn, "ble_link_up", links.append)
+
+    async def _noop_request(rtype, c):
+        return None
+
+    jk.request_bt = _noop_request
+
+    async def scrape_then_stop():
+        task = asyncio.ensure_future(jk.asy_connect_and_scrape())
+        await asyncio.sleep(0.05)
+        jk.run = False
+        await asyncio.wait_for(task, timeout=2)
+
+    asyncio.run(scrape_then_stop())
+    assert links == ["C8:47:8C:00:00:00"]

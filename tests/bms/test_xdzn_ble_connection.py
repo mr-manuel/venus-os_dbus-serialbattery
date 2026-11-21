@@ -38,6 +38,8 @@ _enrich(
     BLE_RELEASE_TIMEOUT=1.0,
     BLE_HOLD_POLL_INTERVAL=0.01,
     ble_hold_active=lambda address: False,
+    ble_strict_pin_blocks=lambda address: False,
+    ble_link_up=lambda address: None,
     get_ble_backend=lambda name=None: None,
     restart_ble_hardware_and_bluez_driver=lambda: None,
 )
@@ -87,6 +89,8 @@ class RecordingBackend:
 
 def _make_bat(backend, monkeypatch):
     monkeypatch.setattr(xdzn_ble, "ble_hold_active", lambda address: False)
+    monkeypatch.setattr(xdzn_ble, "ble_strict_pin_blocks", lambda address: False)
+    monkeypatch.setattr(xdzn_ble, "ble_link_up", lambda address: None)
     bat = Xdzn_Ble.__new__(Xdzn_Ble)
     bat.address = "AA:BB:CC:DD:EE:FF"
     bat.backend = backend
@@ -153,3 +157,16 @@ def test_disconnect_releases_through_the_backend(monkeypatch):
     assert client.stopped_notify == [xdzn_ble.NOTIFY_UUID]
     assert backend.released == [client]
     assert bat._client is None
+
+
+def test_a_strict_pin_without_its_adapter_prevents_any_attempt(monkeypatch):
+    backend = RecordingBackend([])
+    bat = _make_bat(backend, monkeypatch)
+    monkeypatch.setattr(xdzn_ble, "ble_strict_pin_blocks", lambda address: True)
+
+    async def run():
+        bat._event = asyncio.Event()
+        return await bat._connect()
+
+    assert asyncio.run(run()) is False
+    assert backend.create_calls == 0

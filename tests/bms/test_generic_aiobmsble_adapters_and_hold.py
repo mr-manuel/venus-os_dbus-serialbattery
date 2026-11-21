@@ -82,6 +82,8 @@ _enrich(
     BLE_RELEASE_TIMEOUT=1.0,
     BLE_HOLD_POLL_INTERVAL=0.01,
     ble_hold_active=lambda address: False,
+    ble_strict_pin_blocks=lambda address: False,
+    ble_link_up=lambda address: None,
     adapters_in_attempt_order=lambda address, present=None: [],
     get_ble_backend=lambda name=None: None,
     restart_ble_hardware_and_bluez_driver=lambda: None,
@@ -228,3 +230,40 @@ def test_release_of_the_hold_resumes_updates(monkeypatch):
     assert bat.refresh_data() is False  # update ran but found no device
     assert len(scheduled) == 1  # _update_async was scheduled again
     assert bat._ble_hold_logged is False
+
+
+def test_a_strict_pin_without_its_adapter_makes_no_new_connection(monkeypatch):
+    monkeypatch.setattr(generic_aiobmsble, "ble_hold_active", lambda address: False)
+    monkeypatch.setattr(generic_aiobmsble, "ble_strict_pin_blocks", lambda address: True)
+
+    bat = _make_bat()
+    scheduled = []
+    bat._run_coro = lambda coro, timeout=None: (scheduled.append(coro), False)[1]
+
+    assert bat.refresh_data() is False
+    assert scheduled == []
+
+
+def test_a_strict_pin_does_not_cut_a_link_that_is_already_up(monkeypatch):
+    """The gate stops new connections; a kept-alive client is still polled."""
+    monkeypatch.setattr(generic_aiobmsble, "ble_hold_active", lambda address: False)
+    monkeypatch.setattr(generic_aiobmsble, "ble_strict_pin_blocks", lambda address: True)
+
+    bat = _make_bat()
+    bat._aiobmsble = object()
+    scheduled = []
+    bat._run_coro = lambda coro, timeout=None: (scheduled.append(coro), False)[1]
+
+    bat.refresh_data()
+    assert len(scheduled) == 1
+
+
+def test_a_successful_update_reports_the_link_up(monkeypatch):
+    monkeypatch.setattr(generic_aiobmsble, "ble_hold_active", lambda address: False)
+    links = []
+    monkeypatch.setattr(generic_aiobmsble, "ble_link_up", links.append)
+
+    bat = _make_bat()
+    bat._run_coro = lambda coro, timeout=None: True
+    bat.refresh_data()  # data parsing fails on the empty sample; the link note comes first
+    assert links == [ADDRESS]

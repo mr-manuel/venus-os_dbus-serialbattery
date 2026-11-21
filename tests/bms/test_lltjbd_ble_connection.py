@@ -10,6 +10,7 @@ import asyncio
 import os
 import sys
 import threading
+import time
 import types
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "dbus-serialbattery"))
@@ -51,6 +52,8 @@ _enrich(
     BLE_RELEASE_TIMEOUT=1.0,
     BLE_HOLD_POLL_INTERVAL=0.01,
     ble_hold_active=lambda address: False,
+    ble_strict_pin_blocks=lambda address: False,
+    ble_link_up=lambda address: None,
     get_ble_backend=lambda name=None: None,
     restart_ble_hardware_and_bluez_driver=lambda: None,
 )
@@ -195,6 +198,30 @@ def test_a_hold_flag_pauses_the_background_loop(monkeypatch):
     thread.start()
     import time
 
+    time.sleep(0.1)
+    bat.run = False
+    thread.join(timeout=2)
+
+    assert not thread.is_alive()
+    assert attempts == []
+
+
+def test_a_strict_pin_without_its_adapter_pauses_the_background_loop(monkeypatch):
+    backend = RecordingBackend([])
+    bat = _make_bat(backend, monkeypatch)
+    monkeypatch.setattr(lltjbd_ble, "ble_hold_active", lambda address: False)
+    monkeypatch.setattr(lltjbd_ble, "ble_strict_pin_blocks", lambda address: True)
+    monkeypatch.setattr(lltjbd_ble, "BLE_HOLD_POLL_INTERVAL", 0.01)
+
+    attempts = []
+
+    async def record_attempt():
+        attempts.append(1)
+
+    bat.bt_main_loop = record_attempt
+
+    thread = threading.Thread(target=bat.background_loop, daemon=True)
+    thread.start()
     time.sleep(0.1)
     bat.run = False
     thread.join(timeout=2)

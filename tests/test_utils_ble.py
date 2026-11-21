@@ -1945,6 +1945,8 @@ def test_a_rebuild_hands_the_reaper_the_abandoned_generation_not_the_new_one(mon
     # and the NEW thread handle was stored for the next generation's reaper
     assert sb._ble_async_thread is not old_thread
     assert sb._ble_async_thread.name == "BMS_bluetooth_async_thread_gen1"
+
+
 class _EstablishClient:
     """Just enough client for the backend establish path."""
 
@@ -2080,3 +2082,47 @@ def test_an_unreadable_flag_counts_as_held(tmp_path):
         assert utils_ble.ble_hold_active("C8:47:8C:00:00:00")
     finally:
         utils_ble.BLE_HOLD_FLAG_DIR = original
+
+
+def _strict(monkeypatch, strict, present):
+    monkeypatch.setattr(utils_ble, "BLUETOOTH_ADAPTER_PIN_STRICT", strict)
+    monkeypatch.setattr(utils_ble, "configured_adapter_present", lambda address, present_=None: present)
+    monkeypatch.setattr(utils_ble, "_strict_pin_waiting", set())
+
+
+def test_a_strict_pin_never_blocks_when_strict_mode_is_off(monkeypatch):
+    _strict(monkeypatch, strict=False, present=False)
+    assert not utils_ble.ble_strict_pin_blocks("C8:47:8C:00:00:00")
+
+
+def test_a_strict_pin_blocks_while_none_of_its_adapters_is_present(monkeypatch, caplog):
+    _strict(monkeypatch, strict=True, present=False)
+    with caplog.at_level("WARNING"):
+        assert utils_ble.ble_strict_pin_blocks("C8:47:8C:00:00:00")
+        assert utils_ble.ble_strict_pin_blocks("C8:47:8C:00:00:00")
+    # the wait is said once, not on every check
+    assert sum("BLUETOOTH_ADAPTER_PIN_STRICT is on" in r.getMessage() for r in caplog.records) == 1
+
+
+def test_a_strict_pin_resumes_and_says_so_when_its_adapter_returns(monkeypatch, caplog):
+    _strict(monkeypatch, strict=True, present=False)
+    assert utils_ble.ble_strict_pin_blocks("C8:47:8C:00:00:00")
+    monkeypatch.setattr(utils_ble, "configured_adapter_present", lambda address, present_=None: True)
+    with caplog.at_level("INFO"):
+        assert not utils_ble.ble_strict_pin_blocks("C8:47:8C:00:00:00")
+    assert any("is present again" in r.getMessage() for r in caplog.records)
+
+
+def test_a_driver_link_up_re_arms_the_pins_dropped_warning(monkeypatch):
+    """
+    Without the re-arm a swapped card is reported once per process: the next
+    lost pin would go out on the wrong radio without a word.
+    """
+    monkeypatch.setattr(utils_ble, "BLUETOOTH_ADAPTER_PINS", {"C8:47:8C:00:00:00": ["hci5"]})
+    monkeypatch.setattr(utils_ble, "_unpinned_devices", {"C8:47:8C:00:00:00"})
+    utils_ble.ble_link_up("C8:47:8C:00:00:00")
+    # hci5 does not resolve here, so the battery is still unpinned: stays armed-off
+    assert "C8:47:8C:00:00:00" in utils_ble._unpinned_devices
+    monkeypatch.setattr(utils_ble, "bluez_adapters", lambda: {"hci5": "00:1A:7D:DA:71:06"})
+    utils_ble.ble_link_up("C8:47:8C:00:00:00")
+    assert "C8:47:8C:00:00:00" not in utils_ble._unpinned_devices

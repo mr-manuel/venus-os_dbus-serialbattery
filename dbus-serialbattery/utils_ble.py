@@ -551,6 +551,56 @@ def ble_hold_active(address):
     return True
 
 
+def strict_pin_wait_message(address):
+    """The warning a strict pin logs when it starts waiting, worded once for every driver."""
+    return (
+        f"BLE adapter pins for {address} are not being honoured: none of "
+        f"{', '.join(adapters_for(address) or BLUETOOTH_ADAPTER_POOL)} is present. "
+        "Waiting for one of them rather than falling back (BLUETOOTH_ADAPTER_PIN_STRICT is on). "
+        "Either the pinned card was removed or swapped - a MAC pin is only as durable as the "
+        "card that answers to it, so repin the config - or adapter identity cannot be read at "
+        "all, in which case check that hciconfig works."
+    )
+
+
+# devices a strict pin is currently holding back, so each wait is logged once
+_strict_pin_waiting = set()
+
+
+def ble_strict_pin_blocks(address):
+    """
+    True while BLUETOOTH_ADAPTER_PIN_STRICT forbids a connection attempt.
+
+    The check Syncron_Ble makes in its reconnect loop, for drivers that run
+    their own: with a strict pin and none of the battery's adapters present,
+    connecting over a different one is worse than not connecting, so the
+    caller makes no attempt and asks again later. The start and end of each
+    wait are logged once, not per check.
+    """
+    if not BLUETOOTH_ADAPTER_PIN_STRICT or configured_adapter_present(address):
+        if address in _strict_pin_waiting:
+            _strict_pin_waiting.discard(address)
+            logger.info(f"BLE adapter for {address} is present again, resuming connection attempts")
+        return False
+    if address not in _strict_pin_waiting:
+        _strict_pin_waiting.add(address)
+        logger.warning(strict_pin_wait_message(address))
+    return True
+
+
+def ble_link_up(address):
+    """
+    Tell the adapter-pin bookkeeping that a driver's link came up.
+
+    Re-arms the "pins not honoured" warning once the battery is connected
+    over adapters its pins resolve to, so the next time the pinned card goes
+    away it is said again. Syncron_Ble does this when it reports the link up;
+    drivers with their own connection loop call this after each successful
+    connect, or a swapped card would only ever be reported once per process.
+    """
+    _note_pins_honoured(address)
+
+
 # Outer deadlines for the connection backend. Generous on purpose: they are a
 # last resort against a permanently parked await, not a connection timeout.
 # How often the supervision wait re-checks the things that have no callback
@@ -1155,14 +1205,7 @@ class Syncron_Ble:
             if BLUETOOTH_ADAPTER_PIN_STRICT and not configured_adapter_present(self.address):
                 if not waiting_for_adapter:
                     waiting_for_adapter = True
-                    logger.warning(
-                        f"BLE adapter pins for {self.address} are not being honoured: none of "
-                        f"{', '.join(adapters_for(self.address) or BLUETOOTH_ADAPTER_POOL)} is present. "
-                        "Waiting for one of them rather than falling back (BLUETOOTH_ADAPTER_PIN_STRICT is on). "
-                        "Either the pinned card was removed or swapped - a MAC pin is only as durable as the "
-                        "card that answers to it, so repin the config - or adapter identity cannot be read at "
-                        "all, in which case check that hciconfig works."
-                    )
+                    logger.warning(strict_pin_wait_message(self.address))
                 await asyncio.sleep(BLE_HOLD_POLL_INTERVAL)
                 continue
             if waiting_for_adapter:
