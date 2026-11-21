@@ -13,7 +13,16 @@ from asyncio import CancelledError
 from time import sleep
 from typing import Union, Optional
 from utils import get_connection_error_message, logger, BLUETOOTH_FORCE_RESET_BLE_STACK, capture_raw_data
-from utils_ble import restart_ble_hardware_and_bluez_driver
+from utils_ble import (
+    BLE_ESTABLISH_TIMEOUT,
+    BLE_HOLD_POLL_INTERVAL,
+    BLE_RELEASE_TIMEOUT,
+    ble_hold_active,
+    ble_link_up,
+    ble_strict_pin_blocks,
+    get_ble_backend,
+    restart_ble_hardware_and_bluez_driver,
+)
 from bleak import BleakClient, BleakScanner, BLEDevice
 from bleak.exc import BleakDBusError
 from bms.lltjbd import LltJbdProtection, LltJbd
@@ -53,6 +62,9 @@ class LltJbd_Ble(LltJbd):
         self.bt_thread = threading.Thread(name="LltJbd_Ble_Loop", target=self.background_loop, daemon=True)
         self.bt_loop: Optional[asyncio.AbstractEventLoop] = None
         self.bt_client: Optional[BleakClient] = None
+        # one backend for the life of the driver: its adapter rotation state
+        # is what advances to the next radio after a failed attempt
+        self.backend = get_ble_backend()
         self.device: Optional[BLEDevice] = None
         self.response_queue: Optional[asyncio.Queue] = None
         self.ready_event: Optional[asyncio.Event] = None
@@ -102,21 +114,32 @@ class LltJbd_Ble(LltJbd):
             sleep(5)
 
         if not self.device:
-            self.run = False
+            # not found this pass - the battery may be rebooting or briefly
+            # out of range; background_loop tries again
+            await asyncio.sleep(2)
             return
 
+        client = None
         try:
-            async with BleakClient(self.device, disconnected_callback=self.on_disconnect) as client:
-                self.bt_client = client
-                logger.info("|- Device connected, check if it's really a LLT/JBD BMS")
-                self.bt_loop = asyncio.get_event_loop()
-                self.response_queue = asyncio.Queue()
-                self.notify_active = False
-                self.response_buffer = bytearray()
-                self.response_future = None
-                self.ready_event.set()
-                while self.run and client.is_connected and self.main_thread.is_alive():
-                    await asyncio.sleep(0.1)
+            # notify_char=None: the RX characteristic is only known after
+            # _detect_uuids has looked at the connected device, so
+            # send_command subscribes lazily itself
+            client = self.backend.create_client(self.address, self.on_disconnect)
+            client = await asyncio.wait_for(
+                self.backend.establish(client, self.address, None, None),
+                timeout=BLE_ESTABLISH_TIMEOUT,
+            )
+            self.bt_client = client
+            ble_link_up(self.address)
+            logger.info("|- Device connected, check if it's really a LLT/JBD BMS")
+            self.bt_loop = asyncio.get_event_loop()
+            self.response_queue = asyncio.Queue()
+            self.notify_active = False
+            self.response_buffer = bytearray()
+            self.response_future = None
+            self.ready_event.set()
+            while self.run and client.is_connected and self.main_thread.is_alive():
+                await asyncio.sleep(0.1)
             self.bt_loop = None
 
         # Exception occurred: TimeoutError() of type <class 'asyncio.exceptions.TimeoutError'>
@@ -125,8 +148,7 @@ class LltJbd_Ble(LltJbd):
             file = exception_traceback.tb_frame.f_code.co_filename
             line = exception_traceback.tb_lineno
             logger.error(f"BleakClient(): asyncio.exceptions.TimeoutError: {repr(exception_object)} of type {exception_type} " f"in {file} line #{line}")
-            # needed?
-            self.run = False
+            await asyncio.sleep(2)
             return
 
         except TimeoutError:
@@ -134,8 +156,7 @@ class LltJbd_Ble(LltJbd):
             file = exception_traceback.tb_frame.f_code.co_filename
             line = exception_traceback.tb_lineno
             logger.error(f"BleakClient(): TimeoutError: {repr(exception_object)} of type {exception_type} " f"in {file} line #{line}")
-            # needed?
-            self.run = False
+            await asyncio.sleep(2)
             return
 
         except Exception:
@@ -143,12 +164,23 @@ class LltJbd_Ble(LltJbd):
             file = exception_traceback.tb_frame.f_code.co_filename
             line = exception_traceback.tb_lineno
             logger.error(f"BleakClient(): Exception occurred: {repr(exception_object)} of type {exception_type} " f"in {file} line #{line}")
-            # needed?
-            self.run = False
+            await asyncio.sleep(2)
             return
+
+        finally:
+            if client is not None and client.is_connected:
+                try:
+                    await asyncio.wait_for(self.backend.release(client), timeout=BLE_RELEASE_TIMEOUT)
+                except Exception as e:
+                    # a disconnect that never completes must not prevent the
+                    # next connection attempt
+                    logger.warning(f"BLE [{self.address}] disconnect did not complete: {repr(e)}")
 
     def background_loop(self):
         while self.run and self.main_thread.is_alive():
+            if ble_hold_active(self.address) or ble_strict_pin_blocks(self.address):
+                sleep(BLE_HOLD_POLL_INTERVAL)
+                continue
             asyncio.run(self.bt_main_loop())
 
     async def async_test_connection(self):
