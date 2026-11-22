@@ -111,6 +111,7 @@
 * Changed: Startup BMS recognition sequence changed to startup faster for most used BMS by @mr-manuel
 * Changed: Temperature compensation - Preserve missing temperature sensor values instead of crashing when applying adjustment settings. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/457 by @akmhatey-ai
 * Changed: UBMS CAN code style to snake_case, various improvements and fixes by @gimx
+* Changed: UBMS CAN - Added the force charging/discharging off switches (`/Settings/ForceChargingOff`, `/Settings/ForceDischargingOff`). Like dbus-ubms, the U-BMS is commanded to standby through the VMU keep-alive message when both are off, a single direction is blocked by its FET flag. On service stop the U-BMS is now commanded to standby before the keep-alive stops, instead of running into the VMU timeout which needs a power cycle to recover by @gimx
 * Changed: Use Bluetooth MAC address as unique identifier for all Bluetooth BMS by @mr-manuel
 * Changed: Use correct temperature sensors for Daly CAN BMS instead of min/max values by @lex2k0
 * Changed: Use port and address as unique identifier is now available for all serial BMS by @mr-manuel
