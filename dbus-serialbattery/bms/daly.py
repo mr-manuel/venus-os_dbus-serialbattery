@@ -114,6 +114,13 @@ class Daly(Battery):
         self.read_capacity(ser)
         self.read_production_date(ser)
 
+        # init the cell array, so that setup_vedbus() creates the cell voltage paths
+        # (cell_count is already known here from read_status_data() in test_connection())
+        if self.cell_count is not None and len(self.cells) != self.cell_count:
+            self.cells = []
+            for _ in range(self.cell_count):
+                self.cells.append(Cell(False))
+
         return True
 
     def refresh_data(self):
