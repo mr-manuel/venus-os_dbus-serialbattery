@@ -1306,6 +1306,9 @@ class DbusHelper:
             try:
                 cell_voltage_max = utils.MAX_CELL_VOLTAGE * 2
                 voltage_sum = 0
+                # only the cells in series add up to the battery voltage: batteries with parallel
+                # strings (e.g. U-BMS) report the cells of all strings, but cell_count of one
+                series_cells = self.battery.cell_count if self.battery.cell_count else len(self.battery.cells)
                 for i in range(len(self.battery.cells)):
                     voltage = self.battery.cells[i].voltage
                     if voltage is not None and voltage > cell_voltage_max:
@@ -1315,7 +1318,7 @@ class DbusHelper:
                     self._dbusservice[cellpath % (str(i + 1))] = voltage
                     if utils.BATTERY_CELL_DATA_FORMAT & 1:
                         self._dbusservice["/Balances/Cell%s" % (str(i + 1))] = self.battery.get_cell_balancing(i)
-                    if voltage:
+                    if voltage and i < series_cells:
                         voltage_sum += voltage
                 pathbase = "Cell" if (utils.BATTERY_CELL_DATA_FORMAT & 2) else "Voltages"
                 self._dbusservice["/%s/Sum" % pathbase] = round(voltage_sum, 2)

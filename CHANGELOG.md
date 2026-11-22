@@ -56,6 +56,7 @@
 * Changed: dbushelper.py - Postpone the telemetry upload until the battery reports a plausible cell count, preventing garbage cell counts from being uploaded by @mr-manuel
 * Changed: dbushelper.py - Refresh the `LastSeen` setting daily while the driver is running. Previously it was written only at startup, so after more than 30 days of continuous uptime a restart deleted the settings (device instance, custom name, history) of all other batteries sharing the port by @dmitrych5
 * Changed: dbushelper.py - Reworked save settings methods by @lex2k0
+* Changed: dbushelper.py - `/Voltages/Sum` now only adds up the cells in series (`cell_count`), like `get_cell_voltage_sum()`. Batteries with parallel strings like the UBMS CAN report the cells of all strings, which doubled the sum for 2 strings by @gimx
 * Changed: Decoupled SOC Reset after x days from the need that the battery has to switch to bulk charge, thus after every x days are passed by there will be a bulk charge / top balancing by @lex2k0
 * Changed: Default ProductName now includes the BMS unique identifier and the serial-port basename (e.g. `SerialBattery BB02 @ ttyUSB0 (JKBMS PB Model)`) so the GUI label tracks the current port across USB renumbering; the default CustomName is left empty so it acts as a pure user-override slot. Applies to any BMS class that does not override `custom_name()` / `product_name()` by @hsteinhaus
 * Changed: Disabled BMS SOC alerts if `SOC_CALCULATION` is enabled. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/377 by @mr-manuel
