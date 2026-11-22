@@ -525,7 +525,6 @@ class LltJbd_Up16s(Battery):
         discharge_mos_fault = fault_flags & (1 << 22)
         current_limiting_anomaly = fault_flags & (1 << 23)
         aerosol_fault = fault_flags & (1 << 24)
-        full_charge_protection_1 = fault_flags & (1 << 25)
         abnormal_afe_communication = fault_flags & (1 << 26)
         reverse_protection = fault_flags & (1 << 27)
 
@@ -547,13 +546,10 @@ class LltJbd_Up16s(Battery):
         soc_too_low_alarm = alarm_flags & (1 << 15)
         eep_fault_alarm = alarm_flags & (1 << 16)
         rtc_abnormal = alarm_flags & (1 << 17)
-        full_charge_protection_2 = alarm_flags & (1 << 18)  # full_charge_protection_2 appears to be always in the same state as full_charge_protection_1
 
         self.protection.high_cell_voltage = self.from_raw_protection_value(cell_overvoltage_fault, cell_overvoltage_alarm)
         self.protection.low_cell_voltage = self.from_raw_protection_value(cell_undervoltage_fault, cell_undervoltage_alarm)
-        self.protection.high_voltage = self.from_raw_protection_value(
-            total_overvoltage_fault, total_overvoltage_alarm or full_charge_protection_1 or full_charge_protection_2
-        )
+        self.protection.high_voltage = self.from_raw_protection_value(total_overvoltage_fault, total_overvoltage_alarm)
         self.protection.low_voltage = self.from_raw_protection_value(total_undervoltage_fault, total_undervoltage_alarm)
         self.protection.high_charge_current = self.from_raw_protection_value(charge_overcurrent_1_fault or charge_overcurrent_2_fault, charge_overcurrent_alarm)
         self.protection.high_discharge_current = self.from_raw_protection_value(
