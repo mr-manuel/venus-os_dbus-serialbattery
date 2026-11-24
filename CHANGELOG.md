@@ -51,6 +51,7 @@
 * Changed: aiobmsble - Correctly assign temperature sensor slots using the `TempSensor` type added upstream (https://github.com/patman15/aiobmsble/pull/202): MOSFET always maps to slot 0, other sensor types fill the remaining slots 1-4 in the order provided, extra readings are logged as a warning instead of being silently mismapped by @mr-manuel
 * Changed: D-bus charge limits - Skip None writes to `/Info/MaxChargeCurrent` and `/Info/MaxDischargeCurrent` so consumers like `dbus-aggregate-batteries` don't crash with `TypeError: unsupported operand type(s) for *: 'NoneType' and 'int'` during the brief window before the first charge-control decision lands by @hsteinhaus
 * Changed: Daly BMS & Daly CAN BMS: Fix high charge/discharge current alarm. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/378 by @mr-manuel
+* Changed: Daren 485 BMS - Added per-cell balancing status and dynamic Service 0x42 parsing by @kopierschnitte
 * Changed: Daren 485 BMS - Fixed charge/discharge calculation with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/343 by @kopierschnitte
 * Changed: dbushelper.py - Ensure loading of newest battery data if more than one duplicate exists by @lex2k0
 * Changed: dbushelper.py - Postpone the telemetry upload until the battery reports a plausible cell count, preventing garbage cell counts from being uploaded by @mr-manuel
@@ -98,6 +99,7 @@
 * Changed: JKBMS PB - Older hardware versions support dedicated heating values with latest firmware with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/459 by @phreaker0
 * Changed: JKBMS PB - Reject corrupted frames on the shared RS485 bus: settings frames with an implausible cell count (outside 3-32) are re-read instead of applied, status frames are skipped until a valid cell count is known, and frames with an invalid ACK (e.g. belonging to another BMS) are discarded by @mr-manuel
 * Changed: JKBMS PB: Alarms were not set correctly @mr-manuel
+* Changed: KS48100 BMS - Added per-cell balancing status and dynamic Service 0x42 parsing, fixed remaining capacity reporting, and improved internal failure decoding by @kopierschnitte
 * Changed: KS48100 BMS - Fixed charge/discharge calculation with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/343 by @kopierschnitte
 * Changed: LiTime BLE BMS - Fixed unbounded cell-array growth in `parse_status` that flooded the log with `KeyError('/Voltages/CellN')` exceptions because `dbushelper` only registers paths for the initial cell count. Fixes https://github.com/mr-manuel/venus-os_dbus-serialbattery/issues/440
 * Changed: LLT/JBD BLE BMS - Fixed wrong charge/discharge fet assignment @mr-manuel

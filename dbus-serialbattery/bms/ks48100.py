@@ -13,7 +13,7 @@
 # avoid importing wildcards, remove unused imports
 from battery import Battery, Cell
 from utils import SOC_CALCULATION, open_serial_port, get_connection_error_message, logger, capture_raw_data
-from time import sleep
+from time import monotonic, sleep
 from struct import unpack
 from re import findall
 import sys
@@ -28,9 +28,15 @@ class KS48100(Battery):
         # to address reflecting the position of the DIP-switches on the unit(s), starting at '01'.
         self.address = address
         self.serial_number = ""
+        self.balanced_mode = None
+        self._last_balance_mask = None
+        self._last_balance_status = None
+        self._balance_fet_off_since = None
+        self._cell_balance_off_since = {}
         self.history.exclude_values_to_calculate = ["charge_cycles", "total_ah_drawn", "charged_energy", "discharged_energy"]
 
     BATTERYTYPE = "KS48100"
+    BALANCE_OFF_DELAY_SECONDS = 10
 
     def test_connection(self):
         """
@@ -93,6 +99,10 @@ class KS48100(Battery):
                         result = result and self.get_manufacturer_info(ser)
 
                         result = result and self.get_cap_params(ser)
+
+                        # Read balancing configuration once at startup. This is optional
+                        # and must not prevent the driver from starting if Service 0x80 is unsupported.
+                        self.get_balance_params(ser)
                     else:
                         logger.error("Error opening serialport!")
                 else:
@@ -165,7 +175,6 @@ class KS48100(Battery):
                 serial_byte_array = bytearray.fromhex(payload[0:30])
                 self.serial_number = serial_byte_array.decode()
                 logger.info("get_serial: {}".format(self.serial_number))
-
                 result = True
             else:
                 logger.error("Did not find a serial number")
@@ -234,7 +243,10 @@ class KS48100(Battery):
             # Payload starts at offset 13(packet header) + 12 (command_info)
             payload = response[(13 + 12) : len(response) - 5]
             if len(payload) >= 36:  # 9*4 bytes in full request.
-                self.capacity_remaining = int(int(payload[0:4], base=16) / 100)
+                # Use Battery.capacity_remain. The old KS48100 driver used the
+                # non-framework attribute "capacity_remaining", so the BMS value
+                # was not published through the normal capacity paths.
+                self.capacity_remain = int(int(payload[0:4], base=16) / 100)
                 self.capacity = int(int(payload[4:8], base=16) / 100)
                 self.design_capacity = int(payload[8:12], base=16) / 100
                 self.total_charge_capacity = int(payload[12:20], base=16) / 1
@@ -250,6 +262,126 @@ class KS48100(Battery):
             logger.error("get_cap_params response error!")
 
         return result
+
+    def _parse_realtime_payload(self, payload):
+        """Parse the variable-length DATAI payload returned by Service 0x42."""
+        pos = 0
+
+        def take(chars, field_name):
+            nonlocal pos
+            if pos + chars > len(payload):
+                raise ValueError("response too short while reading {}: need {} chars at offset {}, payload has {}".format(field_name, chars, pos, len(payload)))
+            value = payload[pos : pos + chars]
+            pos += chars
+            return value
+
+        def read_u8(field_name):
+            return int(take(2, field_name), base=16)
+
+        def read_u16(field_name):
+            return int(take(4, field_name), base=16)
+
+        def read_i16(field_name):
+            return unpack(">h", bytes.fromhex(take(4, field_name)))[0]
+
+        # DATAFLAG
+        read_u8("dataflag")
+
+        self.soc = read_u16("soc") / 100
+        self.voltage = read_u16("pack_voltage") / 100
+
+        realtime_cell_count = read_u8("cell_count")
+        if realtime_cell_count <= 0 or realtime_cell_count > 32:
+            raise ValueError("invalid cell count {}".format(realtime_cell_count))
+
+        # get_cells_params() normally initializes cell_count and self.cells before
+        # Service 0x42 is read. Do not resize an already published cell array at
+        # runtime, since D-Bus cell paths are created from that initial array.
+        if self.cell_count is None:
+            self.cell_count = realtime_cell_count
+
+        if realtime_cell_count != self.cell_count:
+            raise ValueError("Service 42 cell count ({}) differs from configured cell count ({})".format(realtime_cell_count, self.cell_count))
+
+        if len(self.cells) == 0:
+            for _ in range(self.cell_count):
+                self.cells.append(Cell(False))
+        elif len(self.cells) != self.cell_count:
+            raise ValueError("cell array length ({}) differs from configured cell count ({})".format(len(self.cells), self.cell_count))
+
+        for i in range(realtime_cell_count):
+            self.cells[i].voltage = read_u16("cell_voltage_{}".format(i + 1)) / 1000
+
+        temperature_ambient = read_i16("ambient_temperature") / 10
+        temperature_pack = read_i16("pack_temperature") / 10
+        temperature_mos = read_i16("mos_temperature") / 10
+        self.to_temperature(0, temperature_mos)
+
+        temperature_count = read_u8("temperature_count")
+        if temperature_count > 32:
+            raise ValueError("invalid temperature sensor count {}".format(temperature_count))
+
+        for i in range(temperature_count):
+            temperature = read_i16("temperature_{}".format(i + 1)) / 10
+            # Battery exposes four generic battery temperature slots. Consume any
+            # additional sensors to keep the payload aligned, but publish only 1..4.
+            if i < 4:
+                self.to_temperature(i + 1, temperature)
+
+        self.current = read_i16("pack_current") / 100
+
+        # Consume fields which are not currently exposed by Battery so subsequent
+        # fields stay aligned.
+        pack_internal_resistance = read_u16("pack_internal_resistance") / 10
+
+        # The manufacturer's Service 42 parser treats SOH as an unscaled u16.
+        self.soh = read_u16("soh")
+
+        user_custom = read_u8("user_custom")
+        self.capacity = read_u16("full_capacity") / 100
+        self.capacity_remain = read_u16("remaining_capacity") / 100
+        self.history.charge_cycles = read_u16("charge_cycles")
+
+        voltagestatus = read_u16("voltage_status")
+        currentstatus = read_u16("current_status")
+        temperaturestatus = read_u16("temperature_status")
+        warningstatus = read_u16("warning_status")
+        fetstatus = read_u16("fet_status")
+
+        # Per-cell LOW status masks. They are not exposed individually by the
+        # framework, but precede the balance masks in the manufacturer parser.
+        read_u16("cell_overvoltage_protection_low")
+        read_u16("cell_undervoltage_protection_low")
+        read_u16("cell_overvoltage_alarm_low")
+        read_u16("cell_undervoltage_alarm_low")
+
+        # Balance LOW = cells 1..16, Balance HIGH = cells 17..32.
+        # The vendor implementation enumerates bits LSB-first, i.e. bit 0 = cell 1.
+        balance_low = read_u16("cell_balance_low")
+        balance_high = read_u16("cell_balance_high")
+        balance_mask = balance_low | (balance_high << 16)
+
+        # Service 0x42 reports short balancing pulses. Assert balancing immediately,
+        # but keep the global and per-cell states active until the raw bit has
+        # remained clear continuously for BALANCE_OFF_DELAY_SECONDS.
+        self._update_balancing_status(balance_mask)
+        self._log_balance_status(balance_mask)
+
+        logger.debug(
+            "KS48100 realtime: cells={}, temp_sensors={}, ambient={}C, pack={}C, "
+            "MOS={}C, internal_resistance={}, user_custom={}, balance=0x{:08X}".format(
+                self.cell_count,
+                temperature_count,
+                temperature_ambient,
+                temperature_pack,
+                temperature_mos,
+                pack_internal_resistance,
+                user_custom,
+                balance_mask,
+            )
+        )
+
+        return voltagestatus, currentstatus, temperaturestatus, warningstatus, fetstatus
 
     def get_realtime_data(self, ser):
         """
@@ -273,29 +405,8 @@ class KS48100(Battery):
 
         if response:
             payload = response[13 : len(response) - 5]
-            if len(payload) >= 152:
-                self.soc = int(payload[2:6], base=16) / 100
-                self.soh = int(payload[114:118], base=16) / 1
-                self.voltage = int(payload[6:10], base=16) / 100
-                self.current = unpack(">h", bytes.fromhex(payload[106:110]))[0] / 100
-                temperature_mos = unpack(">h", bytes.fromhex(payload[84:88]))[0] / 10
-                self.to_temperature(0, temperature_mos)
-                temperature_1 = unpack(">h", bytes.fromhex(payload[90:94]))[0] / 10
-                self.to_temperature(1, temperature_1)
-                temperature_2 = unpack(">h", bytes.fromhex(payload[94:98]))[0] / 10
-                self.to_temperature(2, temperature_2)
-                temperature_3 = unpack(">h", bytes.fromhex(payload[98:102]))[0] / 10
-                self.to_temperature(3, temperature_3)
-                temperature_4 = unpack(">h", bytes.fromhex(payload[102:106]))[0] / 10
-                self.to_temperature(4, temperature_4)
-                self.capacity = int(payload[120:124], base=16) / 100
-                self.capacity_remaining = int(payload[124:128], base=16) / 100
-                self.history.charge_cycles = int(payload[128:132], base=16)
-                voltagestatus = int(payload[132:136], base=16)
-                currentstatus = int(payload[136:140], base=16)
-                temperaturestatus = int(payload[140:144], base=16)
-                warningstatus = int(payload[144:148], base=16)
-                fetstatus = int(payload[148:152], base=16)
+            try:
+                voltagestatus, currentstatus, temperaturestatus, warningstatus, fetstatus = self._parse_realtime_payload(payload)
 
                 # check bit 2 for TOT_OVV_PROT and bit 0 for cell_OVV_PROT
                 if voltagestatus & (1 << 2) or voltagestatus & (1 << 0):
@@ -361,11 +472,10 @@ class KS48100(Battery):
                 else:
                     self.protection.cell_imbalance = 0
 
-                # if something else is in warning, report internal failure. warningstatus
-                # contains all sorts of internal components, such as CHG_FET, NTC_fail,
-                # cell_fail, chg_mos_fail, disch_mos_fail, etc.
-                # Ignore V_DIF_alarm and low_BAT_alarm flags, since we're allready checking for those.
-                if (warningstatus & 0b01111110) > 0:
+                # warningstatus contains component failure flags in bits 1..6 and
+                # 9..15. Exclude bit 7 (low battery) and bit 8 (MOS high-temp
+                # protection), which have dedicated meanings.
+                if warningstatus & 0xFE7E:
                     self.protection.internal_failure = 2
                 else:
                     self.protection.internal_failure = 0
@@ -433,17 +543,137 @@ class KS48100(Battery):
                     self.discharge_fet = False
                     self.max_battery_discharge_current = 0
 
-                for i in range(1, 17):
-                    cell_voltage = int(payload[(i - 1) * 4 + 12 : i * 4 + 12], base=16) / 1000
-                    self.cells[i - 1].voltage = cell_voltage
-
                 result = True
-            else:
-                logger.error("get_realtime_data response length error!")
+
+            except (ValueError, TypeError) as e:
+                logger.error("get_realtime_data response parsing error: {}".format(e))
+                logger.debug("get_realtime_data payload: {}".format(payload))
         else:
             logger.error("get_realtime_data response error!")
 
         return result
+
+    def _update_balancing_status(self, balance_mask):
+        """
+        Debounce the OFF state of the pulsed Service 0x42 balancing bits.
+
+        A reported active bit is applied immediately. Once the raw bit clears, the
+        corresponding cell and aggregate balance states remain active until the bit
+        has stayed clear continuously for BALANCE_OFF_DELAY_SECONDS.
+        """
+        now = monotonic()
+
+        for i in range(self.cell_count):
+            raw_active = bool(balance_mask & (1 << i))
+
+            if raw_active:
+                self.cells[i].balance = True
+                self._cell_balance_off_since.pop(i, None)
+            elif self.cells[i].balance:
+                off_since = self._cell_balance_off_since.get(i)
+                if off_since is None:
+                    self._cell_balance_off_since[i] = now
+                elif now - off_since >= self.BALANCE_OFF_DELAY_SECONDS:
+                    self.cells[i].balance = False
+                    self._cell_balance_off_since.pop(i, None)
+            else:
+                self._cell_balance_off_since.pop(i, None)
+
+        if balance_mask != 0:
+            self.balance_fet = True
+            self._balance_fet_off_since = None
+        elif self.balance_fet:
+            if self._balance_fet_off_since is None:
+                self._balance_fet_off_since = now
+            elif now - self._balance_fet_off_since >= self.BALANCE_OFF_DELAY_SECONDS:
+                self.balance_fet = False
+                self._balance_fet_off_since = None
+        else:
+            if self.balance_fet is None:
+                self.balance_fet = False
+            self._balance_fet_off_since = None
+
+    def _log_balance_status(self, balance_mask=None):
+        """Debug-log balancing state on first observation and whenever mode or mask changes."""
+        if balance_mask is not None:
+            self._last_balance_mask = balance_mask
+
+        if self._last_balance_mask is None:
+            return
+
+        status = (self.balanced_mode, self._last_balance_mask)
+        if status == self._last_balance_status:
+            return
+
+        active_cells = [str(i + 1) for i in range(self.cell_count) if self._last_balance_mask & (1 << i)]
+        active_cells_text = ",".join(active_cells) if active_cells else "none"
+        mode_text = str(self.balanced_mode) if self.balanced_mode is not None else "unknown"
+
+        logger.debug(
+            "BALANCE STATUS: mode={} | mask=0x{:08X} | active cells: {}".format(
+                mode_text,
+                self._last_balance_mask,
+                active_cells_text,
+            )
+        )
+        self._last_balance_status = status
+
+    def get_balance_params(self, ser):
+        """
+        Read balancing configuration once at startup using Service 0x80.
+
+        The manufacturer parser stores these four values as 16-bit fields:
+        balance high temperature, balance low temperature (signed),
+        balance starting voltage and balance starting voltage difference.
+        """
+        req = self.create_command_get_balance_params()
+
+        ser.flushOutput()
+        ser.flushInput()
+        ser.write(req.encode())
+        capture_raw_data(ser.port, "tx", req)
+        logger.debug("get_balance_params request sent: {}".format(req))
+
+        # Service 0x80 returns a comparatively long response. At 9600 baud it needs
+        # roughly half a second on the wire, so leave some margin before reading.
+        sleep(0.8)
+
+        response = self.read_response(ser)
+
+        if not response:
+            logger.warning("get_balance_params response error; Service 0x80 may not be supported")
+            return False
+
+        payload = response[13 : len(response) - 5]
+
+        # In the manufacturer Service 0x80 parser these are fields 99..102
+        # (zero-based indices 98..101), each encoded as two bytes / four hex chars.
+        if len(payload) < 408:
+            logger.warning("get_balance_params response too short: {} chars, expected at least 408".format(len(payload)))
+            logger.debug("get_balance_params payload: {}".format(payload))
+            return False
+
+        try:
+            balance_high_temp = int(payload[392:396], base=16)
+            balance_low_temp = unpack(">h", bytes.fromhex(payload[396:400]))[0]
+            balance_start_voltage_raw = int(payload[400:404], base=16)
+            balance_start_diff_raw = int(payload[404:408], base=16)
+        except (ValueError, TypeError) as e:
+            logger.warning("get_balance_params response parsing error: {}".format(e))
+            logger.debug("get_balance_params payload: {}".format(payload))
+            return False
+
+        # Voltage values are reported by these BMS in mV; temperature values are °C.
+        logger.info(
+            "> BALANCE PARAMS: High temp: {} C | Low temp: {} C | "
+            "Start voltage: {:.3f} V | Start difference: {} mV".format(
+                balance_high_temp,
+                balance_low_temp,
+                balance_start_voltage_raw / 1000,
+                balance_start_diff_raw,
+            )
+        )
+        return True
 
     def get_manufacturer_info(self, ser):
         """
@@ -527,13 +757,18 @@ class KS48100(Battery):
                 CHG_C_limit = int(int(payload[34:38], base=16) / 100)
                 # design_capacity_none = int(payload[38:42], base=16) / 100
                 # historical_data_storage_interval = int(payload[42:46], base=16)
-                # balanced_mode = int(payload[46:50], base=16)
+                balanced_mode = int(payload[46:50], base=16)
                 # product_barcode_byte_array = bytearray.fromhex(payload[50:90])
                 # product_barcode = product_barcode_byte_array.decode()
                 # BMS_barcode_byte_array = bytearray.fromhex(payload[90:130])
                 # BMS_barcode = BMS_barcode_byte_array.decode()
 
                 self.cell_count = num_of_cells
+                # Service 0x47 balanced_mode is retained as a raw/configuration mode.
+                # Hardware testing proved that value 0 does not mean balancing disabled:
+                # Service 0x42 can report active cell balancing while balanced_mode is 0.
+                self.balanced_mode = balanced_mode
+                self._log_balance_status()
                 if self.charge_fet is True:
                     self.max_battery_charge_current = CHG_C_limit
                 else:
@@ -612,6 +847,12 @@ class KS48100(Battery):
 
         logger.debug("read_response Data valid!")
         return buff
+
+    def create_command_get_balance_params(self):
+        """
+        Generates the read-only Service 0x80 request used by the manufacturer application.
+        """
+        return self.create_command(self.address, b"\x42", b"\x80", self.address.hex().upper())
 
     def create_command_get_cells_params(self):
         """
