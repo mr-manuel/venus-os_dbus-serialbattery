@@ -54,6 +54,7 @@
 * Changed: Daren 485 BMS - Fixed charge/discharge calculation with https://github.com/mr-manuel/venus-os_dbus-serialbattery/pull/343 by @kopierschnitte
 * Changed: dbushelper.py - Ensure loading of newest battery data if more than one duplicate exists by @lex2k0
 * Changed: dbushelper.py - Postpone the telemetry upload until the battery reports a plausible cell count, preventing garbage cell counts from being uploaded by @mr-manuel
+* Changed: dbushelper.py - Publish `/History/TimeSinceLastFullCharge` at most once a minute, and at once when the time of the last full charge changes. Its value grows every second, so the D-Bus write cache never skipped it and it sent a change signal on every poll for every battery by @TechBlueprints
 * Changed: dbushelper.py - Refresh the `LastSeen` setting daily while the driver is running. Previously it was written only at startup, so after more than 30 days of continuous uptime a restart deleted the settings (device instance, custom name, history) of all other batteries sharing the port by @dmitrych5
 * Changed: dbushelper.py - Reworked save settings methods by @lex2k0
 * Changed: Decoupled SOC Reset after x days from the need that the battery has to switch to bulk charge, thus after every x days are passed by there will be a bulk charge / top balancing by @lex2k0
