@@ -162,6 +162,14 @@ class DbusHelper:
         """
         Last time the LastSeen dbus setting was refreshed.
         """
+        self.time_since_last_full_charge_published_last_time: int = 0
+        """
+        Last time /History/TimeSinceLastFullCharge was published.
+        """
+        self.time_since_last_full_charge_published_timestamp = _SENTINEL
+        """
+        history.timestamp_last_full_charge at the last publish of /History/TimeSinceLastFullCharge.
+        """
         self.telemetry_upload_error_count: int = 0
         self.telemetry_upload_interval: int = 60 * 60 * 3  # 3 hours
         self.telemetry_upload_last: int = 0
@@ -1199,9 +1207,17 @@ class DbusHelper:
         self._dbusservice["/History/MaximumVoltage"] = self.battery.history.maximum_voltage
         self._dbusservice["/History/MinimumCellVoltage"] = self.battery.history.minimum_cell_voltage
         self._dbusservice["/History/MaximumCellVoltage"] = self.battery.history.maximum_cell_voltage
-        self._dbusservice["/History/TimeSinceLastFullCharge"] = (
-            int(time()) - self.battery.history.timestamp_last_full_charge if self.battery.history.timestamp_last_full_charge is not None else None
-        )
+        # This value grows every second, so publishing it on every poll would send a D-Bus
+        # change signal on every poll. Publish it at most every 60 seconds, and at once when
+        # the timestamp of the last full charge changes
+        timestamp_last_full_charge = self.battery.history.timestamp_last_full_charge
+        if (
+            timestamp_last_full_charge != self.time_since_last_full_charge_published_timestamp
+            or int(time()) - self.time_since_last_full_charge_published_last_time >= 60
+        ):
+            self._dbusservice["/History/TimeSinceLastFullCharge"] = int(time()) - timestamp_last_full_charge if timestamp_last_full_charge is not None else None
+            self.time_since_last_full_charge_published_last_time = int(time())
+            self.time_since_last_full_charge_published_timestamp = timestamp_last_full_charge
         self._dbusservice["/History/AutomaticSyncs"] = self.battery.history.automatic_syncs
         self._dbusservice["/History/LowVoltageAlarms"] = self.battery.history.low_voltage_alarms
         self._dbusservice["/History/HighVoltageAlarms"] = self.battery.history.high_voltage_alarms
